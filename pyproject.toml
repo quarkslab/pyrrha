@@ -1,0 +1,26 @@
+[build-system]
+requires = [
+  'setuptools'
+]
+build-backend = 'setuptools.build_meta'
+
+[project]
+name = 'pyrrha'
+authors = [
+    {name = 'Eloïse Brocas', email = 'ebrocas@quarkslab.com'},
+]
+classifiers = [
+    'Development Status :: 3 - Alpha',
+    'Programming Language :: Python :: 3',
+    'Operating System :: POSIX :: Linux',
+    'Topic :: Security',
+    'Environment :: Console',
+]
+dependencies = [
+    'click',
+    'lief',
+]
+version='0.0.1'
+
+[project.scripts]
+pyrrha = 'pyrrha:pyrrha'
