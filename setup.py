@@ -28,14 +28,18 @@ class CMakeBuild(build_ext):
         if not self.build_temp.exists():
             self.build_temp.mkdir(parents=True)
 
-        subprocess.check_call(['cmake', f'{ext.sourcedir}'] + cmake_args, cwd=self.build_temp)
-        subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp)
+        try:
+            subprocess.check_call(['cmake', f'{ext.sourcedir}'] + cmake_args, cwd=self.build_temp)
+            subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp)
 
-        shutil.copy2(self.build_temp / 'bindings_python' / 'sourcetraildb.py', self.build_lib)
-        shutil.copy2(self.build_temp / 'bindings_python' / '_sourcetraildb.so', self.build_lib)
+            shutil.copy2(self.build_temp / 'bindings_python' / 'sourcetraildb.py', self.build_lib)
+            shutil.copy2(self.build_temp / 'bindings_python' / '_sourcetraildb.so', self.build_lib)
+        except Exception as e:
+            raise e
+        finally:
+            shutil.rmtree(EXTRACTION_DIR)
+            shutil.rmtree(self.build_temp)
 
-        shutil.rmtree(EXTRACTION_DIR)
-        shutil.rmtree(self.build_temp)
 
 setup(
     ext_modules=[
