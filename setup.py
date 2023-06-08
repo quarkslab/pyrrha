@@ -1,3 +1,4 @@
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -28,8 +29,10 @@ class CMakeBuild(build_ext):
         if not self.build_temp.exists():
             self.build_temp.mkdir(parents=True)
 
+        env = os.environ.copy()
+
         try:
-            subprocess.check_call(['cmake', f'{ext.sourcedir}'] + cmake_args, cwd=self.build_temp)
+            subprocess.check_call(['cmake', f'{ext.sourcedir}'] + cmake_args, cwd=self.build_temp, env=env)
             subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp)
 
             shutil.copy2(self.build_temp / 'bindings_python' / 'sourcetraildb.py', self.build_lib)
