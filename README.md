@@ -9,13 +9,12 @@ The installation is done in two parts:
 - installing `Sourcetrail` to be able to visualize Pyrra results.
 
 ### Sourcetrail installation
-SOurcetrail can be installed using [its last realease](https://github.com/CoatiSoftware/Sourcetrail/releases/tag/2021.4.19) and its [documentation](https://github.com/CoatiSoftware/Sourcetrail/releases/tag/2021.4.19).
+Sourcetrail can be installed using [its last realease](https://github.com/CoatiSoftware/Sourcetrail/releases/tag/2021.4.19) and its [documentation](https://github.com/CoatiSoftware/Sourcetrail/releases/tag/2021.4.19).
 
 ### Pyrrha installation
 Pyrrha's installation compiles [SourcetrailDB](https://github.com/CoatiSoftware/SourcetrailDB) (Sourcetrail SDK) which require to have:
 - `Cmake` >= 2.6;
-- C++-Compiler with C++11 support;
-- SWIG.
+- C++-Compiler with C++11 support.
 
 #### Linux
 It is recommended to install the Python package inside a virtualenv.
@@ -29,6 +28,18 @@ Not tested.
 #### macOS
 Not tested.
 
+## Docker
+`pyrrha` can be used with a docker.
+
+### Build
+```commandline
+docker build -t pyrrha .
+```
+
+### Usage
+```commandline
+docker run -v $PWD:/tmp/pyrrha pyrrha ROOT_DIRECTORY
+```
 ## Usage
 First, create your db with `pyrrha`.
 
