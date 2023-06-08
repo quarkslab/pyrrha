@@ -1,13 +1,14 @@
 [build-system]
 requires = [
-  'setuptools'
+    'setuptools',
+    'swig'
 ]
 build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'pyrrha'
 authors = [
-    {name = 'Eloïse Brocas', email = 'ebrocas@quarkslab.com'},
+    { name = 'Eloïse Brocas', email = 'ebrocas@quarkslab.com' },
 ]
 classifiers = [
     'Development Status :: 3 - Alpha',
@@ -20,7 +21,7 @@ dependencies = [
     'click',
     'lief',
 ]
-version='0.0.1'
+version = '0.0.1'
 
 [project.scripts]
 pyrrha = 'pyrrha:pyrrha'
