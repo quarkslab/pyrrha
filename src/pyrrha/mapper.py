@@ -10,7 +10,8 @@ from .db import DBInterface
 
 @dataclass
 class ELFBinary:
-    path: Path
+    file_path: Path
+    fw_path: Path
     id: int = None
     imported_lib_names: list[str] = field(default_factory=list)
     imported_libs: list['ELFBinary'] = field(default_factory=list)
@@ -25,9 +26,9 @@ class ELFBinary:
         at the exception done of the ids (the object should be put on a DB)
         """
         if self.name == 'libcrypto.so.1.1':
-            lief_obj = lief.ELF.parse(str(self.path), lief.ELF.DYNSYM_COUNT_METHODS.HASH)
+            lief_obj = lief.ELF.parse(str(self.file_path), lief.ELF.DYNSYM_COUNT_METHODS.HASH)
         else:
-            lief_obj = lief.ELF.parse(str(self.path))
+            lief_obj = lief.ELF.parse(str(self.file_path))
 
         # parse imported libs/symbols
         self.imported_lib_names = lief_obj.libraries
@@ -50,7 +51,7 @@ class ELFBinary:
 
     @property
     def name(self):
-        return self.path.name
+        return self.file_path.name
 
     def record_in_db(self, db: DBInterface) -> None:
         """
@@ -60,11 +61,11 @@ class ELFBinary:
         'self.exported_symbol/function_ids' dictionaries.
         :param db: DB interface
         """
-        self.id = db.record_binary_file(self.path)
+        self.id = db.record_binary_file(self.fw_path)
         for name in self.exported_symbol_ids.keys():
-            self.exported_symbol_ids[name] = db.record_exported_symbol(self.path, name, is_function=False)
+            self.exported_symbol_ids[name] = db.record_exported_symbol(self.fw_path, name, is_function=False)
         for name in self.exported_function_ids.keys():
-            self.exported_function_ids[name] = db.record_exported_symbol(self.path, name, is_function=True)
+            self.exported_function_ids[name] = db.record_exported_symbol(self.fw_path, name, is_function=True)
 
 
 @dataclass
@@ -101,6 +102,14 @@ class Mapper:
         self.symlink_names: dict[str, list[Symlink]] = dict()
         self.symlink_paths: dict[Path, Symlink] = dict()
 
+    def gen_fw_path(self, path: Path) -> Path:
+        """
+        Generate the path of a given file inside a firmware
+        :param path: path of the file inside the local system
+        :return: path of the file inside the firmware
+        """
+        return Path(self.root_directory.anchor).joinpath(path.relative_to(self.root_directory))
+
     def _map_binaries(self) -> None:
         """
         Iterate all the subdirectories of 'self.root_dir' to find all the binaries.
@@ -110,11 +119,11 @@ class Mapper:
         the created ELFBinary objects.
         It adds the binaries into the DB.
         """
-        for path in filter(lambda p: p.is_file() and lief.is_elf(str(p)),
+        for path in filter(lambda p: p.is_file() and not p.is_symlink() and lief.is_elf(str(p)),
                            self.root_directory.rglob('*')):
-            elf_object = ELFBinary(path)
+            elf_object = ELFBinary(path, self.gen_fw_path(path))
             elf_object.record_in_db(self.db_interface)
-            self.binary_paths[elf_object.path] = elf_object
+            self.binary_paths[elf_object.fw_path] = elf_object
             if elf_object.name in self.binary_names:
                 self.binary_names[elf_object.name].append(elf_object)
             else:
@@ -133,15 +142,21 @@ class Mapper:
         """
         for path in filter(lambda p: p.is_symlink(), self.root_directory.rglob('*')):
             target = path.readlink()
-            if target.is_absolute():
-                target = self.root_directory.joinpath(target.relative_to('/'))
-            else:
+            if not target.is_absolute():
                 target = path.resolve()
-            if not target.exists() or target == Path('/dev/null') or not lief.is_elf(str(target)):
-                pass
-            elif target.is_relative_to(self.root_directory) and target in self.binary_paths:
+                if not target.is_file() or not lief.is_elf(str(target)):
+                    continue
+                elif not target.is_relative_to(self.root_directory):
+                    print(f"cannot resolve '{path.name}': path '{target} does not exist in {self.root_directory}'")
+                    continue
+                target = self.gen_fw_path(target)
+            elif target == Path('/dev/null'):
+               # print(f"'{path.name}': path '{path}' points on '/dev/null'")
+                continue
+            if target in self.binary_paths:
                 target_obj = self.binary_paths[target]
-                symlink_obj = Symlink(path, target_obj.path, target_obj.id)
+                path = self.gen_fw_path(path)
+                symlink_obj = Symlink(path, target_obj.fw_path, target_obj.id)
                 symlink_obj.record_in_db(self.db_interface)
                 self.symlink_paths[path] = symlink_obj
                 if symlink_obj.name in self.symlink_names:
@@ -149,7 +164,7 @@ class Mapper:
                 else:
                     self.symlink_names[symlink_obj.name] = [symlink_obj]
             else:
-                print(f"cannot resolve '{path.name}': path '{target} does not exist'")
+                print(f"cannot resolve '{path.name}': path '{target} does not correspond to a recorded binaries'")
 
     def _map_lib_imports(self) -> None:
         """
