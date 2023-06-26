@@ -42,7 +42,7 @@ class ZipCMakeExtension(Extension):
 class CMakeBuild(build_ext):
     def build_extension(self, ext):
         cmake_args = ['-DBUILD_BINDINGS_PYTHON=ON']
-        build_args = ['--target', '_bindings_python']
+        build_args = ['--target', '_bindings_python', '--config', 'Release']
 
         self.build_temp = Path(self.build_temp)
         if not self.build_temp.exists():
@@ -55,7 +55,10 @@ class CMakeBuild(build_ext):
             subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp)
 
             shutil.copy2(self.build_temp / 'bindings_python' / 'sourcetraildb.py', self.build_lib)
-            shutil.copy2(self.build_temp / 'bindings_python' / '_sourcetraildb.so', self.build_lib)
+            if os.name=="nt":
+              shutil.copy2(self.build_temp / 'bindings_python' / 'Release' / '_sourcetraildb.pyd', self.build_lib)
+            else:
+              shutil.copy2(self.build_temp / 'bindings_python' / '_sourcetraildb.so', self.build_lib)
         except Exception as e:
             raise e
         finally:
