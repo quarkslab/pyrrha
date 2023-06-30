@@ -23,13 +23,19 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'pyrrha'
+version = '0.1.0'
 authors = [
     { name = 'Eloïse Brocas', email = 'ebrocas@quarkslab.com' },
 ]
+readme = "README.md"
+description = "Filsesystem binaries mapper tool"
+requires-python = ">=3.10"
+license = {text = "Apache License 2.0"}
 classifiers = [
-    'Development Status :: 3 - Alpha',
+    'Development Status :: 4 - Beta',
     'Programming Language :: Python :: 3',
     'Operating System :: POSIX :: Linux',
+    'Operating System :: Microsoft :: Windows',
     'Topic :: Security',
     'Environment :: Console',
 ]
@@ -37,7 +43,11 @@ dependencies = [
     'click',
     'lief',
 ]
-version = '0.0.1'
+
+[project.urls]
+Homepage = "https://github.com/quarkslab/pyrrha"
+Source = "https://github.com/quarkslab/pyrrha"
+Tracker = "https://github.com/quarkslab/pyrrha/issues"
 
 [project.scripts]
 pyrrha = 'pyrrha:pyrrha'
