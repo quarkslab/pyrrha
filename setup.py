@@ -15,6 +15,7 @@
 #  limitations under the License.
 
 import os
+import urllib.request
 import shutil
 import subprocess
 from pathlib import Path
@@ -24,16 +25,18 @@ from tempfile import mkdtemp
 from zipfile import ZipFile
 
 CURRENT_DIR = Path(__file__).parent
-ZIP_PATH = CURRENT_DIR / 'dependencies' / 'SourcetrailDB-4.db25.p1.zip'
+ZIP_URL = 'https://github.com/CoatiSoftware/SourcetrailDB/archive/refs/tags/v4.db25.p1.zip'
 EXTRACTION_DIR = Path(mkdtemp())
 
 
 class ZipCMakeExtension(Extension):
     def __init__(self, name: str) -> None:
         super().__init__(name, sources=[])
-        zip_file = ZipFile(ZIP_PATH)
+        zip_path, header = urllib.request.urlretrieve(ZIP_URL)
+        zip_file = ZipFile(zip_path)
         zip_file.extractall(path=EXTRACTION_DIR)
         self.sourcedir = EXTRACTION_DIR.resolve().absolute().joinpath('SourcetrailDB-4.db25.p1')
+        urllib.request.urlcleanup()
 
 
 class CMakeBuild(build_ext):
