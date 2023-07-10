@@ -55,39 +55,43 @@ class DBInterface:
         return f'{{ "prefix": "", "name": "{symbol_name}", "postfix": "" }} '
 
     @staticmethod
-    def __record_class(name_element: str) -> int:
+    def __record_class(name_element: str, is_indexed: bool = True) -> int:
         """
         Record a class symbol inside the current open DB.
         This DB should be already open.
         :param name_element: name element of the class as a JSON str of the form
             f'{ "prefix": "class", "name": "MY NAME", "postfix": "()" }'
             (prefix and postfixs are not mandatory)
+        :param is_indexed: if the element is explicit or non-indexed
         :return: unique identifier of the created object inside the DB
         """
         cls_id = sourcetraildb.recordSymbol(
             f'{{"name_delimiter": ":", "name_elements": [ {name_element}] }}')
         sourcetraildb.recordSymbolKind(cls_id, sourcetraildb.SYMBOL_CLASS)
-        sourcetraildb.recordSymbolDefinitionKind(cls_id, sourcetraildb.DEFINITION_EXPLICIT)
+        if is_indexed:
+            sourcetraildb.recordSymbolDefinitionKind(cls_id, sourcetraildb.DEFINITION_EXPLICIT)
         return cls_id
 
     @staticmethod
-    def __record_typedef(name_element: str) -> int:
+    def __record_typedef(name_element: str, is_indexed: bool = True) -> int:
         """
         Record a typedef symbol inside the current open DB.
         This DB should be already open.
         :param name_element: name element of the typedef as a JSON str of the form
             f'{ "prefix": "void", "name": "MY NAME", "postfix": "()" }'
             (prefix and postfixs are not mandatory)
+        :param is_indexed: if the element is explicit or non-indexed
         :return: unique identifier of the created object inside the DB
         """
         cls_id = sourcetraildb.recordSymbol(
             f'{{"name_delimiter": ":", "name_elements": [ {name_element}] }}')
         sourcetraildb.recordSymbolKind(cls_id, sourcetraildb.SYMBOL_TYPEDEF)
-        sourcetraildb.recordSymbolDefinitionKind(cls_id, sourcetraildb.DEFINITION_EXPLICIT)
+        if is_indexed:
+            sourcetraildb.recordSymbolDefinitionKind(cls_id, sourcetraildb.DEFINITION_EXPLICIT)
         return cls_id
 
     @staticmethod
-    def __record_method(class_name_element: str, method_name_element: str) -> int:
+    def __record_method(class_name_element: str, method_name_element: str, is_indexed: bool = True) -> int:
         """
         Record a typedef symbol inside the current open DB.
         This DB should be already open.
@@ -95,16 +99,18 @@ class DBInterface:
             f'{ "prefix": "void", "name": "MY NAME", "postfix": "()" }'
             (prefix and postfixs are not mandatory)
         :param method_name_element: name element of the method
+        :param is_indexed: if the element is explicit or non-indexed
         :return: unique identifier of the created object inside the DB
         """
         meth_id = sourcetraildb.recordSymbol(
             f'{{"name_delimiter": ":", "name_elements": [ {class_name_element}, {method_name_element}] }}')
         sourcetraildb.recordSymbolKind(meth_id, sourcetraildb.SYMBOL_METHOD)
-        sourcetraildb.recordSymbolDefinitionKind(meth_id, sourcetraildb.DEFINITION_EXPLICIT)
+        if is_indexed:
+            sourcetraildb.recordSymbolDefinitionKind(meth_id, sourcetraildb.DEFINITION_EXPLICIT)
         return meth_id
 
     @staticmethod
-    def __record_field(class_name_element: str, field_name_element: str) -> int:
+    def __record_field(class_name_element: str, field_name_element: str, is_indexed: bool = True) -> int:
         """
         Record a field symbol inside the current open DB.
         This DB should be already open.
@@ -112,43 +118,63 @@ class DBInterface:
             f'{ "prefix": "void", "name": "MY NAME", "postfix": "()" }'
             (prefix and postfixs are not mandatory)
         :param field_name_element: name element of the field
+        :param is_indexed: if the element is explicit or non-indexed
         :return: unique identifier of the created object inside the DB
         """
         field_id = sourcetraildb.recordSymbol(
             f'{{"name_delimiter": ":", "name_elements": [ {class_name_element}, {field_name_element}] }}')
         sourcetraildb.recordSymbolKind(field_id, sourcetraildb.SYMBOL_METHOD)
-        sourcetraildb.recordSymbolDefinitionKind(field_id, sourcetraildb.DEFINITION_EXPLICIT)
+        if is_indexed:
+            sourcetraildb.recordSymbolDefinitionKind(field_id, sourcetraildb.DEFINITION_EXPLICIT)
         return field_id
 
-    def record_binary_file(self, file_path: Path) -> int:
+    def record_function(self, function_name: str, is_indexed: bool = True) -> int:
+        """
+        Record a function inside the current open DB.
+        This DB should be already open.
+        :param function_name: name of the function
+        :param is_indexed: if the element is explicit or non-indexed
+        :return: unique identifier of the created object inside the DB
+        """
+        cls_id = sourcetraildb.recordSymbol(
+            f'{{"name_delimiter": ":", "name_elements": [ {self.__create_name_element_from_name(function_name)}] }}')
+        sourcetraildb.recordSymbolKind(cls_id, sourcetraildb.SYMBOL_FUNCTION)
+        if is_indexed:
+            sourcetraildb.recordSymbolDefinitionKind(cls_id, sourcetraildb.DEFINITION_EXPLICIT)
+        return cls_id
+
+    def record_binary_file(self, file_path: Path, is_indexed: bool = True) -> int:
         """
         Add a representation of binary file into the DB
         :param file_path: path of the file (inside the firmware)
+        :param is_indexed: if the element exists (True) in the firmware or should theoretically exist
         :return: the uniq identifier of the file
         """
-        return self.__record_class(self.__create_name_element_from_path(file_path))
+        return self.__record_class(self.__create_name_element_from_path(file_path), is_indexed)
 
-    def record_exported_symbol(self, file_path: Path, name: str, is_function: bool) -> int:
+    def record_exported_symbol(self, file_path: Path, name: str, is_function: bool, is_indexed: bool = True) -> int:
         """
         Add a representation of an exported symbol into the DB
         :param file_path: path of the binary/library (inside the firmware)
         :param name: symbol name
         :param is_function: True if the symbol is a function, else False
+        :param is_indexed: if the element exists (True) in the firmware or should theoretically exist
         :return: the uniq identifier of the exported symbol
         """
         if is_function:
             return self.__record_method(self.__create_name_element_from_path(file_path),
-                                        self.__create_name_element_from_name(name))
+                                        self.__create_name_element_from_name(name), is_indexed)
         return self.__record_field(self.__create_name_element_from_path(file_path),
-                                   self.__create_name_element_from_name(name))
+                                   self.__create_name_element_from_name(name), is_indexed)
 
-    def record_symlink(self, symlink_path: Path) -> int:
+    def record_symlink(self, symlink_path: Path, is_indexed: bool = True) -> int:
         """
         Add a representation of a symlink into the DB
         :param symlink_path: path of the symlink to insert (inside the firmware)
+        :param is_indexed: if the element exists (True) in the firmware or should theoretically exist
         :return: the uniq identifier of the symlink
         """
-        return self.__record_typedef(self.__create_name_element_from_path(symlink_path))
+        return self.__record_typedef(self.__create_name_element_from_path(symlink_path), is_indexed)
 
     @staticmethod
     def record_symlink_target(symlink_id: int, target_id: int) -> None:
