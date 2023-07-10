@@ -1,1 +1,1 @@
-from .mapper import pyrrha
+from .__main__ import pyrrha

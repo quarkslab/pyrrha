@@ -17,7 +17,6 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import click
 import lief
 
 from .db import DBInterface
@@ -104,7 +103,7 @@ class Symlink:
         db.record_symlink_target(self.id, self.target_id)
 
 
-class Mapper:
+class FileSystemMapper:
     def __init__(self, root_directory: Path, db: DBInterface):
         """
         :param root_directory: directory containing the filesystem to map
@@ -266,27 +265,3 @@ class Mapper:
         self._map_lib_imports()
         print("[map] Binaries' lib imports mapping done.")
         self._map_symbol_imports()
-
-
-@click.command('pyrrha',
-               help='Map a filesystem into a sourcetrail compatible db.')
-@click.option('--db',
-              help='Sourcetrail DB file path (.srctrldb).',
-              type=click.Path(file_okay=True, dir_okay=True, path_type=Path),
-              default=Path() / 'pyrrha.srctrldb',
-              show_default=True)
-@click.argument('root_directory',
-                # help='Path of the directory containing the filesystem to map.',
-                type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
-def pyrrha(root_directory, db):
-    db_interface = DBInterface(db)
-    root_directory = root_directory.absolute()
-
-    mapper = Mapper(root_directory, db_interface)
-    mapper.map()
-
-    db_interface.close()
-
-
-if __name__ == '__main__':
-    pyrrha()
