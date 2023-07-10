@@ -51,7 +51,7 @@ $ pip install '.'
 First, create your db with `pyrrha`.
 
 ```commandline
-Usage: pyrrha [OPTIONS] ROOT_DIRECTORY
+Usage: pyrrha fs [OPTIONS] ROOT_DIRECTORY
 
   Map a filesystem into a sourcetrail compatible db.
 
@@ -97,7 +97,7 @@ $ cd .. && rm openwrt_rootfs.tar.gz
 Then we can run Pyrrha on it. It will produce some loges indicating which symlinks or imports cannot been solved directly by the tool. 
 *(Do not forget to activate your virtualenv if you have created one for Pyrrha installation.)*
 ```commandline
-$ pyrrha --db openwrt_db open_root_fs
+$ pyrrha fs --db openwrt_db open_root_fs
 $ ls 
 openwrt_root_fs openwrt_db.srctrldb  openwrt_db.srctrlprj
 ```
