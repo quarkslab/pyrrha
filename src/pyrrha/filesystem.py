@@ -14,6 +14,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -161,12 +162,11 @@ class FileSystemMapper:
                 if not target.is_file() or not lief.is_elf(str(target)):
                     continue
                 elif not target.is_relative_to(self.root_directory):
-                    print(f"cannot resolve '{path.name}': path '{target} does not exist in {self.root_directory}'")
+                    logging.warning(f"[symlinks] cannot resolve '{path.name}': path '{target} does not exist in {self.root_directory}'")
                     continue
                 target = self.gen_fw_path(target)
             elif target == Path('/dev/null'):
-               # print(f"'{path.name}': path '{path}' points on '/dev/null'")
-                continue
+                logging.debug(f"[symlinks] '{path.name}': path '{path}' points on '/dev/null'")
             if target in self.binary_paths:
                 target_obj = self.binary_paths[target]
                 path = self.gen_fw_path(path)
@@ -178,7 +178,7 @@ class FileSystemMapper:
                 else:
                     self.symlink_names[symlink_obj.name] = [symlink_obj]
             else:
-                print(f"cannot resolve '{path.name}': path '{target} does not correspond to a recorded binaries'")
+                logging.warning(f"[symlinks] cannot resolve '{path.name}': path '{target} does not correspond to a recorded binaries'")
 
     def _map_lib_imports(self) -> None:
         """
@@ -196,20 +196,20 @@ class FileSystemMapper:
             for lib_name in binary.imported_lib_names:
                 if lib_name in self.binary_names:
                     if len(self.binary_names[lib_name]) != 1:
-                        print(f"[lib imports] {path}: several matches for importing lib {lib_name}, not put into DB")
+                        logging.warning(f"[lib imports] {path}: several matches for importing lib {lib_name}, not put into DB")
                     else:
                         lib_obj = self.binary_names[lib_name][0]
                         self.db_interface.record_import(binary.id, lib_obj.id)
                         binary.imported_libs.append(lib_obj)
                 elif lib_name in self.symlink_names:
                     if len(self.symlink_names[lib_name]) != 1:
-                        print(f"[lib imports] {path}: several matches for importing lib {lib_name}, not put into DB")
+                        logging.warning(f"[lib imports] {path}: several matches for importing lib {lib_name}, not put into DB")
                     else:
                         sym_obj = self.symlink_names[lib_name][0]
                         self.db_interface.record_import(binary.id, sym_obj.id)
                         binary.imported_libs.append(self.binary_paths[sym_obj.target_path])
                 else:
-                    print(f"[lib imports] {path}: lib '{lib_name}' not found in DB")
+                    logging.warning(f"[lib imports] {path}: lib '{lib_name}' not found in DB")
 
     def _map_symbol_imports(self) -> None:
         """
@@ -224,9 +224,9 @@ class FileSystemMapper:
                     if symb_version in binary.version_requirement:
                         for lib_name in binary.version_requirement[symb_version]:
                             if lib_name not in self.binary_names:
-                                print(f"[symbol imports] {path}: lib '{lib_name}' not found in DB")
+                                logging.warning(f"[symbol imports] {path}: lib '{lib_name}' not found in DB")
                             elif len(self.binary_names[lib_name]) > 1:
-                                print(
+                                logging.warning(
                                     f"[symbol imports] {path}: several matches for importing lib {lib_name}, not put into DB")
                             else:
                                 lib = self.binary_names[lib_name][0]
@@ -247,7 +247,7 @@ class FileSystemMapper:
                             found = True
                             break
                 if found is False:
-                    print(f"[symbol imports] {binary.name}: cannot resolve {func_name}")
+                    logging.warning(f"[symbol imports] {binary.name}: cannot resolve {func_name}")
 
     def map(self) -> None:
         """
@@ -259,9 +259,9 @@ class FileSystemMapper:
         It updates the fields and the DB
         """
         self._map_binaries()
-        print('[map] Binaries mapping done.')
+        logging.info('[map] Binaries mapping done.')
         self._map_symlinks()
-        print('[map] Symlinks mapping done.')
+        logging.info('[map] Symlinks mapping done.')
         self._map_lib_imports()
-        print("[map] Binaries' lib imports mapping done.")
+        logging.info("[map] Binaries' lib imports mapping done.")
         self._map_symbol_imports()
