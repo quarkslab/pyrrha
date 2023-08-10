@@ -26,7 +26,6 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y python3-pip cmake
 RUN mkdir -p $PYRRHA_INSTALL_DIR
 
 WORKDIR ${PYRRHA_INSTALL_DIR}
-COPY dependencies dependencies/
 COPY src src/
 COPY setup.py ./
 COPY pyproject.toml ./
