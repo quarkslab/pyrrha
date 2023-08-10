@@ -80,7 +80,7 @@ $ docker build -t pyrrha .
 ### Usage
 ```commandline
 $ cd ROOT_DIRECTORY/..
-$ docker run -v $PWD:/tmp/pyrrha pyrrha ROOT_DIRECTORY
+$ docker run -vt $PWD:/tmp/pyrrha pyrrha fs ROOT_DIRECTORY
 ```
 
 ## Quick Start- - Usage Example
