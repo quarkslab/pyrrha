@@ -43,6 +43,7 @@ dependencies = [
     'click',
     'coloredlogs',
     'lief',
+    'rich',
 ]
 
 [project.urls]

@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import lief
+from rich.progress import Progress
 
 from .db import DBInterface
 
@@ -112,8 +113,11 @@ class FileSystemMapper:
         """
         self.root_directory = root_directory
         self.db_interface = db
+        self.binaries: list[Path] = list(filter(lambda p: p.is_file() and not p.is_symlink() and lief.is_elf(str(p)),
+                                                self.root_directory.rglob('*')))
         self.binary_names: dict[str, list[ELFBinary]] = dict()
         self.binary_paths: dict[Path, ELFBinary] = dict()
+        self.symlinks: list[Path] = list(filter(lambda p: p.is_symlink(), self.root_directory.rglob('*')))
         self.symlink_names: dict[str, list[Symlink]] = dict()
         self.symlink_paths: dict[Path, Symlink] = dict()
 
@@ -125,64 +129,63 @@ class FileSystemMapper:
         """
         return Path(self.root_directory.anchor).joinpath(path.relative_to(self.root_directory))
 
-    def _map_binaries(self) -> None:
+    def _map_binary(self, path: Path) -> None:
         """
-        Iterate all the subdirectories of 'self.root_dir' to find all the binaries.
-        Add them to the DB and create the associated ELFBinary objects.
+        Given a binary, add it to the DB and create the associated ELFBinary object.
         This function updates the fields 'self.binary_paths' and 'self.binary_names'
         which are respectively binary paths and names dictionaries pointing on
         the created ELFBinary objects.
-        It adds the binaries into the DB.
+        :param path: Binary path
         """
-        for path in filter(lambda p: p.is_file() and not p.is_symlink() and lief.is_elf(str(p)),
-                           self.root_directory.rglob('*')):
-            elf_object = ELFBinary(path, self.gen_fw_path(path))
-            elf_object.record_in_db(self.db_interface)
-            self.binary_paths[elf_object.fw_path] = elf_object
-            if elf_object.name in self.binary_names:
-                self.binary_names[elf_object.name].append(elf_object)
-            else:
-                self.binary_names[elf_object.name] = [elf_object]
+        elf_object = ELFBinary(path, self.gen_fw_path(path))
+        elf_object.record_in_db(self.db_interface)
+        self.binary_paths[elf_object.fw_path] = elf_object
+        if elf_object.name in self.binary_names:
+            self.binary_names[elf_object.name].append(elf_object)
+        else:
+            self.binary_names[elf_object.name] = [elf_object]
 
-    def _map_symlinks(self) -> None:
+    def _map_symlink(self, path) -> None:
         """
-        Iterate all the subdirectories of 'self.root_dir' to find all the symlinks.
-        Resolve them and if they point on an ELF file, add them to the DB and create
-        the associated Symlink objects. Also add in db a link between the Symlink object
+        Given a symlink, resolve it and if it points on an ELF file, add it to the DB and create
+        the associated Symlink object. Also add in db a link between the Symlink object
         and the ELFBinary object corresponding to its target.
         This function updates the fields 'self.symlink_paths' and 'self.symlink_names'
         which are respectively symlink paths and names dictionaries pointing on
         the created Symlink objects.
-        It adds the Symlinks into the DB.
+       :param path: Symlink path
         """
-        for path in filter(lambda p: p.is_symlink(), self.root_directory.rglob('*')):
-            target = path.readlink()
-            if not target.is_absolute():
-                target = path.resolve()
-                if not target.is_file() or not lief.is_elf(str(target)):
-                    continue
-                elif not target.is_relative_to(self.root_directory):
-                    logging.warning(f"[symlinks] cannot resolve '{path.name}': path '{target} does not exist in {self.root_directory}'")
-                    continue
-                target = self.gen_fw_path(target)
-            elif target == Path('/dev/null'):
-                logging.debug(f"[symlinks] '{path.name}': path '{path}' points on '/dev/null'")
-            if target in self.binary_paths:
-                target_obj = self.binary_paths[target]
-                path = self.gen_fw_path(path)
-                symlink_obj = Symlink(path, target_obj.fw_path, target_obj.id)
-                symlink_obj.record_in_db(self.db_interface)
-                self.symlink_paths[path] = symlink_obj
-                if symlink_obj.name in self.symlink_names:
-                    self.symlink_names[symlink_obj.name].append(symlink_obj)
-                else:
-                    self.symlink_names[symlink_obj.name] = [symlink_obj]
+        target = path.readlink()
+        if not target.is_absolute():
+            old_target = target
+            target = path.resolve()
+            if not target.is_file() or not lief.is_elf(str(target)):
+                return
+            elif not target.is_relative_to(self.root_directory):
+                logging.warning(
+                    f"[symlinks] cannot resolve '{path.name}': path '{target}' does not exist in {self.root_directory}")
+                return
+            target = self.gen_fw_path(target)
+        elif target == Path('/dev/null'):
+            logging.debug(f"[symlinks] '{path.name}': path '{path}' points on '/dev/null'")
+            return
+        if target in self.binary_paths:
+            target_obj = self.binary_paths[target]
+            path = self.gen_fw_path(path)
+            symlink_obj = Symlink(path, target_obj.fw_path, target_obj.id)
+            symlink_obj.record_in_db(self.db_interface)
+            self.symlink_paths[path] = symlink_obj
+            if symlink_obj.name in self.symlink_names:
+                self.symlink_names[symlink_obj.name].append(symlink_obj)
             else:
-                logging.warning(f"[symlinks] cannot resolve '{path.name}': path '{target} does not correspond to a recorded binaries'")
+                self.symlink_names[symlink_obj.name] = [symlink_obj]
+        else:
+            logging.warning(
+                f"[symlinks] cannot resolve '{path.name}': path '{target}' does not correspond to a recorded binary")
 
-    def _map_lib_imports(self) -> None:
+    def _map_lib_imports(self, binary) -> None:
         """
-        Iterate over all the binaries (already mapped) and resolve there library
+        Given an already mapped binary, resolve its library
         imports using the following heuristics:
          - look for a binary which have the looked name, if there is a match,
            it is considered as solved, if there is several matches, no mapping is
@@ -192,62 +195,62 @@ class FileSystemMapper:
         'imported libs' field with the corresponding ElfBinary objects (or the
         targeted ELFBinary object in the case of a Symlink)
         """
-        for path, binary in self.binary_paths.items():
-            for lib_name in binary.imported_lib_names:
-                if lib_name in self.binary_names:
-                    if len(self.binary_names[lib_name]) != 1:
-                        logging.warning(f"[lib imports] {path}: several matches for importing lib {lib_name}, not put into DB")
-                    else:
-                        lib_obj = self.binary_names[lib_name][0]
-                        self.db_interface.record_import(binary.id, lib_obj.id)
-                        binary.imported_libs.append(lib_obj)
-                elif lib_name in self.symlink_names:
-                    if len(self.symlink_names[lib_name]) != 1:
-                        logging.warning(f"[lib imports] {path}: several matches for importing lib {lib_name}, not put into DB")
-                    else:
-                        sym_obj = self.symlink_names[lib_name][0]
-                        self.db_interface.record_import(binary.id, sym_obj.id)
-                        binary.imported_libs.append(self.binary_paths[sym_obj.target_path])
+        for lib_name in binary.imported_lib_names:
+            if lib_name in self.binary_names:
+                if len(self.binary_names[lib_name]) != 1:
+                    logging.warning(
+                        f"[lib imports] {binary.fw_path}: several matches for importing lib {lib_name}, not put into DB")
                 else:
-                    logging.warning(f"[lib imports] {path}: lib '{lib_name}' not found in DB")
+                    lib_obj = self.binary_names[lib_name][0]
+                    self.db_interface.record_import(binary.id, lib_obj.id)
+                    binary.imported_libs.append(lib_obj)
+            elif lib_name in self.symlink_names:
+                if len(self.symlink_names[lib_name]) != 1:
+                    logging.warning(
+                        f"[lib imports] {binary.fw_path}: several matches for importing lib {lib_name}, not put into DB")
+                else:
+                    sym_obj = self.symlink_names[lib_name][0]
+                    self.db_interface.record_import(binary.id, sym_obj.id)
+                    binary.imported_libs.append(self.binary_paths[sym_obj.target_path])
+            else:
+                logging.warning(f"[lib imports] {binary.fw_path}: lib '{lib_name}' not found in DB")
 
-    def _map_symbol_imports(self) -> None:
+    def _map_symbol_imports(self, binary: ELFBinary) -> None:
         """
-        Iterate over all the binaries (already mapped) and resolve their symbols.
+        Given an already mapped binary, resolve its symbols.
         This function update the DB with the import links found.
         """
-        for path, binary in self.binary_paths.items():
-            for func_name in binary.imported_symbols:
-                found = False
-                if len(func_name.split('@@')) == 2:  # symbols with a specific version
-                    symb_name, symb_version = func_name.split('@@')
-                    if symb_version in binary.version_requirement:
-                        for lib_name in binary.version_requirement[symb_version]:
-                            if lib_name not in self.binary_names:
-                                logging.warning(f"[symbol imports] {path}: lib '{lib_name}' not found in DB")
-                            elif len(self.binary_names[lib_name]) > 1:
-                                logging.warning(
-                                    f"[symbol imports] {path}: several matches for importing lib {lib_name}, not put into DB")
-                            else:
-                                lib = self.binary_names[lib_name][0]
-                                if symb_name in lib.exported_symbol_ids:
-                                    self.db_interface.record_import(binary.id, lib.exported_symbol_ids[symb_name])
-                                    found = True
-                                elif symb_name in lib.exported_function_ids:
-                                    self.db_interface.record_import(binary.id, lib.exported_function_ids[symb_name])
-                                    found = True
-                else:
-                    for lib in binary.imported_libs:
-                        if func_name in lib.exported_symbol_ids:
-                            self.db_interface.record_import(binary.id, lib.exported_symbol_ids[func_name])
-                            found = True
-                            break
-                        elif func_name in lib.exported_function_ids:
-                            self.db_interface.record_import(binary.id, lib.exported_function_ids[func_name])
-                            found = True
-                            break
-                if found is False:
-                    logging.warning(f"[symbol imports] {binary.name}: cannot resolve {func_name}")
+        for func_name in binary.imported_symbols:
+            found = False
+            if len(func_name.split('@@')) == 2:  # symbols with a specific version
+                symb_name, symb_version = func_name.split('@@')
+                if symb_version in binary.version_requirement:
+                    for lib_name in binary.version_requirement[symb_version]:
+                        if lib_name not in self.binary_names:
+                            logging.warning(f"[symbol imports] {binary.fw_path}: lib '{lib_name}' not found in DB")
+                        elif len(self.binary_names[lib_name]) > 1:
+                            logging.warning(
+                                f"[symbol imports] {binary.fw_path}: several matches for importing lib {lib_name}, not put into DB")
+                        else:
+                            lib = self.binary_names[lib_name][0]
+                            if symb_name in lib.exported_symbol_ids:
+                                self.db_interface.record_import(binary.id, lib.exported_symbol_ids[symb_name])
+                                found = True
+                            elif symb_name in lib.exported_function_ids:
+                                self.db_interface.record_import(binary.id, lib.exported_function_ids[symb_name])
+                                found = True
+            else:
+                for lib in binary.imported_libs:
+                    if func_name in lib.exported_symbol_ids:
+                        self.db_interface.record_import(binary.id, lib.exported_symbol_ids[func_name])
+                        found = True
+                        break
+                    elif func_name in lib.exported_function_ids:
+                        self.db_interface.record_import(binary.id, lib.exported_function_ids[func_name])
+                        found = True
+                        break
+            if found is False:
+                logging.warning(f"[symbol imports] {binary.name}: cannot resolve {func_name}")
 
     def map(self) -> None:
         """
@@ -258,10 +261,22 @@ class FileSystemMapper:
         - symbol imports.
         It updates the fields and the DB
         """
-        self._map_binaries()
-        logging.info('[map] Binaries mapping done.')
-        self._map_symlinks()
-        logging.info('[map] Symlinks mapping done.')
-        self._map_lib_imports()
-        logging.info("[map] Binaries' lib imports mapping done.")
-        self._map_symbol_imports()
+        with Progress() as progress:
+
+            binaries_map = progress.add_task("[deep_pink2]Binaries mapping", total=len(self.binaries))
+            symlinks_map = progress.add_task("[orange_red1]Symlinks mapping", total=len(self.symlinks))
+            lib_imports = progress.add_task("[orange1]Library imports mapping", total=len(self.binaries))
+            symbol_imports = progress.add_task("[gold1]Symbol imports mapping", total=len(self.binaries))
+
+            for path in self.binaries:
+                self._map_binary(path)
+                progress.update(binaries_map, advance=1)
+            for path in self.symlinks:
+                self._map_symlink(path)
+                progress.update(symlinks_map, advance=1)
+            for binary in self.binary_paths.values():
+                self._map_lib_imports(binary)
+                progress.update(lib_imports, advance=1)
+            for binary in self.binary_paths.values():
+                self._map_symbol_imports(binary)
+                progress.update(symbol_imports, advance=1)
