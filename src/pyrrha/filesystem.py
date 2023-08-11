@@ -213,7 +213,9 @@ class FileSystemMapper:
                     self.db_interface.record_import(binary.id, sym_obj.id)
                     binary.imported_libs.append(self.binary_paths[sym_obj.target_path])
             else:
-                logging.warning(f"[lib imports] {binary.fw_path}: lib '{lib_name}' not found in DB")
+                logging.debug(f"[lib imports] {binary.fw_path}: lib '{lib_name}' not found in DB")
+                lib_id = self.db_interface.record_binary_file(Path(lib_name), is_indexed=False)
+                self.db_interface.record_import(binary.id, lib_id)
 
     def _map_symbol_imports(self, binary: ELFBinary) -> None:
         """
