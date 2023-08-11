@@ -223,13 +223,16 @@ class FileSystemMapper:
         This function update the DB with the import links found.
         """
         for func_name in binary.imported_symbols:
-            found = False
             if len(func_name.split('@@')) == 2:  # symbols with a specific version
                 symb_name, symb_version = func_name.split('@@')
                 if symb_version in binary.version_requirement:
                     for lib_name in binary.version_requirement[symb_version]:
                         if lib_name not in self.binary_names:
-                            logging.warning(f"[symbol imports] {binary.fw_path}: lib '{lib_name}' not found in DB")
+                            logging.debug(f"[symbol imports] {binary.fw_path}: lib '{lib_name}' not found in DB")
+                            symb_id = self.db_interface.record_exported_symbol(Path(lib_name), symb_name,
+                                                                               is_function=False,
+                                                                               is_indexed=False)
+                            self.db_interface.record_import(binary.id, symb_id)
                         elif len(self.binary_names[lib_name]) > 1:
                             logging.warning(
                                 f"[symbol imports] {binary.fw_path}: several matches for importing lib {lib_name}, not put into DB")
@@ -237,11 +240,10 @@ class FileSystemMapper:
                             lib = self.binary_names[lib_name][0]
                             if symb_name in lib.exported_symbol_ids:
                                 self.db_interface.record_import(binary.id, lib.exported_symbol_ids[symb_name])
-                                found = True
                             elif symb_name in lib.exported_function_ids:
                                 self.db_interface.record_import(binary.id, lib.exported_function_ids[symb_name])
-                                found = True
             else:
+                found = False
                 for lib in binary.imported_libs:
                     if func_name in lib.exported_symbol_ids:
                         self.db_interface.record_import(binary.id, lib.exported_symbol_ids[func_name])
@@ -251,8 +253,10 @@ class FileSystemMapper:
                         self.db_interface.record_import(binary.id, lib.exported_function_ids[func_name])
                         found = True
                         break
-            if found is False:
-                logging.warning(f"[symbol imports] {binary.name}: cannot resolve {func_name}")
+                if found is False:
+                    logging.debug(f"[symbol imports] {binary.name}: cannot resolve {func_name}")
+                    symb_id = self.db_interface.record_symbol(func_name, is_indexed=False)
+                    self.db_interface.record_import(binary.id, symb_id)
 
     def map(self) -> None:
         """
