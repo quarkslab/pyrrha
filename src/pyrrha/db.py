@@ -123,7 +123,7 @@ class DBInterface:
         """
         field_id = sourcetraildb.recordSymbol(
             f'{{"name_delimiter": ":", "name_elements": [ {class_name_element}, {field_name_element}] }}')
-        sourcetraildb.recordSymbolKind(field_id, sourcetraildb.SYMBOL_METHOD)
+        sourcetraildb.recordSymbolKind(field_id, sourcetraildb.SYMBOL_FIELD)
         if is_indexed:
             sourcetraildb.recordSymbolDefinitionKind(field_id, sourcetraildb.DEFINITION_EXPLICIT)
         return field_id
@@ -166,6 +166,20 @@ class DBInterface:
                                         self.__create_name_element_from_name(name), is_indexed)
         return self.__record_field(self.__create_name_element_from_path(file_path),
                                    self.__create_name_element_from_name(name), is_indexed)
+
+    def record_symbol(self, name: str, is_indexed: bool = True) -> int:
+        """
+        Add a representation of a symbol into the DB
+        :param name: symbol name
+        :param is_indexed: if the element exists (True) in the firmware or should theoretically exist
+        :return: the uniq identifier of the exported symbol
+        """
+        field_id = sourcetraildb.recordSymbol(
+            f'{{"name_delimiter": ":", "name_elements": [ {self.__create_name_element_from_name(name)}] }}')
+        sourcetraildb.recordSymbolKind(field_id, sourcetraildb.SYMBOL_FIELD)
+        if is_indexed:
+            sourcetraildb.recordSymbolDefinitionKind(field_id, sourcetraildb.DEFINITION_EXPLICIT)
+        return field_id
 
     def record_symlink(self, symlink_path: Path, is_indexed: bool = True) -> int:
         """
