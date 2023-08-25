@@ -32,6 +32,9 @@ class ELFBinary:
     imported_lib_names: list[str] = field(default_factory=list)
     imported_libs: list['ELFBinary'] = field(default_factory=list)
     imported_symbols: list[str] = field(default_factory=list)  # list(symbol names) symbols and functions
+    imported_symbol_ids: list[int] = field(default_factory=list)
+    non_resolved_lib_imports: list[str] = field(default_factory=list)
+    non_resolved_symbol_imports: list[str] = field(default_factory=list)
     version_requirement: dict[str, list[str]] = field(default_factory=dict)  # dict(symbol_name, list(requirements))
     exported_symbol_ids: dict[str, int] = field(default_factory=dict)  # dict(name, id)
     exported_function_ids: dict[str, int] = field(default_factory=dict)  # dict(name, id)
@@ -157,7 +160,6 @@ class FileSystemMapper:
         """
         target = path.readlink()
         if not target.is_absolute():
-            old_target = target
             target = path.resolve()
             if not target.is_file() or not lief.is_elf(str(target)):
                 return
@@ -216,6 +218,7 @@ class FileSystemMapper:
                 logging.debug(f"[lib imports] {binary.fw_path}: lib '{lib_name}' not found in DB")
                 lib_id = self.db_interface.record_binary_file(Path(lib_name), is_indexed=False)
                 self.db_interface.record_import(binary.id, lib_id)
+                binary.non_resolved_lib_imports.append(lib_name)
 
     def _map_symbol_imports(self, binary: ELFBinary) -> None:
         """
@@ -233,30 +236,46 @@ class FileSystemMapper:
                                                                                is_function=False,
                                                                                is_indexed=False)
                             self.db_interface.record_import(binary.id, symb_id)
+                            binary.non_resolved_symbol_imports.append(func_name)
                         elif len(self.binary_names[lib_name]) > 1:
                             logging.warning(
                                 f"[symbol imports] {binary.fw_path}: several matches for importing lib {lib_name}, not put into DB")
                         else:
-                            lib = self.binary_names[lib_name][0]
+                            lib: ELFBinary = self.binary_names[lib_name][0]
                             if symb_name in lib.exported_symbol_ids:
-                                self.db_interface.record_import(binary.id, lib.exported_symbol_ids[symb_name])
+                                symb_id = lib.exported_symbol_ids[symb_name]
+                                self.db_interface.record_import(binary.id, symb_id)
+                                binary.imported_symbol_ids.append(symb_id)
                             elif symb_name in lib.exported_function_ids:
-                                self.db_interface.record_import(binary.id, lib.exported_function_ids[symb_name])
+                                symb_id = lib.exported_function_ids[symb_name]
+                                self.db_interface.record_import(binary.id, symb_id)
+                                binary.imported_symbol_ids.append(symb_id)
+                            else:
+                                symb_id = self.db_interface.record_exported_symbol(lib.fw_path, symb_name,
+                                                                                   is_function=False,
+                                                                                   is_indexed=False)
+                                self.db_interface.record_import(binary.id, symb_id)
+                                binary.non_resolved_symbol_imports.append(func_name)
             else:
                 found = False
                 for lib in binary.imported_libs:
                     if func_name in lib.exported_symbol_ids:
-                        self.db_interface.record_import(binary.id, lib.exported_symbol_ids[func_name])
+                        symb_id = lib.exported_symbol_ids[func_name]
+                        self.db_interface.record_import(binary.id, symb_id)
+                        binary.imported_symbol_ids.append(symb_id)
                         found = True
                         break
                     elif func_name in lib.exported_function_ids:
-                        self.db_interface.record_import(binary.id, lib.exported_function_ids[func_name])
+                        symb_id = lib.exported_function_ids[func_name]
+                        self.db_interface.record_import(binary.id, symb_id)
+                        binary.imported_symbol_ids.append(symb_id)
                         found = True
                         break
                 if found is False:
                     logging.debug(f"[symbol imports] {binary.name}: cannot resolve {func_name}")
                     symb_id = self.db_interface.record_symbol(func_name, is_indexed=False)
                     self.db_interface.record_import(binary.id, symb_id)
+                    binary.non_resolved_symbol_imports.append(func_name)
 
     def map(self) -> None:
         """
