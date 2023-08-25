@@ -14,6 +14,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -277,7 +278,37 @@ class FileSystemMapper:
                     self.db_interface.record_import(binary.id, symb_id)
                     binary.non_resolved_symbol_imports.append(func_name)
 
-    def map(self) -> None:
+    def _create_export(self):
+        logging.debug("Start export")
+        export = {"symlinks": [],
+                  "binaries": [],
+                  "symbols" : []}
+        for sym in self.symlink_paths.values():
+            export["symlinks"].append({"name"     : sym.path.name,
+                                       "path"     : str(sym.path),
+                                       "id"       : sym.id,
+                                       "target_id": sym.target_id})
+
+        for elf in self.binary_paths.values():
+            exported_symbol_ids = list(elf.exported_symbol_ids.values()) + list(elf.exported_function_ids.values())
+            export["binaries"].append({"name"      : elf.name,
+                                       "path"      : str(elf.fw_path),
+                                       "id"        : elf.id,
+                                       "export_ids": exported_symbol_ids,
+                                       "imports"   : {"lib"    : {"ids"         : [lib.id for lib in elf.imported_libs],
+                                                                  "non-resolved": elf.non_resolved_lib_imports},
+                                                      "symbols": {"ids"         : elf.imported_symbol_ids,
+                                                                  "non-resolved": elf.non_resolved_symbol_imports}}})
+            symbols = [{"name": name, "id": s_id, "is_func": False} for name, s_id in elf.exported_symbol_ids.items()]
+            funcs = [{"name": name, "id": f_id, "is_func": True} for name, f_id in elf.exported_function_ids.items()]
+            export["symbols"].extend(symbols + funcs)
+
+        logging.debug("Saving export")
+        json_path = self.db_interface.db_path.with_suffix('.json')
+        json_path.write_text(json.dumps(export))
+        logging.info(f'Export saved: {json_path}')
+
+    def map(self, export: bool = False) -> None:
         """
         Map all the content of 'self.root_directory', in the order:
         - binaries;
@@ -285,6 +316,8 @@ class FileSystemMapper:
         - lib imports;
         - symbol imports.
         It updates the fields and the DB
+        :param export: if True create a JSON export of the mapping. It will be stored
+            at the same place as the DB (file name: DB_NAME.json)
         """
         with Progress() as progress:
 
@@ -305,3 +338,6 @@ class FileSystemMapper:
             for binary in self.binary_paths.values():
                 self._map_symbol_imports(binary)
                 progress.update(symbol_imports, advance=1)
+
+            if export:
+                self._create_export()

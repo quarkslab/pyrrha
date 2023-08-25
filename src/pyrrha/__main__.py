@@ -34,15 +34,20 @@ def pyrrha(debug):
               type=click.Path(file_okay=True, dir_okay=True, path_type=Path),
               default=Path() / 'pyrrha.srctrldb',
               show_default=True)
+@click.option('-j', '--json',
+              help='Create a JSON export of the resulting mapping.',
+              is_flag=True,
+              default=False,
+              show_default=False)
 @click.argument('root_directory',
                 # help='Path of the directory containing the filesystem to map.',
                 type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
-def fs(db, root_directory):
+def fs(db, json, root_directory):
     db_interface = DBInterface(db)
     root_directory = root_directory.absolute()
 
     mapper = FileSystemMapper(root_directory, db_interface)
-    mapper.map()
+    mapper.map(json)
 
     db_interface.close()
 
