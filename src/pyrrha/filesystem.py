@@ -165,7 +165,7 @@ class FileSystemMapper:
 
     def _map_symlink(self, path) -> None:
         """
-        Given a symlink, resolve it and if it points on an ELF file, add it to the DB and create
+        Given a symlink, resolve it and if it points on a binary file, add it to the DB and create
         the associated Symlink object. Also add in db a link between the Symlink object
         and the Binary object corresponding to its target.
         This function updates the fields 'self.symlink_paths' and 'self.symlink_names'
@@ -294,6 +294,7 @@ class FileSystemMapper:
 
     def _create_export(self):
         logging.debug("Start export")
+
         export = {"symlinks": [],
                   "binaries": [],
                   "symbols" : []}
@@ -303,18 +304,18 @@ class FileSystemMapper:
                                        "id"       : sym.id,
                                        "target_id": sym.target_id})
 
-        for elf in self.binary_paths.values():
-            exported_symbol_ids = list(elf.exported_symbol_ids.values()) + list(elf.exported_function_ids.values())
-            export["binaries"].append({"name"      : elf.name,
-                                       "path"      : str(elf.fw_path),
-                                       "id"        : elf.id,
+        for bin in self.binary_paths.values():
+            exported_symbol_ids = list(bin.exported_symbol_ids.values()) + list(bin.exported_function_ids.values())
+            export["binaries"].append({"name"      : bin.name,
+                                       "path"      : str(bin.fw_path),
+                                       "id"        : bin.id,
                                        "export_ids": exported_symbol_ids,
-                                       "imports"   : {"lib"    : {"ids"         : [lib.id for lib in elf.libs],
-                                                                  "non-resolved": elf.non_resolved_libs},
-                                                      "symbols": {"ids"         : elf.imported_symbol_ids,
-                                                                  "non-resolved": elf.non_resolved_symbol_imports}}})
-            symbols = [{"name": name, "id": s_id, "is_func": False} for name, s_id in elf.exported_symbol_ids.items()]
-            funcs = [{"name": name, "id": f_id, "is_func": True} for name, f_id in elf.exported_function_ids.items()]
+                                       "imports"   : {"lib"    : {"ids"         : [lib.id for lib in bin.libs],
+                                                                  "non-resolved": bin.non_resolved_libs},
+                                                      "symbols": {"ids"         : bin.imported_symbol_ids,
+                                                                  "non-resolved": bin.non_resolved_symbol_imports}}})
+            symbols = [{"name": name, "id": s_id, "is_func": False} for name, s_id in bin.exported_symbol_ids.items()]
+            funcs = [{"name": name, "id": f_id, "is_func": True} for name, f_id in bin.exported_function_ids.items()]
             export["symbols"].extend(symbols + funcs)
 
         logging.debug("Saving export")
