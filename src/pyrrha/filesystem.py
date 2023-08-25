@@ -26,48 +26,62 @@ from .db import DBInterface
 
 
 @dataclass
-class ELFBinary:
+class Binary:
     file_path: Path
     fw_path: Path
     id: int = None
-    imported_lib_names: list[str] = field(default_factory=list)
-    imported_libs: list['ELFBinary'] = field(default_factory=list)
+    lib_names: list[str] = field(default_factory=list)
+    libs: list['Binary'] = field(default_factory=list)
     imported_symbols: list[str] = field(default_factory=list)  # list(symbol names) symbols and functions
     imported_symbol_ids: list[int] = field(default_factory=list)
-    non_resolved_lib_imports: list[str] = field(default_factory=list)
+    non_resolved_libs: list[str] = field(default_factory=list)
     non_resolved_symbol_imports: list[str] = field(default_factory=list)
+    exported_function_ids: dict[str, int] = field(default_factory=dict)  # dict(name, id)
+
+    # ELF specific fields
     version_requirement: dict[str, list[str]] = field(default_factory=dict)  # dict(symbol_name, list(requirements))
     exported_symbol_ids: dict[str, int] = field(default_factory=dict)  # dict(name, id)
-    exported_function_ids: dict[str, int] = field(default_factory=dict)  # dict(name, id)
 
     def __post_init__(self):
         """
         parse the given path with lief to automatically fill the other fields
         at the exception done of the ids (the object should be put on a DB)
         """
-        if self.name == 'libcrypto.so.1.1':
-            lief_obj = lief.ELF.parse(str(self.file_path), lief.ELF.DYNSYM_COUNT_METHODS.HASH)
-        else:
-            lief_obj = lief.ELF.parse(str(self.file_path))
+        lief_obj: lief.Binary = lief.parse(str(self.file_path))
+        is_elf = isinstance(lief_obj, lief.ELF.Binary)
 
-        # parse imported libs/symbols
-        self.imported_lib_names = lief_obj.libraries
-        self.imported_symbols = [s.name for s in lief_obj.imported_symbols]
+        if is_elf:
+            if self.name.startswith('libcrypto') and len(lief_obj.exported_functions) == 0:
+                lief_obj = lief.ELF.parse(str(self.file_path), lief.ELF.DYNSYM_COUNT_METHODS.HASH)
 
-        # parse exported symbols
-        for s in lief_obj.exported_symbols:
-            if s.is_function:
-                self.exported_function_ids[s.name] = None
-            else:
-                self.exported_symbol_ids[s.name] = None
+        # parse imported libs
+        self.lib_names = lief_obj.libraries
 
-        # parse version requirements
-        for req in lief_obj.symbols_version_requirement:
-            for symb in req.get_auxiliary_symbols():
-                if symb.name in self.version_requirement:
-                    self.version_requirement[symb.name].append(req.name)
+        if is_elf:
+            # parse imported symbols
+            lief_obj: lief.ELF.Binary
+            self.imported_symbols = [s.name for s in lief_obj.imported_symbols]
+
+            # parse exported symbols
+            for s in lief_obj.exported_symbols:
+                if s.is_function:
+                    self.exported_function_ids[s.name] = None
                 else:
-                    self.version_requirement[symb.name] = [req.name]
+                    self.exported_symbol_ids[s.name] = None
+
+            # parse version requirements
+            for req in lief_obj.symbols_version_requirement:
+                for symb in req.get_auxiliary_symbols():
+                    if symb.name in self.version_requirement:
+                        self.version_requirement[symb.name].append(req.name)
+                    else:
+                        self.version_requirement[symb.name] = [req.name]
+        else:
+            self.imported_symbols = [f.name for f in lief_obj.imported_functions]
+            for s in lief_obj.exported_functions:
+                self.exported_function_ids[s.name] = None
+
+
 
     @property
     def name(self):
@@ -117,10 +131,10 @@ class FileSystemMapper:
         """
         self.root_directory = root_directory
         self.db_interface = db
-        self.binaries: list[Path] = list(filter(lambda p: p.is_file() and not p.is_symlink() and lief.is_elf(str(p)),
+        self.binaries: list[Path] = list(filter(lambda p: p.is_file() and not p.is_symlink() and (lief.is_elf(str(p)) or lief.is_pe(str(p))),
                                                 self.root_directory.rglob('*')))
-        self.binary_names: dict[str, list[ELFBinary]] = dict()
-        self.binary_paths: dict[Path, ELFBinary] = dict()
+        self.binary_names: dict[str, list[Binary]] = dict()
+        self.binary_paths: dict[Path, Binary] = dict()
         self.symlinks: list[Path] = list(filter(lambda p: p.is_symlink(), self.root_directory.rglob('*')))
         self.symlink_names: dict[str, list[Symlink]] = dict()
         self.symlink_paths: dict[Path, Symlink] = dict()
@@ -135,13 +149,13 @@ class FileSystemMapper:
 
     def _map_binary(self, path: Path) -> None:
         """
-        Given a binary, add it to the DB and create the associated ELFBinary object.
+        Given a binary, add it to the DB and create the associated Binary object.
         This function updates the fields 'self.binary_paths' and 'self.binary_names'
         which are respectively binary paths and names dictionaries pointing on
-        the created ELFBinary objects.
+        the created Binary objects.
         :param path: Binary path
         """
-        elf_object = ELFBinary(path, self.gen_fw_path(path))
+        elf_object = Binary(path, self.gen_fw_path(path))
         elf_object.record_in_db(self.db_interface)
         self.binary_paths[elf_object.fw_path] = elf_object
         if elf_object.name in self.binary_names:
@@ -153,7 +167,7 @@ class FileSystemMapper:
         """
         Given a symlink, resolve it and if it points on an ELF file, add it to the DB and create
         the associated Symlink object. Also add in db a link between the Symlink object
-        and the ELFBinary object corresponding to its target.
+        and the Binary object corresponding to its target.
         This function updates the fields 'self.symlink_paths' and 'self.symlink_names'
         which are respectively symlink paths and names dictionaries pointing on
         the created Symlink objects.
@@ -196,9 +210,9 @@ class FileSystemMapper:
          - if no binary match, the same heuristics are applied to symlinks
         This function update the DB with the import links found and each binary's
         'imported libs' field with the corresponding ElfBinary objects (or the
-        targeted ELFBinary object in the case of a Symlink)
+        targeted Binary object in the case of a Symlink)
         """
-        for lib_name in binary.imported_lib_names:
+        for lib_name in binary.lib_names:
             if lib_name in self.binary_names:
                 if len(self.binary_names[lib_name]) != 1:
                     logging.warning(
@@ -206,7 +220,7 @@ class FileSystemMapper:
                 else:
                     lib_obj = self.binary_names[lib_name][0]
                     self.db_interface.record_import(binary.id, lib_obj.id)
-                    binary.imported_libs.append(lib_obj)
+                    binary.libs.append(lib_obj)
             elif lib_name in self.symlink_names:
                 if len(self.symlink_names[lib_name]) != 1:
                     logging.warning(
@@ -214,14 +228,14 @@ class FileSystemMapper:
                 else:
                     sym_obj = self.symlink_names[lib_name][0]
                     self.db_interface.record_import(binary.id, sym_obj.id)
-                    binary.imported_libs.append(self.binary_paths[sym_obj.target_path])
+                    binary.libs.append(self.binary_paths[sym_obj.target_path])
             else:
                 logging.debug(f"[lib imports] {binary.fw_path}: lib '{lib_name}' not found in DB")
                 lib_id = self.db_interface.record_binary_file(Path(lib_name), is_indexed=False)
                 self.db_interface.record_import(binary.id, lib_id)
-                binary.non_resolved_lib_imports.append(lib_name)
+                binary.non_resolved_libs.append(lib_name)
 
-    def _map_symbol_imports(self, binary: ELFBinary) -> None:
+    def _map_symbol_imports(self, binary: Binary) -> None:
         """
         Given an already mapped binary, resolve its symbols.
         This function update the DB with the import links found.
@@ -242,7 +256,7 @@ class FileSystemMapper:
                             logging.warning(
                                 f"[symbol imports] {binary.fw_path}: several matches for importing lib {lib_name}, not put into DB")
                         else:
-                            lib: ELFBinary = self.binary_names[lib_name][0]
+                            lib: Binary = self.binary_names[lib_name][0]
                             if symb_name in lib.exported_symbol_ids:
                                 symb_id = lib.exported_symbol_ids[symb_name]
                                 self.db_interface.record_import(binary.id, symb_id)
@@ -259,7 +273,7 @@ class FileSystemMapper:
                                 binary.non_resolved_symbol_imports.append(func_name)
             else:
                 found = False
-                for lib in binary.imported_libs:
+                for lib in binary.libs:
                     if func_name in lib.exported_symbol_ids:
                         symb_id = lib.exported_symbol_ids[func_name]
                         self.db_interface.record_import(binary.id, symb_id)
@@ -295,8 +309,8 @@ class FileSystemMapper:
                                        "path"      : str(elf.fw_path),
                                        "id"        : elf.id,
                                        "export_ids": exported_symbol_ids,
-                                       "imports"   : {"lib"    : {"ids"         : [lib.id for lib in elf.imported_libs],
-                                                                  "non-resolved": elf.non_resolved_lib_imports},
+                                       "imports"   : {"lib"    : {"ids"         : [lib.id for lib in elf.libs],
+                                                                  "non-resolved": elf.non_resolved_libs},
                                                       "symbols": {"ids"         : elf.imported_symbol_ids,
                                                                   "non-resolved": elf.non_resolved_symbol_imports}}})
             symbols = [{"name": name, "id": s_id, "is_func": False} for name, s_id in elf.exported_symbol_ids.items()]
