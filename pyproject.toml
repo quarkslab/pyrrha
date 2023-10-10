@@ -16,10 +16,8 @@
 
 [build-system]
 requires = [
-    'setuptools',
-    'swig'
+    'setuptools'
 ]
-build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'pyrrha'
@@ -43,6 +41,7 @@ dependencies = [
     'click',
     'coloredlogs',
     'lief',
+    'numbat',
     'rich',
 ]
 
