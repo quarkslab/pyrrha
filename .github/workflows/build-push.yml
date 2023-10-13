@@ -8,7 +8,7 @@ on:
   pull_request:
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ghcr.io/quarkslab/pyrrha
+  IMAGE_NAME: quarkslab/pyrrha
 jobs:
   build-and-push-image:
     runs-on: ubuntu-latest
@@ -32,7 +32,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
