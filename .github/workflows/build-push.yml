@@ -1,0 +1,38 @@
+name: Build and Push Docker image
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - v*
+  pull_request:
+env:
+  IMAGE_NAME: ${{ github.repository }}
+jobs:
+  build-and-push-image:
+    runs-on: ubuntu-latest
+
+    permissions:
+      packages: write
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+
+      - name: Extract metadata (tags, labels) for Docker
+          id: meta
+          uses: docker/metadata-action
+          with:
+            images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+      - name: Build and push Docker image
+          uses: docker/build-push-action
+          with:
+            context: .
+            push: true
+            tags: ${{ steps.meta.outputs.tags }}
+            labels: ${{ steps.meta.outputs.labels }}
