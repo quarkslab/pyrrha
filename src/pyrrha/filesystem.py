@@ -81,8 +81,6 @@ class Binary:
             for s in lief_obj.exported_functions:
                 self.exported_function_ids[s.name] = None
 
-
-
     @property
     def name(self):
         return self.file_path.name
@@ -131,8 +129,9 @@ class FileSystemMapper:
         """
         self.root_directory = root_directory
         self.db_interface = db
-        self.binaries: list[Path] = list(filter(lambda p: p.is_file() and not p.is_symlink() and (lief.is_elf(str(p)) or lief.is_pe(str(p))),
-                                                self.root_directory.rglob('*')))
+        self.binaries: list[Path] = list(
+            filter(lambda p: p.is_file() and not p.is_symlink() and (lief.is_elf(str(p)) or lief.is_pe(str(p))),
+                   self.root_directory.rglob('*')))
         self.binary_names: dict[str, list[Binary]] = dict()
         self.binary_paths: dict[Path, Binary] = dict()
         self.symlinks: list[Path] = list(filter(lambda p: p.is_symlink(), self.root_directory.rglob('*')))
@@ -295,28 +294,29 @@ class FileSystemMapper:
     def _create_export(self):
         logging.debug("Start export")
 
-        export = {"symlinks": [],
-                  "binaries": [],
-                  "symbols" : []}
+        export = {"symlinks": dict(),
+                  "binaries": dict(),
+                  "symbols" : dict()}
         for sym in self.symlink_paths.values():
-            export["symlinks"].append({"name"     : sym.path.name,
-                                       "path"     : str(sym.path),
-                                       "id"       : sym.id,
-                                       "target_id": sym.target_id})
+            export["symlinks"].[sym.id] = {"name"     : sym.path.name,
+                                           "path"     : str(sym.path),
+                                           "target_id": sym.target_id}
 
         for bin in self.binary_paths.values():
             exported_symbol_ids = list(bin.exported_symbol_ids.values()) + list(bin.exported_function_ids.values())
-            export["binaries"].append({"name"      : bin.name,
-                                       "path"      : str(bin.fw_path),
-                                       "id"        : bin.id,
-                                       "export_ids": exported_symbol_ids,
-                                       "imports"   : {"lib"    : {"ids"         : [lib.id for lib in bin.libs],
-                                                                  "non-resolved": bin.non_resolved_libs},
-                                                      "symbols": {"ids"         : bin.imported_symbol_ids,
-                                                                  "non-resolved": bin.non_resolved_symbol_imports}}})
-            symbols = [{"name": name, "id": s_id, "is_func": False} for name, s_id in bin.exported_symbol_ids.items()]
-            funcs = [{"name": name, "id": f_id, "is_func": True} for name, f_id in bin.exported_function_ids.items()]
-            export["symbols"].extend(symbols + funcs)
+            export["binaries"][bin.id] = {"name"      : bin.name,
+                                          "path"      : str(bin.fw_path),
+                                          "export_ids": exported_symbol_ids,
+                                          "imports"   : {"lib"    : {"ids"         : [lib.id for lib in bin.libs],
+                                                                     "non-resolved": bin.non_resolved_libs},
+                                                         "symbols": {"ids"         : bin.imported_symbol_ids,
+                                                                     "non-resolved": bin.non_resolved_symbol_imports}}}
+            for name, s_id in bin.exported_symbol_ids.items():
+                export["symbols"][s_id] = {"name": name,
+                                           "is_func": False}
+            for name,f_id in bin.exported_function_ids.items():
+                export["symbols"][f_id] = {"name"   : name,
+                                           "is_func": True}
 
         logging.debug("Saving export")
         json_path = self.db_interface.db_path.with_suffix('.json')
