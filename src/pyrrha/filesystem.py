@@ -129,12 +129,12 @@ class FileSystemMapper:
         """
         self.root_directory = root_directory
         self.db_interface = db
-        self.binaries: list[Path] = list(
+        self.binaries: set[Path] = set(
             filter(lambda p: p.is_file() and not p.is_symlink() and (lief.is_elf(str(p)) or lief.is_pe(str(p))),
                    self.root_directory.rglob('*')))
         self.binary_names: dict[str, list[Binary]] = dict()
         self.binary_paths: dict[Path, Binary] = dict()
-        self.symlinks: list[Path] = list(filter(lambda p: p.is_symlink(), self.root_directory.rglob('*')))
+        self.symlinks: set[Path] = set(filter(lambda p: p.is_symlink(), self.root_directory.rglob('*')))
         self.symlink_names: dict[str, list[Symlink]] = dict()
         self.symlink_paths: dict[Path, Symlink] = dict()
 
@@ -298,7 +298,7 @@ class FileSystemMapper:
                   "binaries": dict(),
                   "symbols" : dict()}
         for sym in self.symlink_paths.values():
-            export["symlinks"].[sym.id] = {"name"     : sym.path.name,
+            export["symlinks"][sym.id] = {"name"     : sym.path.name,
                                            "path"     : str(sym.path),
                                            "target_id": sym.target_id}
 
