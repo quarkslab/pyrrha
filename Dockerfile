@@ -14,7 +14,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-FROM docker.io/library/python:3.11
+FROM docker.io/library/python:3.11-slim
 SHELL ["/bin/bash", "-c"]
 
 ENV PYRRHA_INSTALL_DIR=/tmp/pyrrha_install
@@ -29,6 +29,7 @@ WORKDIR ${PYRRHA_INSTALL_DIR}
 COPY src src/
 COPY setup.py ./
 COPY pyproject.toml ./
+COPY README.md ./
 
 RUN python3 -m pip install -U pip
 RUN python3 -m pip install .
