@@ -108,7 +108,7 @@ $ cd .. && rm openwrt_rootfs.tar.gz
 Then we can run Pyrrha on it. It will produce some logs indicating which symlinks or imports cannot be solved directly by the tool. 
 *(Do not forget to activate your virtualenv if you have created one for Pyrrha installation.)*
 ```commandline
-$ pyrrha fs --db openwrt_db open_root_fs
+$ pyrrha fs --db openwrt_db openwrt_root_fs
 $ ls 
 openwrt_root_fs openwrt_db.srctrldb  openwrt_db.srctrlprj
 ```
@@ -117,6 +117,11 @@ You can now navigate into the resulting cartography with Sourcetrail.
 ```commandline
 $ sourcetrail openwrt_db.srctrlprj
 ```
+
+![](docs/img/example_sourcetrail.png)
+<p align="center">
+<b>Pyrrha result opened with Sourcetrail.</b>
+</p>
 
 ## Authors
 - Eloïse Brocas (@ebrocas), Quarkslab
