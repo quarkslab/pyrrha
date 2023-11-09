@@ -20,21 +20,23 @@ SHELL ["/bin/bash", "-c"]
 ENV PYRRHA_INSTALL_DIR=/tmp/pyrrha_install
 ENV PYRRHA_WORKING_DIR=/tmp/pyrrha
 
-RUN apt-get update
-RUN DEBIAN_FRONTEND=noninteractive apt-get install -y python3-pip cmake
-
 RUN mkdir -p $PYRRHA_INSTALL_DIR
 
 WORKDIR ${PYRRHA_INSTALL_DIR}
+
+RUN python3 -m pip install --no-cache-dir -U pip
+
 COPY src src/
 COPY setup.py ./
 COPY pyproject.toml ./
 COPY README.md ./
 
-RUN python3 -m pip install -U pip
-RUN python3 -m pip install .
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y cmake build-essential && \
+    python3 -m pip install --no-cache-dir . && \
+    apt-get autoremove -y --purge cmake build-essential && \
+    rm -rf $PYRRHA_INSTALL_DIR /var/lib/apt/lists/*
 
 WORKDIR ${PYRRHA_WORKING_DIR}
-RUN rm -rf $PYRRHA_INSTALL_DIR
 
 ENTRYPOINT ["pyrrha"]
