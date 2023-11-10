@@ -42,6 +42,17 @@ class Binary:
     version_requirement: dict[str, list[str]] = field(default_factory=dict)  # dict(symbol_name, list(requirements))
     exported_symbol_ids: dict[str, int] = field(default_factory=dict)  # dict(name, id)
 
+    @staticmethod
+    def is_supported(p: Path) -> bool:
+        """
+        Check if the given path points on a file (NOT via a symlink) which is
+        of a format handled by this parser.
+        :param p: the path of the file to analyzed
+        :return: True is the path point on a file
+        """
+        return p.is_file() and not p.is_symlink() and (lief.is_elf(str(p)) or lief.is_pe(str(p)))
+
+
     def __post_init__(self):
         """
         parse the given path with lief to automatically fill the other fields
@@ -130,7 +141,7 @@ class FileSystemMapper:
         self.root_directory = root_directory
         self.db_interface = db
         self.binaries: set[Path] = set(
-            filter(lambda p: p.is_file() and not p.is_symlink() and (lief.is_elf(str(p)) or lief.is_pe(str(p))),
+            filter(lambda p: Binary.is_supported(p),
                    self.root_directory.rglob('*')))
         self.binary_names: dict[str, list[Binary]] = dict()
         self.binary_paths: dict[Path, Binary] = dict()
@@ -175,7 +186,7 @@ class FileSystemMapper:
         target = path.readlink()
         if not target.is_absolute():
             target = path.resolve()
-            if not target.is_file() or not lief.is_elf(str(target)):
+            if not Binary.is_supported(target):
                 return
             elif not target.is_relative_to(self.root_directory):
                 logging.warning(
@@ -184,6 +195,8 @@ class FileSystemMapper:
             target = self.gen_fw_path(target)
         elif target == Path('/dev/null'):
             logging.debug(f"[symlinks] '{path.name}': path '{path}' points on '/dev/null'")
+            return
+        if not Binary.is_supported(target):
             return
         if target in self.binary_paths:
             target_obj = self.binary_paths[target]
