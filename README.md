@@ -77,7 +77,7 @@ Usage: pyrrha fs [OPTIONS] ROOT_DIRECTORY
 
 Options:
   --db PATH   Sourcetrail DB file path (.srctrldb).  [default: pyrrha.srctrldb]
-  -j, --json  Create a JSON export of the resulting mapping.
+  -e, --json  Create a JSON export of the resulting mapping.
   -h, --help  Show this message and exit.
 ```
 
