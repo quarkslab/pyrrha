@@ -1,5 +1,6 @@
 import coloredlogs
 import logging
+import multiprocessing
 from pathlib import Path
 
 import click
@@ -41,7 +42,7 @@ def pyrrha(debug):
               show_default=False)
 @click.option('-j', '--jobs',
               help='Number of parallel jobs created in plus of the main thread.',
-              type=click.IntRange(min=1),
+              type=click.IntRange(1, multiprocessing.cpu_count(), clamp=True),
               default=1,
               show_default=True)
 @click.argument('root_directory',
