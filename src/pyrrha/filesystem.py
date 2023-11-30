@@ -16,11 +16,13 @@
 
 import json
 import logging
+import queue
 from dataclasses import dataclass, field
+from multiprocessing import Pool, Queue, Manager
 from pathlib import Path
 
 import lief
-from rich.progress import Progress
+from rich.progress import Progress, TimeElapsedColumn
 
 from .db import DBInterface
 
@@ -51,7 +53,6 @@ class Binary:
         :return: True is the path point on a file
         """
         return p.is_file() and not p.is_symlink() and (lief.is_elf(str(p)) or lief.is_pe(str(p)))
-
 
     def __post_init__(self):
         """
@@ -157,21 +158,41 @@ class FileSystemMapper:
         """
         return Path(self.root_directory.anchor).joinpath(path.relative_to(self.root_directory))
 
-    def _map_binary(self, path: Path) -> None:
+    def _parse_binary_job(self, ingress: Queue, egress: Queue) -> None:
         """
-        Given a binary, add it to the DB and create the associated Binary object.
+        Parse an executable file and create the associated Binary object.
+        It is used for multiprocessing.
+        :param ingress: input Queue, contain a Path
+        :param egress: output Queue, send back (file path, Binary result or
+        logging string if an issue happen)
+        """
+        while True:
+            try:
+                path = ingress.get(timeout=0.5)
+                try:
+                    res = Binary(path, self.gen_fw_path(path))
+                except Exception as e:
+                    res = e
+                egress.put((path, res))
+            except queue.Empty:
+                pass
+            except KeyboardInterrupt:
+                break
+
+    def _map_binary(self, bin_object: Binary) -> None:
+        """
+        Given a Binary object add it to the DB.
         This function updates the fields 'self.binary_paths' and 'self.binary_names'
         which are respectively binary paths and names dictionaries pointing on
         the created Binary objects.
-        :param path: Binary path
+        :param bin_object: Binary object
         """
-        elf_object = Binary(path, self.gen_fw_path(path))
-        elf_object.record_in_db(self.db_interface)
-        self.binary_paths[elf_object.fw_path] = elf_object
-        if elf_object.name in self.binary_names:
-            self.binary_names[elf_object.name].append(elf_object)
+        bin_object.record_in_db(self.db_interface)
+        self.binary_paths[bin_object.fw_path] = bin_object
+        if bin_object.name in self.binary_names:
+            self.binary_names[bin_object.name].append(bin_object)
         else:
-            self.binary_names[elf_object.name] = [elf_object]
+            self.binary_names[bin_object.name] = [bin_object]
 
     def _map_symlink(self, path) -> None:
         """
@@ -312,22 +333,23 @@ class FileSystemMapper:
                   "symbols" : dict()}
         for sym in self.symlink_paths.values():
             export["symlinks"][sym.id] = {"name"     : sym.path.name,
-                                           "path"     : str(sym.path),
-                                           "target_id": sym.target_id}
+                                          "path"     : str(sym.path),
+                                          "target_id": sym.target_id}
 
         for bin in self.binary_paths.values():
             exported_symbol_ids = list(bin.exported_symbol_ids.values()) + list(bin.exported_function_ids.values())
             export["binaries"][bin.id] = {"name"      : bin.name,
                                           "path"      : str(bin.fw_path),
                                           "export_ids": exported_symbol_ids,
-                                          "imports"   : {"lib"    : {"ids"         : [lib.id for lib in bin.libs],
+                                          "imports"   : {"lib"    : {"ids"         : [str(lib.id) for lib in bin.libs],
+                                                                     # keys are string so to keep type unicity
                                                                      "non-resolved": bin.non_resolved_libs},
                                                          "symbols": {"ids"         : bin.imported_symbol_ids,
                                                                      "non-resolved": bin.non_resolved_symbol_imports}}}
             for name, s_id in bin.exported_symbol_ids.items():
-                export["symbols"][s_id] = {"name": name,
+                export["symbols"][s_id] = {"name"   : name,
                                            "is_func": False}
-            for name,f_id in bin.exported_function_ids.items():
+            for name, f_id in bin.exported_function_ids.items():
                 export["symbols"][f_id] = {"name"   : name,
                                            "is_func": True}
 
@@ -336,7 +358,7 @@ class FileSystemMapper:
         json_path.write_text(json.dumps(export))
         logging.info(f'Export saved: {json_path}')
 
-    def map(self, export: bool = False) -> None:
+    def map(self, threads: int, export: bool = False) -> None:
         """
         Map all the content of 'self.root_directory', in the order:
         - binaries;
@@ -344,6 +366,7 @@ class FileSystemMapper:
         - lib imports;
         - symbol imports.
         It updates the fields and the DB
+        :param threads: number of threads to use
         :param export: if True create a JSON export of the mapping. It will be stored
             at the same place as the DB (file name: DB_NAME.json)
         """
@@ -354,12 +377,37 @@ class FileSystemMapper:
             lib_imports = progress.add_task("[orange1]Library imports mapping", total=len(self.binaries))
             symbol_imports = progress.add_task("[gold1]Symbol imports mapping", total=len(self.binaries))
 
+            # Parse binaries (multiprocessed)
+            manager = Manager()
+            ingress = manager.Queue()
+            egress = manager.Queue()
+            pool = Pool(threads)
+
+            # Launch all workers and fill input queue
+            for _ in range(threads):
+                pool.apply_async(self._parse_binary_job, (ingress, egress))
             for path in self.binaries:
-                self._map_binary(path)
+                ingress.put(path)
+
+            i = 0
+            while True:
+                path, res = egress.get()
+                i += 1
+                if isinstance(res, Binary):
+                    self._map_binary(res)
+                else:
+                    logging.warning(f'Error while parsing {path}: {res}')
                 progress.update(binaries_map, advance=1)
+                if i == len(self.binaries):
+                    break
+            pool.terminate()
+
+            # Parse and resolve symlinks
             for path in self.symlinks:
                 self._map_symlink(path)
                 progress.update(symlinks_map, advance=1)
+
+            # Handle imports
             for binary in self.binary_paths.values():
                 self._map_lib_imports(binary)
                 progress.update(lib_imports, advance=1)
