@@ -31,11 +31,8 @@ COPY setup.py ./
 COPY pyproject.toml ./
 COPY README.md ./
 
-RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y cmake build-essential && \
-    python3 -m pip install --no-cache-dir . && \
-    apt-get autoremove -y --purge cmake build-essential && \
-    rm -rf $PYRRHA_INSTALL_DIR /var/lib/apt/lists/*
+RUN python3 -m pip install --no-cache-dir . && \
+    rm -rf $PYRRHA_INSTALL_DIR
 
 WORKDIR ${PYRRHA_WORKING_DIR}
 
