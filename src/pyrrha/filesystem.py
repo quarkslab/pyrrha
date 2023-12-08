@@ -22,9 +22,8 @@ from multiprocessing import Pool, Queue, Manager
 from pathlib import Path
 
 import lief
-from rich.progress import Progress, TimeElapsedColumn
-
-from .db import DBInterface
+from numbat import SourcetrailDB
+from rich.progress import Progress
 
 
 @dataclass
@@ -97,7 +96,12 @@ class Binary:
     def name(self):
         return self.file_path.name
 
-    def record_in_db(self, db: DBInterface) -> None:
+    @staticmethod
+    def __create_name_element_from_path(path: Path) -> str:
+        """Uniformize the name elements used to represent paths"""
+        return f'{{ "prefix": "{path.parent}/", "name": "{path.name}", "postfix": "" }} '
+
+    def record_in_db(self, db: SourcetrailDB) -> None:
         """
         Record the binary inside the given db as well as its exported
         symbols/functions.
@@ -105,11 +109,11 @@ class Binary:
         'self.exported_symbol/function_ids' dictionaries.
         :param db: DB interface
         """
-        self.id = db.record_binary_file(self.fw_path)
+        self.id = db.record_class(self.name, prefix=f"{self.fw_path.parent}/", delimiter=":")
         for name in self.exported_symbol_ids.keys():
-            self.exported_symbol_ids[name] = db.record_exported_symbol(self.fw_path, name, is_function=False)
+            self.exported_symbol_ids[name] = db.record_symbol_node(name, parent_id=self.id)
         for name in self.exported_function_ids.keys():
-            self.exported_function_ids[name] = db.record_exported_symbol(self.fw_path, name, is_function=True)
+            self.exported_function_ids[name] = db.record_method(name, parent_id=self.id)
 
 
 @dataclass
@@ -123,18 +127,18 @@ class Symlink:
     def name(self):
         return self.path.name
 
-    def record_in_db(self, db: DBInterface) -> None:
+    def record_in_db(self, db: SourcetrailDB) -> None:
         """
         Record the symlink inside the given db as its link to its target.
         Update 'self.id' with the id of the created object.
         :param db: DB interface
         """
-        self.id = db.record_symlink(self.path)
-        db.record_symlink_target(self.id, self.target_id)
+        self.id = db.record_typedef_node(self.name, prefix=f"{self.path.parent}/", delimiter=":")
+        db.record_ref_import(self.id, self.target_id)
 
 
 class FileSystemMapper:
-    def __init__(self, root_directory: Path, db: DBInterface):
+    def __init__(self, root_directory: Path, db: SourcetrailDB):
         """
         :param root_directory: directory containing the filesystem to map
         :param db: interface to the DB
@@ -252,7 +256,7 @@ class FileSystemMapper:
                         f"[lib imports] {binary.fw_path}: several matches for importing lib {lib_name}, not put into DB")
                 else:
                     lib_obj = self.binary_names[lib_name][0]
-                    self.db_interface.record_import(binary.id, lib_obj.id)
+                    self.db_interface.record_ref_import(binary.id, lib_obj.id)
                     binary.libs.append(lib_obj)
             elif lib_name in self.symlink_names:
                 if len(self.symlink_names[lib_name]) != 1:
@@ -260,12 +264,12 @@ class FileSystemMapper:
                         f"[lib imports] {binary.fw_path}: several matches for importing lib {lib_name}, not put into DB")
                 else:
                     sym_obj = self.symlink_names[lib_name][0]
-                    self.db_interface.record_import(binary.id, sym_obj.id)
+                    self.db_interface.record_ref_import(binary.id, sym_obj.id)
                     binary.libs.append(self.binary_paths[sym_obj.target_path])
             else:
                 logging.debug(f"[lib imports] {binary.fw_path}: lib '{lib_name}' not found in DB")
-                lib_id = self.db_interface.record_binary_file(Path(lib_name), is_indexed=False)
-                self.db_interface.record_import(binary.id, lib_id)
+                lib_id = self.db_interface.record_class(lib_name, is_indexed=False)
+                self.db_interface.record_ref_import(binary.id, lib_id)
                 binary.non_resolved_libs.append(lib_name)
 
     def _map_symbol_imports(self, binary: Binary) -> None:
@@ -280,10 +284,10 @@ class FileSystemMapper:
                     for lib_name in binary.version_requirement[symb_version]:
                         if lib_name not in self.binary_names:
                             logging.debug(f"[symbol imports] {binary.fw_path}: lib '{lib_name}' not found in DB")
-                            symb_id = self.db_interface.record_exported_symbol(Path(lib_name), symb_name,
-                                                                               is_function=False,
-                                                                               is_indexed=False)
-                            self.db_interface.record_import(binary.id, symb_id)
+                            lib_id = self.db_interface.record_class(lib_name, is_indexed=False)
+                            symb_id = self.db_interface.record_symbol_node(symb_name, parent_id=lib_id,
+                                                                           is_indexed=False)
+                            self.db_interface.record_ref_import(binary.id, symb_id)
                             binary.non_resolved_symbol_imports.append(func_name)
                         elif len(self.binary_names[lib_name]) > 1:
                             logging.warning(
@@ -292,37 +296,36 @@ class FileSystemMapper:
                             lib: Binary = self.binary_names[lib_name][0]
                             if symb_name in lib.exported_symbol_ids:
                                 symb_id = lib.exported_symbol_ids[symb_name]
-                                self.db_interface.record_import(binary.id, symb_id)
+                                self.db_interface.record_ref_import(binary.id, symb_id)
                                 binary.imported_symbol_ids.append(symb_id)
                             elif symb_name in lib.exported_function_ids:
                                 symb_id = lib.exported_function_ids[symb_name]
-                                self.db_interface.record_import(binary.id, symb_id)
+                                self.db_interface.record_ref_import(binary.id, symb_id)
                                 binary.imported_symbol_ids.append(symb_id)
                             else:
-                                symb_id = self.db_interface.record_exported_symbol(lib.fw_path, symb_name,
-                                                                                   is_function=False,
-                                                                                   is_indexed=False)
-                                self.db_interface.record_import(binary.id, symb_id)
+                                symb_id = self.db_interface.record_symbol_node(symb_name, parent_id=lib.id,
+                                                                               is_indexed=False)
+                                self.db_interface.record_ref_import(binary.id, symb_id)
                                 binary.non_resolved_symbol_imports.append(func_name)
             else:
                 found = False
                 for lib in binary.libs:
                     if func_name in lib.exported_symbol_ids:
                         symb_id = lib.exported_symbol_ids[func_name]
-                        self.db_interface.record_import(binary.id, symb_id)
+                        self.db_interface.record_ref_import(binary.id, symb_id)
                         binary.imported_symbol_ids.append(symb_id)
                         found = True
                         break
                     elif func_name in lib.exported_function_ids:
                         symb_id = lib.exported_function_ids[func_name]
-                        self.db_interface.record_import(binary.id, symb_id)
+                        self.db_interface.record_ref_import(binary.id, symb_id)
                         binary.imported_symbol_ids.append(symb_id)
                         found = True
                         break
                 if found is False:
                     logging.debug(f"[symbol imports] {binary.name}: cannot resolve {func_name}")
-                    symb_id = self.db_interface.record_symbol(func_name, is_indexed=False)
-                    self.db_interface.record_import(binary.id, symb_id)
+                    symb_id = self.db_interface.record_symbol_node(func_name, is_indexed=False)
+                    self.db_interface.record_ref_import(binary.id, symb_id)
                     binary.non_resolved_symbol_imports.append(func_name)
 
     def _create_export(self):
@@ -354,7 +357,7 @@ class FileSystemMapper:
                                            "is_func": True}
 
         logging.debug("Saving export")
-        json_path = self.db_interface.db_path.with_suffix('.json')
+        json_path = self.db_interface.path.with_suffix('.json')
         json_path.write_text(json.dumps(export))
         logging.info(f'Export saved: {json_path}')
 
@@ -401,19 +404,23 @@ class FileSystemMapper:
                 if i == len(self.binaries):
                     break
             pool.terminate()
+            self.db_interface.commit()
 
             # Parse and resolve symlinks
             for path in self.symlinks:
                 self._map_symlink(path)
                 progress.update(symlinks_map, advance=1)
+            self.db_interface.commit()
 
             # Handle imports
             for binary in self.binary_paths.values():
                 self._map_lib_imports(binary)
                 progress.update(lib_imports, advance=1)
+            self.db_interface.commit()
             for binary in self.binary_paths.values():
                 self._map_symbol_imports(binary)
                 progress.update(symbol_imports, advance=1)
+            self.db_interface.commit()
 
             if export:
                 self._create_export()

@@ -4,8 +4,8 @@ import multiprocessing
 from pathlib import Path
 
 import click
+from numbat import SourcetrailDB
 
-from .db import DBInterface
 from .filesystem import FileSystemMapper
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
@@ -28,6 +28,8 @@ def pyrrha(debug):
  Map ELF files, their imports and their exports.
  Also map symlinks which target ELF files.
 """
+
+
 @pyrrha.command('fs',
                 help='Map a filesystem into a sourcetrail-compatible db.')
 @click.option('--db',
@@ -48,8 +50,11 @@ def pyrrha(debug):
 @click.argument('root_directory',
                 # help='Path of the directory containing the filesystem to map.',
                 type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
-def fs(db, jobs, json, root_directory):
-    db_interface = DBInterface(db)
+def fs(db: Path, json, root_directory):
+    if db.exists() and db.is_file():
+        db_interface = SourcetrailDB.open(db, clear=True)
+    else:
+        db_interface = SourcetrailDB.create(db)
     root_directory = root_directory.absolute()
 
     mapper = FileSystemMapper(root_directory, db_interface)
