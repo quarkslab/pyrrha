@@ -33,10 +33,6 @@ The installation is done in two parts:
 Sourcetrail can be installed using [its last release](https://github.com/CoatiSoftware/Sourcetrail/releases/tag/2021.4.19) and its [documentation](https://github.com/CoatiSoftware/Sourcetrail/blob/master/DOCUMENTATION.md#installation).
 
 ### Pyrrha installation
-Pyrrha installation compiles [SourcetrailDB](https://github.com/CoatiSoftware/SourcetrailDB) (Sourcetrail SDK) which requires to have:
-- `Cmake` >= 2.6;
-- C++-Compiler with C++11 support.
-
 Pyrrha requires a Python version >= 3.10.
 It is recommended to install the Python package inside a virtualenv. You can use `pip` to install it.
 ```commandline
