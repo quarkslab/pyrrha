@@ -96,11 +96,6 @@ class Binary:
     def name(self):
         return self.file_path.name
 
-    @staticmethod
-    def __create_name_element_from_path(path: Path) -> str:
-        """Uniformize the name elements used to represent paths"""
-        return f'{{ "prefix": "{path.parent}/", "name": "{path.name}", "postfix": "" }} '
-
     def record_in_db(self, db: SourcetrailDB) -> None:
         """
         Record the binary inside the given db as well as its exported
