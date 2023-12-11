@@ -211,17 +211,29 @@ class FileSystemMapper:
         target = path.readlink()
         if not target.is_absolute():
             target = path.resolve()
-            if not Binary.is_supported(target):
-                return
-            elif not target.is_relative_to(self.root_directory):
+            if not target.is_relative_to(self.root_directory):
                 logging.warning(
                     f"[symlinks] cannot resolve '{path.name}': path '{target}' does not exist in {self.root_directory}")
+                return
+            if not target.exists():
+                target = self.gen_fw_path(target)
+                logging.warning(f"[symlinks] path {target} does not exist")
+                return
+            if not Binary.is_supported(target):
+                target = self.gen_fw_path(target)
+                logging.debug(f"path {target} does not correspond to a supported binary")
                 return
             target = self.gen_fw_path(target)
         elif target == Path('/dev/null'):
             logging.debug(f"[symlinks] '{path.name}': path '{path}' points on '/dev/null'")
             return
-        if not Binary.is_supported(target):
+        elif not target.exists():
+            target = self.gen_fw_path(target)
+            logging.warning(f"[symlinks] path {target} does not exist")
+            return
+        elif not Binary.is_supported(target):
+            target = self.gen_fw_path(target)
+            logging.debug(f"path {target} does not correspond to a supported binary")
             return
         if target in self.binary_paths:
             target_obj = self.binary_paths[target]
