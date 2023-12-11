@@ -387,35 +387,42 @@ class FileSystemMapper:
             lib_imports = progress.add_task("[orange1]Library imports mapping", total=len(self.binaries))
             symbol_imports = progress.add_task("[gold1]Symbol imports mapping", total=len(self.binaries))
 
-            # Parse binaries (multiprocessed)
-            manager = Manager()
-            ingress = manager.Queue()
-            egress = manager.Queue()
-            pool = Pool(threads)
-
-            # Launch all workers and fill input queue
+            # Parse binaries
             logging.debug(f"[main] Start Binaries parsing: {len(self.binaries)} binaries to parse")
-            for _ in range(threads):
-                pool.apply_async(self._parse_binary_job, (ingress, egress))
-            for path in self.binaries:
-                ingress.put(path)
+            if threads > 1:  # multiprocessed case
+                manager = Manager()
+                ingress = manager.Queue()
+                egress = manager.Queue()
+                pool = Pool(threads)
 
-            i = 0
-            while True:
-                path, res = egress.get()
-                i += 1
-                if isinstance(res, Binary):
-                    self._map_binary(res)
-                else:
-                    logging.warning(f'Error while parsing {path}: {res}')
-                progress.update(binaries_map, advance=1)
-                if i == len(self.binaries):
-                    break
-            pool.terminate()
+                # Launch all workers and fill input queue
+                for _ in range(threads - 1):
+                    pool.apply_async(self._parse_binary_job, (ingress, egress))
+                for path in self.binaries:
+                    ingress.put(path)
+                logging.debug(f"[main] {threads - 1} threads created")
+
+                i = 0
+                while True:
+                    path, res = egress.get()
+                    i += 1
+                    if isinstance(res, Binary):
+                        self._map_binary(res)
+                    else:
+                        logging.warning(f'Error while parsing {path}: {res}')
+                    progress.update(binaries_map, advance=1)
+                    if i == len(self.binaries):
+                        break
+                pool.terminate()
+            else:
+                logging.debug("[main] One thread mode")
+                for path in self.binaries:
+                    self._map_binary(Binary(path, self.gen_fw_path(path)))
+                    progress.update(binaries_map, advance=1)
             self.db_interface.commit()
 
             # Parse and resolve symlinks
-            logging.debug("[main] Start Symlinks parsing: {len(self.symlinks)} symlinks to parse")
+            logging.debug(f"[main] Start Symlinks parsing: {len(self.symlinks)} symlinks to parse")
             for path in self.symlinks:
                 self._map_symlink(path)
                 progress.update(symlinks_map, advance=1)
