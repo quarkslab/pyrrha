@@ -35,6 +35,10 @@ Sourcetrail can be installed using [its last release](https://github.com/CoatiSo
 ### Pyrrha installation
 Pyrrha requires a Python version >= 3.10.
 It is recommended to install the Python package inside a virtualenv. You can use `pip` to install it.
+```python
+pip install pyrrha-project
+```
+If you prefer using sources to install Pyrrha, do the following:
 ```commandline
 # Do not forget to activate your virtualenv
 $ pip install 'pyrrha @ git+https://github.com/quarkslab/pyrrha'
