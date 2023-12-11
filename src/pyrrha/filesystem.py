@@ -387,6 +387,7 @@ class FileSystemMapper:
             pool = Pool(threads)
 
             # Launch all workers and fill input queue
+            logging.debug(f"[main] Start Binaries parsing: {len(self.binaries)} binaries to parse")
             for _ in range(threads):
                 pool.apply_async(self._parse_binary_job, (ingress, egress))
             for path in self.binaries:
@@ -407,16 +408,19 @@ class FileSystemMapper:
             self.db_interface.commit()
 
             # Parse and resolve symlinks
+            logging.debug("[main] Start Symlinks parsing: {len(self.symlinks)} symlinks to parse")
             for path in self.symlinks:
                 self._map_symlink(path)
                 progress.update(symlinks_map, advance=1)
             self.db_interface.commit()
 
             # Handle imports
+            logging.debug("[main] Start Libraries imports resolution")
             for binary in self.binary_paths.values():
                 self._map_lib_imports(binary)
                 progress.update(lib_imports, advance=1)
             self.db_interface.commit()
+            logging.debug(f"[main] Start Symbols imports resolution")
             for binary in self.binary_paths.values():
                 self._map_symbol_imports(binary)
                 progress.update(symbol_imports, advance=1)
