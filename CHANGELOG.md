@@ -1,3 +1,31 @@
+# v0.4.0—Numbat version
+This version introduces the usage of Numbat, our home-made Sourcetrail SDK fully Pythonic. Thanks to it, `pyrrha` is much easier to install.
+
+
+## Features
+All:
+* Remove SourcetrailDB dependency to use `numbat` library
+
+File system parser:
+* multiprocess binary parsing (lief export)
+
+Docker/CI:
+* Adapt to numbat dependency. Remove all the useless installations.
+* Add package publication on pypi.
+
+## :warning: Important Changes
+- Package name was changes into `pyrrha-mapper` as the `pyrrha` package already exists on Pypi.
+
+## Fixes
+- Symlink resolution was partially broken due to not extensive checks on the path. It was trying to parse directory for example.
+
+## Associated Python package
+This release contains a CI that automatically upload the package on Pypi. You can now install Pyrrha by doing 
+```python
+pip install pyrrha-mapper
+```
+
+**Full Changelog**: https://github.com/quarkslab/pyrrha/compare/v0.2.0...v0.4.0
 # v0.3.0—Hack.lu edition
 Version release at the occasion of the talk [Pyrrha: navigate easily into your system binaries](https://pretalx.com/hack-lu-2023/talk/WVFPNK/) given at the CTI-summit of Hack.lu.
 
