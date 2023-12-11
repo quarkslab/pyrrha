@@ -20,7 +20,7 @@ requires = [
 ]
 
 [project]
-name = 'pyrrha'
+name = 'pyrrha-mapper'
 version = '0.3.0'
 authors = [
     { name = 'Eloïse Brocas', email = 'ebrocas@quarkslab.com' },
@@ -49,6 +49,7 @@ dependencies = [
 Homepage = "https://github.com/quarkslab/pyrrha"
 Source = "https://github.com/quarkslab/pyrrha"
 Tracker = "https://github.com/quarkslab/pyrrha/issues"
+Changelog = "https://github.com/quarkslab/pyrrha/changleog.md"
 
 [project.scripts]
-pyrrha = 'pyrrha:pyrrha'
+pyrrha = 'pyrrha_mapper:pyrrha'
