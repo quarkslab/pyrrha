@@ -43,14 +43,14 @@ def pyrrha(debug):
               default=False,
               show_default=False)
 @click.option('-j', '--jobs',
-              help='Number of parallel jobs created in plus of the main thread.',
+              help='Number of parallel jobs created (threads).',
               type=click.IntRange(1, multiprocessing.cpu_count(), clamp=True),
               default=1,
               show_default=True)
 @click.argument('root_directory',
                 # help='Path of the directory containing the filesystem to map.',
                 type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
-def fs(db: Path, json, root_directory):
+def fs(db: Path, json, jobs, root_directory):
     if db.exists() and db.is_file():
         db_interface = SourcetrailDB.open(db, clear=True)
     else:
