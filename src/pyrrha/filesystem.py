@@ -132,6 +132,39 @@ class Symlink:
         db.record_ref_import(self.id, self.target_id)
 
 
+def gen_fw_path(path: Path, root_directory: Path) -> Path:
+    """
+    Generate the path of a given file inside a firmware
+    :param path: path of the file inside the local system
+    :param root_directory: path of the virtual root of the firmware
+    :return: path of the file inside the firmware
+    """
+    return Path(root_directory.anchor).joinpath(path.relative_to(root_directory))
+
+
+def parse_binary_job(ingress: Queue, egress: Queue, root_directory: Path) -> None:
+    """
+    Parse an executable file and create the associated Binary object.
+    It is used for multiprocessing.
+    :param ingress: input Queue, contain a Path
+    :param egress: output Queue, send back (file path, Binary result or
+    logging string if an issue happen)
+    :param root_directory: path of the virtual root of the firmware
+    """
+    while True:
+        try:
+            path = ingress.get(timeout=0.5)
+            try:
+                res = Binary(path, gen_fw_path(path, root_directory))
+            except Exception as e:
+                res = e
+            egress.put((path, res))
+        except queue.Empty:
+            pass
+        except KeyboardInterrupt:
+            break
+
+
 class FileSystemMapper:
     def __init__(self, root_directory: Path, db: SourcetrailDB):
         """
@@ -155,28 +188,7 @@ class FileSystemMapper:
         :param path: path of the file inside the local system
         :return: path of the file inside the firmware
         """
-        return Path(self.root_directory.anchor).joinpath(path.relative_to(self.root_directory))
-
-    def _parse_binary_job(self, ingress: Queue, egress: Queue) -> None:
-        """
-        Parse an executable file and create the associated Binary object.
-        It is used for multiprocessing.
-        :param ingress: input Queue, contain a Path
-        :param egress: output Queue, send back (file path, Binary result or
-        logging string if an issue happen)
-        """
-        while True:
-            try:
-                path = ingress.get(timeout=0.5)
-                try:
-                    res = Binary(path, self.gen_fw_path(path))
-                except Exception as e:
-                    res = e
-                egress.put((path, res))
-            except queue.Empty:
-                pass
-            except KeyboardInterrupt:
-                break
+        return gen_fw_path(path, self.root_directory)
 
     def _map_binary(self, bin_object: Binary) -> None:
         """
@@ -397,7 +409,7 @@ class FileSystemMapper:
 
                 # Launch all workers and fill input queue
                 for _ in range(threads - 1):
-                    pool.apply_async(self._parse_binary_job, (ingress, egress))
+                    pool.apply_async(parse_binary_job, (ingress, egress, self.root_directory))
                 for path in self.binaries:
                     ingress.put(path)
                 logging.debug(f"[main] {threads - 1} threads created")
