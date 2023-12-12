@@ -51,7 +51,7 @@ def pyrrha(debug):
                 # help='Path of the directory containing the filesystem to map.',
                 type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
 def fs(db: Path, json, jobs, root_directory):
-    if db.exists() and db.is_file():
+    if SourcetrailDB.exists(db):
         db_interface = SourcetrailDB.open(db, clear=True)
     else:
         db_interface = SourcetrailDB.create(db)
