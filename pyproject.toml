@@ -41,7 +41,7 @@ dependencies = [
     'click',
     'coloredlogs',
     'lief',
-    'numbat',
+    'numbat>=0.2.0',
     'rich',
 ]
 
