@@ -235,11 +235,9 @@ class FileSystemMapper:
             logging.debug(f"[symlinks] '{path.name}': path '{path}' points on '/dev/null'")
             return
         elif not target.exists():
-            target = self.gen_fw_path(target)
             logging.warning(f"[symlinks] path {target} does not exist")
             return
         elif not Binary.is_supported(target):
-            target = self.gen_fw_path(target)
             logging.debug(f"path {target} does not correspond to a supported binary")
             return
         if target in self.binary_paths:
