@@ -1,6 +1,19 @@
+# v0.4.1
+This version enforces the usage of a more efficient version of numbat and fixes some little bugs.
+
+## Features
+All:
+- enforce numbat >= 0.2 to increase analysis speed
+
+## Fixes
+File system parser:
+- check db existence with the appropriate numbat method
+- remove error-prone path modifications in symlink resolution
+
+**Full Changelog**: https://github.com/quarkslab/pyrrha/compare/v0.4.0...v0.4.1
+
 # v0.4.0—Numbat version
 This version introduces the usage of Numbat, our home-made Sourcetrail SDK fully Pythonic. Thanks to it, `pyrrha` is much easier to install.
-
 
 ## Features
 All:
@@ -25,7 +38,8 @@ This release contains a CI that automatically upload the package on Pypi. You ca
 pip install pyrrha-mapper
 ```
 
-**Full Changelog**: https://github.com/quarkslab/pyrrha/compare/v0.2.0...v0.4.0
+**Full Changelog**: https://github.com/quarkslab/pyrrha/compare/v0.3.0...v0.4.0
+
 # v0.3.0—Hack.lu edition
 Version release at the occasion of the talk [Pyrrha: navigate easily into your system binaries](https://pretalx.com/hack-lu-2023/talk/WVFPNK/) given at the CTI-summit of Hack.lu.
 
