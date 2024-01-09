@@ -26,7 +26,7 @@ authors = [
     { name = 'Eloïse Brocas', email = 'ebrocas@quarkslab.com' },
 ]
 readme = "README.md"
-description = "Filsesystem binaries mapper tool"
+description = "A mapper collection for firmware analysis"
 requires-python = ">=3.10"
 license = {text = "Apache License 2.0"}
 classifiers = [
@@ -53,3 +53,13 @@ Changelog = "https://github.com/quarkslab/pyrrha/changleog.md"
 
 [project.scripts]
 pyrrha = 'pyrrha_mapper:pyrrha'
+
+[project.optional-dependencies]
+doc = [
+    'black',
+    'mkdocs',
+    'mkdocs-autorefs',
+    'mkdocs-glightbox',
+    'mkdocs-material',
+    'mkdocs-section-index'
+]
