@@ -1,0 +1,78 @@
+site_name: Pyrrha Documentation
+site_description: "A mapper collection for firmware analysis."
+repo_url: "https://github.com/quarkslab/pyrrha"
+repo_name: "quarkslab/pyrrha"
+watch: [ mkdocs.yml, README.md, CHANGELOG.md, src/pyrrha_mapper ]
+copyright: Copyright &copy; 2023 Quarkslab
+
+theme:
+  name: "material"
+  palette:
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: red
+      accent: red
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: red
+      accent: red
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+
+  features:
+    - content.code.annotate
+    - content.code.copy
+    - footer
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Mappers:
+      - mappers/mappers.md
+      - Filesystem: mappers/fs.md
+  - Contributing:
+      - Mapper Development: contributing/dev_mapper.md
+  - Changelog: changelog.md
+  - License: license.md
+
+
+plugins:
+  - autorefs
+  - glightbox # picture zoom
+  - search
+  - section-index
+
+
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      base_path: [ ".", ".." ]
+      check_paths: true
+  - pymdownx.superfences
+
+extra:
+  social:
+    - icon: fontawesome/solid/globe
+      link: https:www.quarkslab.com
+    - icon: fontawesome/brands/github
+      link: https://github.com/quarkslab
+    - icon: fontawesome/brands/x-twitter
+      link: https://twitter.com/quarkslab
