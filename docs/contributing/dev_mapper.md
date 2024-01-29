@@ -1,7 +1,7 @@
 # Add a new mapper
 
 ## Mapper Development
-First develop your mapper. We are using `numbat` to manipulate the db used by sourcetrail to store the pieces of information to show in Sourcetrail. Everything is explained in [Numbat's Getiing Started Tutorial]().
+First develop your mapper. We are using `numbat` to manipulate the db used by sourcetrail to store the pieces of information to show in Sourcetrail. Everything is explained in [Numbat's Getting Started Tutorial]().
 
 Then, add the required dependencies into `pyproject.toml`.
 
