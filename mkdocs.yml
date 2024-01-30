@@ -3,7 +3,7 @@ site_description: "A mapper collection for firmware analysis."
 repo_url: "https://github.com/quarkslab/pyrrha"
 repo_name: "quarkslab/pyrrha"
 watch: [ mkdocs.yml, README.md, CHANGELOG.md, src/pyrrha_mapper ]
-copyright: Copyright &copy; 2023 Quarkslab
+copyright: Copyright &copy; 2023-2024 Quarkslab
 
 theme:
   name: "material"
