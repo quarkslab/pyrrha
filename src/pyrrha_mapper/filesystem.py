@@ -25,6 +25,7 @@ import lief
 from numbat import SourcetrailDB
 from rich.progress import Progress
 
+lief.logging.disable()
 
 @dataclass
 class Binary:
