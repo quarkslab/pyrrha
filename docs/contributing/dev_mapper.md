@@ -1,14 +1,14 @@
 # Add a new mapper
 
 ## Mapper Development
-First develop your mapper. We are using `numbat` to manipulate the db used by sourcetrail to store the pieces of information to show in Sourcetrail. Everything is explained in Numbat's Getting Started Tutorial. (Numbat will be open-sourced before the end of March 2024)
+First develop your mapper. We are using `numbat` to manipulate the db used by sourcetrail to store the pieces of information to show in Sourcetrail. Everything is explained in [Numbat's detailed tutorial](https://quarkslab.github.io/numbat/tutorial/).
 
 Then, add the required dependencies into `pyproject.toml`.
 
 ## Integration into the main program
 Once the mapper is ready, it should be integrated into `pyrrha` CLI by adding the corresponding subcommand in the `src/pyrrha_mapper/__main__.py`. The CLI system is handled with [click](https://click.palletsprojects.com)
 
-The subcommand corresponds to a function implementing the main of your mapper and some decorators to declare the subcommand name, its options and its arguments. 
+The subcommand corresponds to a function implementing the main of your mapper and some decorators to declare the subcommand name, its options and its arguments.
 
 The command name is declared with the following decorator. It automatically adds two options: `--db` to indicate the path of the db and `-d` to set the log level at `DEBUG` instead of `INFO`.
 
@@ -42,22 +42,22 @@ You can now add options and arguments if needed. Below you can found some exampl
 Then, you can implement the function that will run your mapper. It will have as parameters all
 the options and arguments declared before. We also provide two utilities function which sets up the logs and create/open a db given a path.
 
-!!! note 
-    
+!!! note
+
     Do not forget that by default, the first two parameters will be `debug: bool, db: Path`.
 
 ```python linenums="143"
 def my_mapper(debug: bool, db: Path, myoption, jobs, target_directory):
     setup_logs(debug)
     db_instance = setup_db(db)
-    
-    # main work 
-    
+
+    # main work
+
     db_instance.close() # do not forget to close your db connection    
 ```
 
 ???+ abstract "Final ` __main__.py`"
-    ``` py linenums="121" 
+    ``` py linenums="121"
     @pyrrha.command(
         'my_mapper',  # the command name
         cls=MapperCommand,  # it will add default options
@@ -83,11 +83,11 @@ def my_mapper(debug: bool, db: Path, myoption, jobs, target_directory):
     def my_mapper(debug: bool, db: Path, myoption, jobs, target_directory):
         setup_logs(debug)
         db_instance = setup_db(db)
-        
-        # main work 
-        
+
+        # main work
+
         db_instance.close() # do not forget to close your db connection  
-    
+
     if __name__ == '__main__':
         pyrrha()
 
