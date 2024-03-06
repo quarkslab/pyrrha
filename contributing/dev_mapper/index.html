@@ -611,11 +611,11 @@
 
 <h1 id="add-a-new-mapper">Add a new mapper</h1>
 <h2 id="mapper-development">Mapper Development</h2>
-<p>First develop your mapper. We are using <code>numbat</code> to manipulate the db used by sourcetrail to store the pieces of information to show in Sourcetrail. Everything is explained in Numbat's Getting Started Tutorial. (Numbat will be open-sourced before the end of March 2024)</p>
+<p>First develop your mapper. We are using <code>numbat</code> to manipulate the db used by sourcetrail to store the pieces of information to show in Sourcetrail. Everything is explained in <a href="https://quarkslab.github.io/numbat/tutorial/">Numbat's detailed tutorial</a>.</p>
 <p>Then, add the required dependencies into <code>pyproject.toml</code>.</p>
 <h2 id="integration-into-the-main-program">Integration into the main program</h2>
 <p>Once the mapper is ready, it should be integrated into <code>pyrrha</code> CLI by adding the corresponding subcommand in the <code>src/pyrrha_mapper/__main__.py</code>. The CLI system is handled with <a href="https://click.palletsprojects.com">click</a></p>
-<p>The subcommand corresponds to a function implementing the main of your mapper and some decorators to declare the subcommand name, its options and its arguments. </p>
+<p>The subcommand corresponds to a function implementing the main of your mapper and some decorators to declare the subcommand name, its options and its arguments.</p>
 <p>The command name is declared with the following decorator. It automatically adds two options: <code>--db</code> to indicate the path of the db and <code>-d</code> to set the log level at <code>DEBUG</code> instead of <code>INFO</code>.</p>
 <p><div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-121">121</a></span>
 <span class="normal"><a href="#__codelineno-0-122">122</a></span>
@@ -678,7 +678,7 @@ the options and arguments declared before. We also provide two utilities functio
 </span><span id="__span-2-144"><a id="__codelineno-2-144" name="__codelineno-2-144"></a>    <span class="n">setup_logs</span><span class="p">(</span><span class="n">debug</span><span class="p">)</span>
 </span><span id="__span-2-145"><a id="__codelineno-2-145" name="__codelineno-2-145"></a>    <span class="n">db_instance</span> <span class="o">=</span> <span class="n">setup_db</span><span class="p">(</span><span class="n">db</span><span class="p">)</span>
 </span><span id="__span-2-146"><a id="__codelineno-2-146" name="__codelineno-2-146"></a>
-</span><span id="__span-2-147"><a id="__codelineno-2-147" name="__codelineno-2-147"></a>    <span class="c1"># main work </span>
+</span><span id="__span-2-147"><a id="__codelineno-2-147" name="__codelineno-2-147"></a>    <span class="c1"># main work</span>
 </span><span id="__span-2-148"><a id="__codelineno-2-148" name="__codelineno-2-148"></a>
 </span><span id="__span-2-149"><a id="__codelineno-2-149" name="__codelineno-2-149"></a>    <span class="n">db_instance</span><span class="o">.</span><span class="n">close</span><span class="p">()</span> <span class="c1"># do not forget to close your db connection    </span>
 </span></code></pre></div></td></tr></table></div>
@@ -741,7 +741,7 @@ the options and arguments declared before. We also provide two utilities functio
 </span><span id="__span-3-144"><a id="__codelineno-3-144" name="__codelineno-3-144"></a>    <span class="n">setup_logs</span><span class="p">(</span><span class="n">debug</span><span class="p">)</span>
 </span><span id="__span-3-145"><a id="__codelineno-3-145" name="__codelineno-3-145"></a>    <span class="n">db_instance</span> <span class="o">=</span> <span class="n">setup_db</span><span class="p">(</span><span class="n">db</span><span class="p">)</span>
 </span><span id="__span-3-146"><a id="__codelineno-3-146" name="__codelineno-3-146"></a>
-</span><span id="__span-3-147"><a id="__codelineno-3-147" name="__codelineno-3-147"></a>    <span class="c1"># main work </span>
+</span><span id="__span-3-147"><a id="__codelineno-3-147" name="__codelineno-3-147"></a>    <span class="c1"># main work</span>
 </span><span id="__span-3-148"><a id="__codelineno-3-148" name="__codelineno-3-148"></a>
 </span><span id="__span-3-149"><a id="__codelineno-3-149" name="__codelineno-3-149"></a>    <span class="n">db_instance</span><span class="o">.</span><span class="n">close</span><span class="p">()</span> <span class="c1"># do not forget to close your db connection  </span>
 </span><span id="__span-3-150"><a id="__codelineno-3-150" name="__codelineno-3-150"></a>
