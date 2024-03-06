@@ -21,7 +21,7 @@ requires = [
 
 [project]
 name = 'pyrrha-mapper'
-version = '0.4.1'
+version = '0.4.2'
 authors = [
     { name = 'Eloïse Brocas', email = 'ebrocas@quarkslab.com' },
 ]
