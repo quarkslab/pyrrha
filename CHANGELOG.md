@@ -1,3 +1,21 @@
+## v0.4.2—Documentation
+This version introduces a brand new documentation and some uniformization to help future mapper development.
+
+### Features
+All:
+
+* A new documentation
+
+File system parser:
+
+* Deactivate lief logging to reduce "noise".
+
+Docker/CI:
+
+* Add template for future mapper.
+
+**Full Changelog**: [https://github.com/quarkslab/pyrrha/compare/v0.4.1...v0.4.2](https://github.com/quarkslab/pyrrha/compare/v0.4.1...v0.4.2)
+
 ## v0.4.1
 This version enforces the usage of a more efficient version of numbat and fixes some little bugs.
 
@@ -38,7 +56,7 @@ Docker/CI:
 - Symlink resolution was partially broken due to not extensive checks on the path. It was trying to parse directory for example.
 
 ### Associated Python package
-This release contains a CI that automatically upload the package on Pypi. You can now install Pyrrha by doing 
+This release contains a CI that automatically upload the package on Pypi. You can now install Pyrrha by doing
 ```python
 pip install pyrrha-mapper
 ```
