@@ -33,7 +33,7 @@ classifiers = [
     'Topic :: Security',
     'Environment :: Console',
 ]
-dependencies = ['click', 'coloredlogs', 'lief', 'numbat>=0.2.0', 'rich']
+dependencies = ['click', 'coloredlogs', 'lief>=0.15.0', 'numbat>=0.2.0', 'rich']
 
 [project.urls]
 Homepage = "https://github.com/quarkslab/pyrrha"
