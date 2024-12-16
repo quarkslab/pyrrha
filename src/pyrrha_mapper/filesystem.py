@@ -71,7 +71,9 @@ class Binary:
 
         if is_elf:
             if self.name.startswith('libcrypto') and len(lief_obj.exported_functions) == 0:
-                lief_obj = lief.ELF.parse(str(self.file_path), lief.ELF.DYNSYM_COUNT_METHODS.HASH)
+                parser_config = lief.ELF.ParserConfig()
+                parser_config.count_mtd = lief.ELF.ParserConfig.DYNSYM_COUNT.HASH
+                lief_obj = lief.ELF.parse(str(self.file_path), parser_config)
 
         # parse imported libs
         self.lib_names = lief_obj.libraries
