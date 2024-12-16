@@ -15,20 +15,16 @@
 #  limitations under the License.
 
 [build-system]
-requires = [
-    'setuptools'
-]
+requires = ['setuptools']
 
 [project]
 name = 'pyrrha-mapper'
 version = '0.4.2'
-authors = [
-    { name = 'Eloïse Brocas', email = 'ebrocas@quarkslab.com' },
-]
+authors = [{ name = 'Eloïse Brocas', email = 'ebrocas@quarkslab.com' }]
 readme = "README.md"
 description = "A mapper collection for firmware analysis"
 requires-python = ">=3.10"
-license = {text = "Apache License 2.0"}
+license = { text = "Apache License 2.0" }
 classifiers = [
     'Development Status :: 4 - Beta',
     'Programming Language :: Python :: 3',
@@ -37,19 +33,13 @@ classifiers = [
     'Topic :: Security',
     'Environment :: Console',
 ]
-dependencies = [
-    'click',
-    'coloredlogs',
-    'lief',
-    'numbat>=0.2.0',
-    'rich',
-]
+dependencies = ['click', 'coloredlogs', 'lief', 'numbat>=0.2.0', 'rich']
 
 [project.urls]
 Homepage = "https://github.com/quarkslab/pyrrha"
 Source = "https://github.com/quarkslab/pyrrha"
 Tracker = "https://github.com/quarkslab/pyrrha/issues"
-Changelog = "https://github.com/quarkslab/pyrrha/changleog.md"
+Changelog = "https://github.com/quarkslab/pyrrha/CHANGELOG.md"
 
 [project.scripts]
 pyrrha = 'pyrrha_mapper:pyrrha'
@@ -61,5 +51,5 @@ doc = [
     'mkdocs-autorefs',
     'mkdocs-glightbox',
     'mkdocs-material',
-    'mkdocs-section-index'
+    'mkdocs-section-index',
 ]
