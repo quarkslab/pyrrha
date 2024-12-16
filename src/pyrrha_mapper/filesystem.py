@@ -61,7 +61,7 @@ class Binary:
         """
         return p.is_file() and not p.is_symlink() and (lief.is_elf(str(p)) or lief.is_pe(str(p)))
 
-    def __post_init__(self):
+    def load(self):
         """
         parse the given path with lief to automatically fill the other fields
         at the exception done of the ids (the object should be put on a DB)
@@ -169,6 +169,7 @@ def parse_binary_job(ingress: Queue, egress: Queue, root_directory: Path) -> Non
             path = ingress.get(timeout=0.5)
             try:
                 res = Binary(path, gen_fw_path(path, root_directory))
+                res.load()
             except Exception as e:
                 res = e
             egress.put((path, res))
