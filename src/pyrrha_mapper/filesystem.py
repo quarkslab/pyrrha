@@ -102,6 +102,7 @@ class Binary:
 
     @property
     def name(self):
+        """:return: name of the binary without its path"""
         return self.file_path.name
 
     def record_in_db(self, db: SourcetrailDB) -> None:
@@ -121,6 +122,7 @@ class Binary:
 
 @dataclass
 class Symlink:
+    """Class that represents a Symlink and store the associated DB id"""
     path: Path
     target_path: Path
     target_id: int
@@ -128,6 +130,7 @@ class Symlink:
 
     @property
     def name(self):
+        """:return: name of the symlink without its path"""
         return self.path.name
 
     def record_in_db(self, db: SourcetrailDB) -> None:
