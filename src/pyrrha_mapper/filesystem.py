@@ -20,10 +20,17 @@ import queue
 from dataclasses import dataclass, field
 from multiprocessing import Pool, Queue, Manager
 from pathlib import Path
+from enum import Enum
 
 import lief
 from numbat import SourcetrailDB
 from rich.progress import Progress
+
+class ResolveDuplicateOption(Enum):
+    IGNORE = 1
+    ARBITRARY = 2
+    INTERACTIVE = 3
+
 
 lief.logging.disable()
 
@@ -107,7 +114,7 @@ class Binary:
         """
         self.id = db.record_class(self.name, prefix=f"{self.fw_path.parent}/", delimiter=":")
         for name in self.exported_symbol_ids.keys():
-            self.exported_symbol_ids[name] = db.record_symbol_node(name, parent_id=self.id)
+            self.exported_symbol_ids[name] = db.record_field(name, parent_id=self.id)
         for name in self.exported_function_ids.keys():
             self.exported_function_ids[name] = db.record_method(name, parent_id=self.id)
 
@@ -255,7 +262,7 @@ class FileSystemMapper:
             logging.warning(
                 f"[symlinks] cannot resolve '{path.name}': path '{target}' does not correspond to a recorded binary")
 
-    def _map_lib_imports(self, binary) -> None:
+    def _map_lib_imports(self, binary, resolve_duplicate_imports = ResolveDuplicateOption.IGNORE) -> None:
         """
         Given an already mapped binary, resolve its library
         imports using the following heuristics:
@@ -269,19 +276,43 @@ class FileSystemMapper:
         """
         for lib_name in binary.lib_names:
             if lib_name in self.binary_names:
-                if len(self.binary_names[lib_name]) != 1:
+                if len(self.binary_names[lib_name]) > 1 and resolve_duplicate_imports is ResolveDuplicateOption.IGNORE:
                     logging.warning(
                         f"[lib imports] {binary.fw_path}: several matches for importing lib {lib_name}, not put into DB")
                 else:
-                    lib_obj = self.binary_names[lib_name][0]
+                    to_import = None
+                    if len(self.binary_names[lib_name]) > 1 and resolve_duplicate_imports is ResolveDuplicateOption.INTERACTIVE:
+                        while to_import is None or to_import < 0 or to_import >= len(self.binary_names[lib_name]):
+                            print(f"several matches for importing lib {lib_name}, choose one to keep\n")
+                            for i in range(len(self.binary_names[lib_name])):
+                                print(f"{i}: {self.binary_names[lib_name][i].file_path}")
+                            try:
+                                to_import = int(input())
+                            except ValueError:
+                                print("Enter a valid number")
+                    else: # "arbitrary" option
+                        to_import = 0
+                    lib_obj = self.binary_names[lib_name][to_import]
                     self.db_interface.record_ref_import(binary.id, lib_obj.id)
                     binary.libs.append(lib_obj)
             elif lib_name in self.symlink_names:
-                if len(self.symlink_names[lib_name]) != 1:
+                if len(self.symlink_names[lib_name]) > 1 and resolve_duplicate_imports is ResolveDuplicateOption.IGNORE:
                     logging.warning(
                         f"[lib imports] {binary.fw_path}: several matches for importing lib {lib_name}, not put into DB")
                 else:
-                    sym_obj = self.symlink_names[lib_name][0]
+                    to_import = None
+                    if len(self.symlink_names[lib_name]) > 1 and resolve_duplicate_imports is ResolveDuplicateOption.INTERACTIVE:
+                        while to_import is None or to_import < 0 or to_import >= len(self.symlink_names[lib_name]):
+                            print(f"several matches for importing lib {lib_name}, choose one to keep\n")
+                            for i in range(len(self.symlink_names[lib_name])):
+                                print(f"{i}: {self.symlink_names[lib_name][i].target_path}")
+                            try:
+                                to_import = int(input())
+                            except ValueError:
+                                print("Enter a valid number")
+                    else: # "arbitrary" option
+                        to_import = 0
+                    sym_obj = self.symlink_names[lib_name][to_import]
                     self.db_interface.record_ref_import(binary.id, sym_obj.id)
                     binary.libs.append(self.binary_paths[sym_obj.target_path])
             else:
@@ -290,7 +321,7 @@ class FileSystemMapper:
                 self.db_interface.record_ref_import(binary.id, lib_id)
                 binary.non_resolved_libs.append(lib_name)
 
-    def _map_symbol_imports(self, binary: Binary) -> None:
+    def _map_symbol_imports(self, binary: Binary, resolve_duplicate_imports = ResolveDuplicateOption.IGNORE) -> None:
         """
         Given an already mapped binary, resolve its symbols.
         This function update the DB with the import links found.
@@ -303,15 +334,27 @@ class FileSystemMapper:
                         if lib_name not in self.binary_names:
                             logging.debug(f"[symbol imports] {binary.fw_path}: lib '{lib_name}' not found in DB")
                             lib_id = self.db_interface.record_class(lib_name, is_indexed=False)
-                            symb_id = self.db_interface.record_symbol_node(symb_name, parent_id=lib_id,
+                            symb_id = self.db_interface.record_field(symb_name, parent_id=lib_id,
                                                                            is_indexed=False)
                             self.db_interface.record_ref_import(binary.id, symb_id)
                             binary.non_resolved_symbol_imports.append(func_name)
-                        elif len(self.binary_names[lib_name]) > 1:
+                        elif len(self.binary_names[lib_name]) > 1 and resolve_duplicate_imports is ResolveDuplicateOption.IGNORE:
                             logging.warning(
                                 f"[symbol imports] {binary.fw_path}: several matches for importing lib {lib_name}, not put into DB")
                         else:
-                            lib: Binary = self.binary_names[lib_name][0]
+                            to_import = None
+                            if len(self.binary_names[lib_name]) > 1 and resolve_duplicate_imports is ResolveDuplicateOption.INTERACTIVE:
+                                while to_import is None or to_import < 0 or to_import >= len(self.binary_names[lib_name]):
+                                    print(f"several matches for importing lib {lib_name}, choose one to keep\n")
+                                    for i in range(len(self.binary_names[lib_name])):
+                                        print(f"{i}: {self.binary_names[lib_name][i].file_path}")
+                                    try:
+                                        to_import = int(input())
+                                    except ValueError:
+                                        print("Enter a valid number")
+                            else: # "arbitrary" option
+                                to_import = 0
+                            lib: Binary = self.binary_names[lib_name][to_import]
                             if symb_name in lib.exported_symbol_ids:
                                 symb_id = lib.exported_symbol_ids[symb_name]
                                 self.db_interface.record_ref_import(binary.id, symb_id)
@@ -321,7 +364,7 @@ class FileSystemMapper:
                                 self.db_interface.record_ref_import(binary.id, symb_id)
                                 binary.imported_symbol_ids.append(symb_id)
                             else:
-                                symb_id = self.db_interface.record_symbol_node(symb_name, parent_id=lib.id,
+                                symb_id = self.db_interface.record_field(symb_name, parent_id=lib.id,
                                                                                is_indexed=False)
                                 self.db_interface.record_ref_import(binary.id, symb_id)
                                 binary.non_resolved_symbol_imports.append(func_name)
@@ -342,7 +385,7 @@ class FileSystemMapper:
                         break
                 if found is False:
                     logging.debug(f"[symbol imports] {binary.name}: cannot resolve {func_name}")
-                    symb_id = self.db_interface.record_symbol_node(func_name, is_indexed=False)
+                    symb_id = self.db_interface.record_field(func_name, is_indexed=False)
                     self.db_interface.record_ref_import(binary.id, symb_id)
                     binary.non_resolved_symbol_imports.append(func_name)
 
@@ -379,7 +422,7 @@ class FileSystemMapper:
         json_path.write_text(json.dumps(export))
         logging.info(f'Export saved: {json_path}')
 
-    def map(self, threads: int, export: bool = False) -> None:
+    def map(self, threads: int, export: bool = False, resolve_duplicate_imports = ResolveDuplicateOption.IGNORE) -> None:
         """
         Map all the content of 'self.root_directory', in the order:
         - binaries;
@@ -390,6 +433,7 @@ class FileSystemMapper:
         :param threads: number of threads to use
         :param export: if True create a JSON export of the mapping. It will be stored
             at the same place as the DB (file name: DB_NAME.json)
+        :param resolve_duplicate_imports: the chosen option for duplicate import resolution 
         """
         with Progress() as progress:
 
@@ -442,12 +486,12 @@ class FileSystemMapper:
             # Handle imports
             logging.debug("[main] Start Libraries imports resolution")
             for binary in self.binary_paths.values():
-                self._map_lib_imports(binary)
+                self._map_lib_imports(binary, resolve_duplicate_imports)
                 progress.update(lib_imports, advance=1)
             self.db_interface.commit()
             logging.debug(f"[main] Start Symbols imports resolution")
             for binary in self.binary_paths.values():
-                self._map_symbol_imports(binary)
+                self._map_symbol_imports(binary, resolve_duplicate_imports)
                 progress.update(symbol_imports, advance=1)
             self.db_interface.commit()
 
