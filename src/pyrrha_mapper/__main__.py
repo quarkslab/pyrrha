@@ -22,7 +22,7 @@ from pathlib import Path
 import click
 from numbat import SourcetrailDB
 
-from .filesystem import FileSystemMapper
+from .filesystem import FileSystemMapper, ResolveDuplicateOption
 
 
 # -------------------------------------------------------------------------------
@@ -121,16 +121,45 @@ their imports and their exports plus the symlinks that points on these executabl
               metavar='INT',
               default=1,
               show_default=True)
+@click.option('--ignore',
+              help='When resolving duplicate imports, ignore them',
+              is_flag=True,
+              default=False,
+              show_default=False)
+@click.option('--arbitrary',
+              help='When resolving duplicate imports, select the first one available',
+              is_flag=True,
+              default=False,
+              show_default=False)
+@click.option('--interactive',
+              help='When resolving duplicate imports, manually select which one to use',
+              is_flag=True,
+              default=False,
+              show_default=False)
 @click.argument('root_directory',
                 # help='Path of the directory containing the filesystem to map.',
                 type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
-def fs(debug: bool, db: Path, json, jobs, root_directory):
+def fs(debug: bool, db: Path, json, jobs, ignore, arbitrary, interactive, root_directory):
     setup_logs(debug)
+    if ignore + arbitrary + interactive > 1:
+        logging.error('--ignore, --arbitrary and --interactive are mutually exclusive options.')
+        return
+
+    resolve_duplicates = ResolveDuplicateOption.IGNORE
+    if arbitrary:
+        resolve_duplicates = ResolveDuplicateOption.ARBITRARY
+    elif interactive:
+        resolve_duplicates = ResolveDuplicateOption.INTERACTIVE
+
     db_instance = setup_db(db)
+    db_instance.set_node_type('class', 'Binaries', 'binary')
+    db_instance.set_node_type('typedef', 'Symlinks', 'symlink')
+    db_instance.set_node_type('method', hover_display='exported function')
+    db_instance.set_node_type('field', hover_display='exported symbol')
 
     root_directory = root_directory.absolute()
     fs_mapper = FileSystemMapper(root_directory, db_instance)
-    fs_mapper.map(jobs, json)
+    fs_mapper.map(jobs, json, resolve_duplicates)
 
     db_instance.close()
 
