@@ -14,14 +14,13 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import coloredlogs
 import logging
 import multiprocessing
 from pathlib import Path
 
 import click
+import coloredlogs
 from numbat import SourcetrailDB
-
 from pyrrha_mapper.filesystem import ResolveDuplicateOption
 from pyrrha_mapper.imports_mapper import FileSystemImportsMapper
 
@@ -133,47 +132,36 @@ their imports and their exports plus the symlinks that points on these executabl
     show_default=True,
 )
 @click.option(
-    "--ignore", help="When resolving duplicate imports, ignore them", is_flag=True, default=False, show_default=False
+    "--ignore",
+    "resolve_duplicates",
+    flag_value=ResolveDuplicateOption.IGNORE,
+    help="When resolving duplicate imports, ignore them",
+    default=True,
 )
 @click.option(
     "--arbitrary",
+    "resolve_duplicates",
+    flag_value=ResolveDuplicateOption.ARBITRARY,
     help="When resolving duplicate imports, select the first one available",
-    is_flag=True,
-    default=False,
-    show_default=False,
 )
 @click.option(
     "--interactive",
-    help="When resolving duplicate imports, manually select which one to use",
-    is_flag=True,
-    default=False,
-    show_default=False,
+    "resolve_duplicates",
+    flag_value=ResolveDuplicateOption.INTERACTIVE,
+    help="When resolving duplicate imports, user manually select which one to use",
 )
 @click.argument(
     "root_directory",
     # help='Path of the directory containing the filesystem to map.',
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
 )
-def fs(debug: bool, db: Path, json, jobs, ignore, arbitrary, interactive, root_directory):
+def fs(debug: bool, db: Path, json, jobs, resolve_duplicates, root_directory):
     setup_logs(debug)
-    if ignore + arbitrary + interactive > 1:
-        logging.error("--ignore, --arbitrary and --interactive are mutually exclusive options.")
-        return
-
-    resolve_duplicates = ResolveDuplicateOption.IGNORE
-    if arbitrary:
-        resolve_duplicates = ResolveDuplicateOption.ARBITRARY
-    elif interactive:
-        resolve_duplicates = ResolveDuplicateOption.INTERACTIVE
-
     db_instance = setup_db(db)
-    db_instance.set_node_type("class", "Binaries", "binary")
-    db_instance.set_node_type("typedef", "Symlinks", "symlink")
-    db_instance.set_node_type("method", hover_display="exported function")
-    db_instance.set_node_type("field", hover_display="exported symbol")
 
     root_directory = root_directory.absolute()
     fs_mapper = FileSystemImportsMapper(root_directory, db_instance)
+
     fs_mapper.map(jobs, json, resolve_duplicates)
 
     db_instance.close()
