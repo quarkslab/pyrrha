@@ -3,3 +3,6 @@ build/
 *.egg-info/
 .idea/
 root-fs/
+*.code-workspace
+.vscode
+*.srctrl*
