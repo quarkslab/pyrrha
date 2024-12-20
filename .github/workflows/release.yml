@@ -25,7 +25,7 @@ jobs:
         with:
           name: artifact_${{ matrix.python-version }}
           path: |
-            dist/numbat*.whl
+            dist/pyrrha*.whl
             dist/*.tar.gz
 
   upload_pypi:
