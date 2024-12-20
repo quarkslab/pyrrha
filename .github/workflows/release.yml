@@ -8,24 +8,25 @@ jobs:
   build_wheel_and_sdist:
     name: Build wheel
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [ "3.10", "3.11", "3.12", "3.13" ]
 
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: pip install build
       - name: Build wheel and sdist
-        run: python3 -m build
+        run: python -m build
       - uses: actions/upload-artifact@v4
         with:
-          name: artifact
-          path: dist/pyrrha*.whl
-      - uses: actions/upload-artifact@v4
-        with:
-          name: artifact
-          path: dist/*.tar.gz
+          name: artifact_${{ matrix.python-version }}
+          path: |
+            dist/numbat*.whl
+            dist/*.tar.gz
 
   upload_pypi:
     needs: build_wheel_and_sdist
@@ -33,13 +34,11 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          # unpacks default artifact into dist/
-          # if `name: artifact` is omitted, the action will create extra parent dir
-          name: artifact
+          pattern: artifact_*
+          merge-multiple: true
           path: dist
-
       - name: Publish a Python distribution to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.8.2
+        uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_DEPLOY_TOKEN }}
 
