@@ -6,18 +6,20 @@
 First, create your db with `pyrrha`. The `ROOT_DIRECTORY` should contain the whole filesystem you want to map, it should be already extracted or mounted. `ROOT_DIRECTORY` will be considered by Pyrrha as the filesystem root for all the symlink resolutions. 
 
 ```commandline
-Usage: pyrrha fs [OPTIONS] ROOT_DIRECTORY
+Usage: Usage: pyrrha fs [OPTIONS] ROOT_DIRECTORY
 
-  Map a filesystem into a sourcetrail-compatible db. It maps ELF and PE files, their imports and their
-  exports plus the symlinks that points on these executable files.
+  Map a filesystem into a sourcetrail-compatible db. It maps ELF and PE files, their imports and their exports plus
+  the symlinks that points on these executable files.
 
 Options:
   -d, --debug     Set log level to DEBUG
   --db PATH       Sourcetrail DB file path (.srctrldb).  [default: pyrrha.srctrldb]
   -e, --json      Create a JSON export of the resulting mapping.
   -j, --jobs INT  Number of parallel jobs created (threads).  [default: 1; 1<=x<=16]
+  --ignore        When resolving duplicate imports, ignore them
+  --arbitrary     When resolving duplicate imports, select the first one available
+  --interactive   When resolving duplicate imports, user manually select which one to use
   -h, --help      Show this message and exit.
-
 ```
 
 You can also export your Pyrrha results as a JSON file (option `-j`) to be able to postprocess them. For example, you can diff the results between two versions of the same system and list the binaries added/removed and which symbols has been added/removed (*cf* example script in `example`).
