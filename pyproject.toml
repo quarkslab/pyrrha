@@ -19,7 +19,7 @@ requires = ['setuptools']
 
 [project]
 name = 'pyrrha-mapper'
-version = '0.4.2'
+version = '0.4.3'
 authors = [{ name = 'Eloïse Brocas', email = 'ebrocas@quarkslab.com' }]
 readme = "README.md"
 description = "A mapper collection for firmware analysis"
@@ -33,7 +33,7 @@ classifiers = [
     'Topic :: Security',
     'Environment :: Console',
 ]
-dependencies = ['click', 'coloredlogs', 'lief>=0.15.0', 'numbat>=0.2.0', 'rich']
+dependencies = ['click', 'coloredlogs', 'lief>=0.15.0', 'numbat>=0.2.2', 'rich']
 
 [project.urls]
 Homepage = "https://github.com/quarkslab/pyrrha"
