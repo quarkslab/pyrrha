@@ -160,6 +160,12 @@ class FileSystemMapper(ABC):
         self.symlink_names: dict[str, list[Symlink]] = dict()
         self.symlink_paths: dict[Path, Symlink] = dict()
 
+        # Setup graph customisation in NumbatUI
+        db.set_node_type("class", "Binaries", "binary")
+        db.set_node_type("typedef", "Symlinks", "symlink")
+        db.set_node_type("method", hover_display="exported function")
+        db.set_node_type("field", hover_display="exported symbol")
+
     def gen_fw_path(self, path: Path) -> Path:
         """
         Generate the path of a given file inside a firmware
