@@ -53,8 +53,11 @@ The detailed documentation of each mapper is available in the [documentation](ht
 
 Pyrrha has been presented at two conferences listed below. These talks include live demo of the `fs` parser which map links between libraries and executables files.
 
-- [Pyrrha: navigate easily into your system binaries, *Hack.lu'23*. [[slides]](https://github.com/quarkslab/conf-presentations/blob/master/Confs/HackLu23/pyrrha.pdf) [[video]](https://www.youtube.com/watch?v=-dMl-SvQl4k) 
+- Pyrrha: navigate easily into your system binaries, *Hack.lu'23*. [[slides]](https://github.com/quarkslab/conf-presentations/blob/master/Confs/HackLu23/pyrrha.pdf) [[video]](https://www.youtube.com/watch?v=-dMl-SvQl4k) 
 - Map your Firmware!, *PTS'23*. [[slides]](https://github.com/quarkslab/conf-presentations/blob/master/Confs/PTS23/PTS2023-Talk-14-Pyrrha-map-your-firmware.pdf) [[video]](https://passthesalt.ubicast.tv/videos/2023-map-your-firmware/) 
 
 ## Authors
 - Eloïse Brocas (@ebrocas), Quarkslab
+
+### Past Contributors
+- Pascal Wu (@pwu42), during his internship at Quarkslab

@@ -1,3 +1,20 @@
+## v0.4.3—Resolution Strategies
+
+### Features
+File system parser:
+
+* Add duplicate import resolution strategies: the user can now choose between three strategies (`--ignore`, `--arbitrary`, `--interactive`).
+* Add customization into the resulting graph (NumbatUI features, which is currently under active development).
+* Rework internal mapper architecture.
+
+### Fixes
+File system parser:
+
+- Fix the path resolution issues when firmware path contains `..`
+
+**Full Changelog**: [https://github.com/quarkslab/pyrrha/compare/v0.4.2...v0.4.3](https://github.com/quarkslab/pyrrha/compare/v0.4.2...v0.4.3)
+
+
 ## v0.4.2—Documentation
 This version introduces a brand new documentation and some uniformization to help future mapper development.
 
