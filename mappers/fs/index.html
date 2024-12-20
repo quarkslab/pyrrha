@@ -661,17 +661,20 @@
 <h2 id="usage">Usage</h2>
 <h3 id="mapping-with-pyrrha">Mapping with Pyrrha</h3>
 <p>First, create your db with <code>pyrrha</code>. The <code>ROOT_DIRECTORY</code> should contain the whole filesystem you want to map, it should be already extracted or mounted. <code>ROOT_DIRECTORY</code> will be considered by Pyrrha as the filesystem root for all the symlink resolutions. </p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Usage: pyrrha fs [OPTIONS] ROOT_DIRECTORY
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Usage: Usage: pyrrha fs [OPTIONS] ROOT_DIRECTORY
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  Map a filesystem into a sourcetrail-compatible db. It maps ELF and PE files, their imports and their
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  exports plus the symlinks that points on these executable files.
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  Map a filesystem into a sourcetrail-compatible db. It maps ELF and PE files, their imports and their exports plus
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  the symlinks that points on these executable files.
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>Options:
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>  -d, --debug     Set log level to DEBUG
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>  --db PATH       Sourcetrail DB file path (.srctrldb).  [default: pyrrha.srctrldb]
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>  -e, --json      Create a JSON export of the resulting mapping.
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  -j, --jobs INT  Number of parallel jobs created (threads).  [default: 1; 1&lt;=x&lt;=16]
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>  -h, --help      Show this message and exit.
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>  --ignore        When resolving duplicate imports, ignore them
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>  --arbitrary     When resolving duplicate imports, select the first one available
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>  --interactive   When resolving duplicate imports, user manually select which one to use
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>  -h, --help      Show this message and exit.
 </span></code></pre></div>
 <p>You can also export your Pyrrha results as a JSON file (option <code>-j</code>) to be able to postprocess them. For example, you can diff the results between two versions of the same system and list the binaries added/removed and which symbols has been added/removed (<em>cf</em> example script in <code>example</code>).</p>
 <h3 id="visualization-with-sourcetrail">Visualization with Sourcetrail</h3>
