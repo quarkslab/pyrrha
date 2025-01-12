@@ -68,7 +68,7 @@ class Binary:
             if quokka_file.exists():
                 program = Program(quokka_file, exec_file)
             else:
-                program = Program.from_binary(exec_file, timeout=3600)
+                program = Program.from_binary(exec_file, str(exec_file)+".quokka", timeout=3600)
         except ChunkMissingError as e:
             raise SyntaxError()
         if program is None:

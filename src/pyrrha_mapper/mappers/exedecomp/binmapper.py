@@ -135,6 +135,7 @@ def load_decompiled(program: Program) -> dict[int, DecompiledFunction]:
 
         return final_data
     else:
+        logging.info("extracting decompilation file (with idascript)")
         decompile_file = decompile_program(program)
         if decompile_file.exists():
             return load_decompiled(program)  # call ourselves again
