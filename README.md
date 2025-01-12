@@ -58,6 +58,8 @@ Pyrrha has been presented at two conferences listed below. These talks include l
 
 ## Authors
 - Eloïse Brocas (@ebrocas), Quarkslab
+- Robin David (@RobinDavid), Quarkslab
+
 
 ### Past Contributors
 - Pascal Wu (@pwu42), during his internship at Quarkslab

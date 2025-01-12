@@ -25,7 +25,7 @@ from pyrrha_mapper.filesystem import ResolveDuplicateOption
 from pyrrha_mapper.imports_mapper import FileSystemImportsMapper
 from pyrrha_mapper.mappers import intercg
 from pyrrha_mapper.types import Disassembler, Exporters
-
+from pyrrha_mapper.mappers import exedecomp
 
 # -------------------------------------------------------------------------------
 #                           Common stuff for mappers
@@ -270,6 +270,46 @@ def fs_call_graph(debug: bool,
     except RuntimeError:
         pass
 
+
+    db_instance.commit()
+    db_instance.close()
+
+
+
+
+@pyrrha.command(
+    "exe-decomp",
+    cls=MapperCommand,
+    short_help="Map an executable call graph with its decompiled code.",
+    help="Map a single executable call graph into a sourcetrail-compatible database."
+         "It also index the decompiled code along with all call cross-references.",
+)
+@click.option("--disassembler",
+              required=False,
+              type=Disassembler,
+              default=Disassembler.AUTO,
+              show_default=True,
+              help="Disassembler to use for disassembly.")
+@click.argument(
+    "executable",
+    type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
+)
+def fs_exe_decompiled(debug: bool,
+                  db: Path,
+                  disassembler: Disassembler,
+                  executable: Path):
+    setup_logs(debug, db)
+    db_instance = setup_db(db)
+
+    if disassembler not in [Disassembler.AUTO, Disassembler.IDA]:
+        click.echo(f"disassembler not yet supported")
+        # TODO: add support for other disassembler (forward parameter to mapper)
+        return 1
+
+    if exedecomp.map_binary(db_instance, executable):
+        logging.info("success.")
+    else:
+        logging.error("failure.")
 
     db_instance.commit()
     db_instance.close()
