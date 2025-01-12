@@ -17,6 +17,7 @@ IGNORE_LIST = [
     "__gmon_start__"
 ]
 
+QUOKKA_EXT = ".quokka"
 
 def load_file_system(dump: PyrrhaDump, root_path: Path) -> list[Binary]:
     tot = len(dump.bin_by_path)
@@ -27,7 +28,7 @@ def load_file_system(dump: PyrrhaDump, root_path: Path) -> list[Binary]:
         bin_path = bin_entry['path']
 
         rel_bin = str(bin_path[1:] if bin_path.startswith("/") else bin_path)
-        quokka_file = root_path / (rel_bin+".quokka")
+        quokka_file = root_path / (rel_bin+QUOKKA_EXT)
         exec_file = root_path / rel_bin
         s = "SKIP" if not exec_file.exists() else ('LOAD' if quokka_file.exists() else 'CREATE')
         logging.info(f"[{i+1}/{tot}] process: {bin_path} [{s}]")
@@ -199,4 +200,4 @@ def map_firmware(db: SourcetrailDB, root_path: Path, dump: PyrrhaDump, jobs: int
                 except KeyError as e:
                     logging.error(f"can't find symbols: {e}")
         logging.info(f"Good: {good}, Bad: {bad}")
-        return True
+    return True
