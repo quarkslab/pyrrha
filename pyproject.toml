@@ -20,7 +20,10 @@ requires = ['setuptools']
 [project]
 name = 'pyrrha-mapper'
 version = '0.4.3'
-authors = [{ name = 'Eloïse Brocas', email = 'ebrocas@quarkslab.com' }]
+authors = [
+    { name = 'Eloïse Brocas', email = 'ebrocas@quarkslab.com' },
+    { name = "Robin David", email = "rdavid@quarkslab.com"}
+]
 readme = "README.md"
 description = "A mapper collection for firmware analysis"
 requires-python = ">=3.10"
@@ -33,7 +36,15 @@ classifiers = [
     'Topic :: Security',
     'Environment :: Console',
 ]
-dependencies = ['click', 'coloredlogs', 'lief>=0.15.0', 'numbat>=0.2.2', 'rich']
+dependencies = ['click',
+                'coloredlogs',
+                'lief>=0.15.0',
+                'numbat>=0.2.2',
+                'rich',
+                # InterCG mapper
+                'quokka-project',
+                # Exedecomp mapper
+                'idascript']
 
 [project.urls]
 Homepage = "https://github.com/quarkslab/pyrrha"

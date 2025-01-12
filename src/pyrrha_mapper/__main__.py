@@ -23,6 +23,8 @@ import coloredlogs
 from numbat import SourcetrailDB
 from pyrrha_mapper.filesystem import ResolveDuplicateOption
 from pyrrha_mapper.imports_mapper import FileSystemImportsMapper
+from pyrrha_mapper.mappers import intercg
+from pyrrha_mapper.types import Disassembler, Exporters
 
 
 # -------------------------------------------------------------------------------
@@ -53,14 +55,17 @@ class MapperCommand(click.Command):
         self.no_args_is_help = True
 
 
-def setup_logs(is_debug_level: bool) -> None:
+def setup_logs(is_debug_level: bool, db_path: str | Path = "") -> None:
     """
     Setup logs.
+
     :param is_debug_level: if True set the log level as DEBUG else INFO
+    :param db_path: if provided, save a collocated log file.
     """
     log_format = dict(fmt="[%(asctime)s][%(levelname)s]: %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    level = logging.DEBUG if is_debug_level else logging.INFO
     coloredlogs.install(
-        level=logging.DEBUG if is_debug_level else logging.INFO,
+        level=level,
         level_styles={
             "debug": {"color": "magenta"},
             "info": {"color": "cyan"},
@@ -71,6 +76,14 @@ def setup_logs(is_debug_level: bool) -> None:
         field_styles={"asctime": {"color": "green"}, "levelname": {"bold": True}},
         **log_format,
     )
+
+    if db_path:
+        log_file = str(db_path)+".log"
+        # add file handler
+        file_handler = logging.FileHandler(log_file, mode="w")
+        file_handler.setLevel(level)
+        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        logging.root.addHandler(file_handler)
 
 
 def setup_db(db_path, overwrite_db: bool = True) -> SourcetrailDB:
@@ -165,6 +178,104 @@ def fs(debug: bool, db: Path, json, jobs, resolve_duplicates, root_directory):
     fs_mapper.map(jobs, json, resolve_duplicates)
 
     db_instance.close()
+
+
+
+
+@pyrrha.command(
+    "fs-cg",
+    cls=MapperCommand,
+    short_help="Map the Call Graph of every firmware executable a sourcetrail-compatible db.",
+    help="Map a the Inter-Image Call Graph of a whole filesystem into a sourcetrail-compatible"
+         "It disassembles executables using a disassembler and extract the call graph."
+         "It then results all call references accross binaries.",
+)
+
+@click.option(
+    "-j",
+    "--jobs",
+    help="Number of parallel jobs created (threads).",
+    type=click.IntRange(1, int(multiprocessing.cpu_count()*0.7), clamp=True), # 70% of threads
+    metavar="INT",
+    default=1,
+    show_default=True,
+)
+@click.option(
+    "--ignore",
+    "resolve_duplicates",
+    flag_value=ResolveDuplicateOption.IGNORE,
+    help="When resolving duplicate imports, ignore them",
+    default=True,
+)
+@click.option(
+    "--arbitrary",
+    "resolve_duplicates",
+    flag_value=ResolveDuplicateOption.ARBITRARY,
+    help="When resolving duplicate imports, select the first one available",
+)
+@click.option(
+    "--interactive",
+    "resolve_duplicates",
+    flag_value=ResolveDuplicateOption.INTERACTIVE,
+    help="When resolving duplicate imports, user manually select which one to use",
+)
+@click.option("--fs-mapper-dump",
+              required=True,
+              type=click.Path(file_okay=True, dir_okay=False, exists=True),
+              help="Pyrrha fs mapper dump.")
+@click.option("--disassembler",
+              required=False,
+              type=Disassembler,
+              default=Disassembler.AUTO,
+              show_default=True,
+              help="Disassembler to use for disassembly.")
+@click.option("--exporter",
+              required=False,
+              type=Exporters,
+              default=Exporters.AUTO,
+              show_default=True,
+              help="Binary exporter to use for binary analysis.")
+@click.argument(
+    "root_directory",
+    # help='Path of the directory containing the filesystem to map.',
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+)
+def fs_call_graph(debug: bool,
+                  db: Path,
+                  jobs: int,
+                  resolve_duplicates: ResolveDuplicateOption,
+                  fs_mapper_dump: str,
+                  disassembler: Disassembler,
+                  exporter: Exporters,
+                  root_directory):
+    setup_logs(debug, db)
+    db_instance = setup_db(db)
+
+    if disassembler not in [Disassembler.AUTO, Disassembler.IDA]:
+        click.echo(f"disassembler not yet supported")
+        # TODO: add support for other disassembler
+        return 1
+
+    if exporter not in [Exporters.AUTO, Exporters.QUOKKA]:
+        click.echo(f"binary exporter: {exporter.name} not yet supported")
+        # TODO: add support for other disassembler
+        return 1
+
+    root_directory = root_directory.absolute()
+
+    pyrrha_dump = intercg.PyrrhaDump(Path(fs_mapper_dump))
+
+    try:
+        intercg.map_firmware(db_instance, root_directory, pyrrha_dump, jobs, resolve_duplicates)
+    except RuntimeError:
+        pass
+
+
+    db_instance.commit()
+    db_instance.close()
+
+
+
 
 
 if __name__ == "__main__":
