@@ -1,9 +1,10 @@
+"""Types shared in multiple mappers"""
 from enum import Enum, auto
 
 
 class Disassembler(Enum):
     """
-    Enum to represent a SRE (Software Reverse Enginneering tool)
+    Enum to represent a SRE (Software Reverse Engineering tool)
     aka a disassembler.
     """
 
@@ -21,3 +22,12 @@ class Exporters(Enum):
     AUTO = auto()      # doc: The exporter shall be automatically selected
     BINEXPORT = auto() # doc: Use Binexport as exporter
     QUOKKA = auto()    # doc: Use Quokka as exporter
+
+
+class ResolveDuplicateOption(Enum):
+    """
+    Enum to represent the strategy of resolution when the mapper cannot solve it.
+    """
+    IGNORE = 1       # doc: The mapper will let the conflict as unresolved.
+    ARBITRARY = 2    # doc: The mapper will choose a default one.
+    INTERACTIVE = 3  # doc: The user can interactively solve the conflict.
