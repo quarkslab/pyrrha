@@ -21,11 +21,9 @@ from pathlib import Path
 import click
 import coloredlogs
 from numbat import SourcetrailDB
-from pyrrha_mapper.filesystem import ResolveDuplicateOption
-from pyrrha_mapper.imports_mapper import FileSystemImportsMapper
-from pyrrha_mapper.mappers import intercg
-from pyrrha_mapper.types import Disassembler, Exporters
-from pyrrha_mapper.mappers import exedecomp
+
+from pyrrha_mapper.mappers import intercg, exedecomp, FileSystemImportsMapper
+from pyrrha_mapper.types import Disassembler, Exporters, ResolveDuplicateOption
 
 # -------------------------------------------------------------------------------
 #                           Common stuff for mappers

@@ -7,7 +7,7 @@ from pathlib import Path
 import lief
 from numbat import SourcetrailDB
 
-from pyrrha_mapper.filesystem import Binary, FileSystemMapper
+from .filesystem import Binary, FileSystemMapper
 
 lief.logging.disable()
 
