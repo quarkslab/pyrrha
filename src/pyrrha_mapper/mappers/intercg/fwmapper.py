@@ -9,8 +9,7 @@ from numbat import SourcetrailDB
 from .binary import Binary
 from .pyrrha_dump import PyrrhaDump
 
-# FIXME: should be in a common module of pyrrha
-from pyrrha_mapper.filesystem import ResolveDuplicateOption
+from pyrrha_mapper.types import ResolveDuplicateOption
 
 
 IGNORE_LIST = [

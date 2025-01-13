@@ -20,17 +20,11 @@ from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from multiprocessing import Pool, Queue, Manager
 from pathlib import Path
-from enum import Enum
 
 from numbat import SourcetrailDB
 from rich.progress import Progress
 
-
-class ResolveDuplicateOption(Enum):
-    IGNORE = 1
-    ARBITRARY = 2
-    INTERACTIVE = 3
-
+from pyrrha_mapper.types import ResolveDuplicateOption
 
 @dataclass
 class Binary(ABC):
@@ -348,8 +342,8 @@ class FileSystemMapper(ABC):
                             self.db_interface.record_ref_import(binary.id, symb_id)
                             binary.non_resolved_symbol_imports.append(func_name)
                         elif (
-                            len(self.binary_names[lib_name]) > 1
-                            and resolve_duplicate_imports is ResolveDuplicateOption.IGNORE
+                                len(self.binary_names[lib_name]) > 1
+                                and resolve_duplicate_imports is ResolveDuplicateOption.IGNORE
                         ):
                             logging.warning(
                                 f"[symbol imports] {binary.fw_path}: several matches for importing lib {lib_name}, not put into DB"
