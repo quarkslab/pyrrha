@@ -179,13 +179,13 @@ def map_firmware(db: SourcetrailDB, root_path: Path, dump: PyrrhaDump, jobs: int
                                     print(f"cache: {[x.path for x in resolve_cache]}")
                                     for cache_entry in resolve_cache:
                                         if cache_entry in served_by:  # reuse already selected entry
-                                            logging.debug(f"reuse manually selected entry to desambiguate {target}")
+                                            logging.debug(f"reuse manually selected entry to disambiguate {target}")
                                             served_by = [cache_entry]
                                     if len(served_by) > 1:  # still not resolved
                                         print(f"symbol {target} needed for {binary.path} served by multiple binaries:")
 
-                                        for i, v in enumerate(table[target]):
-                                            print(f"* [{i}] {v.path}")
+                                        for num, option in enumerate(table[target]):
+                                            print(f"* [{num}] {option.path}")
 
                                         res = input("Select (default=0): ")
                                         val = 0 if not res else int(res)
@@ -201,7 +201,7 @@ def map_firmware(db: SourcetrailDB, root_path: Path, dump: PyrrhaDump, jobs: int
                                     logging.debug(f"symbol {target} served by {served_by[0].name} automatically add it!")
                                     deps_symbols.update(symbol_ids[pid_to_nid[served_by[0].pyrrha_id]])
                                     targets.append(target)  # Push back the target to try again
-                                else:  # still still not resolved
+                                else:  # if still not resolved
                                     bad += 1
                                     logging.warning(f"can't resolve edge: {f_name} -> {target}: provided by {[x.name for x in table[target]] if target in table else '[EMPTY]'}")
                     except KeyError as e:
