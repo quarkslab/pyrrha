@@ -22,7 +22,7 @@ from multiprocessing import Pool, Queue, Manager
 from pathlib import Path
 
 from numbat import SourcetrailDB
-from rich.progress import Progress
+from rich.progress import Progress, TextColumn, BarColumn, MofNCompleteColumn, TimeElapsedColumn
 
 from pyrrha_mapper.types import ResolveDuplicateOption
 
@@ -419,7 +419,12 @@ class FileSystemMapper(ABC):
             at the same place as the DB (file name: DB_NAME.json)
         :param resolve_duplicate_imports: the chosen option for duplicate import resolution
         """
-        with Progress() as progress:
+        with Progress(
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                MofNCompleteColumn(),
+                TimeElapsedColumn(),
+        ) as progress:
 
             binaries_map = progress.add_task("[deep_pink2]Binaries mapping", total=len(self.binaries))
             symlinks_map = progress.add_task("[orange_red1]Symlinks mapping", total=len(self.symlinks))
