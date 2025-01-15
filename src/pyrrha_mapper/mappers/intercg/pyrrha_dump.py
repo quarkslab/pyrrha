@@ -29,7 +29,7 @@ class PyrrhaDump(object):
 
     def get_dependencies(self, pyr_id: str | int) -> dict[int, dict]:
         entry = self.data['binaries'][str(pyr_id)]
-        return {x: self.data['binaries'][str(x)] for x in entry['imports']['lib']['ids']}
+        return {int(x): self.data['binaries'][str(x)] for x in entry['imports']['lib']['ids']}
 
     def get_all_imported_symbols(self, id: str|int) -> set[str]:
         entry = self.data['binaries'][str(id)]
