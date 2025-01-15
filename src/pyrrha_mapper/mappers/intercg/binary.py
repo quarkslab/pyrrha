@@ -53,7 +53,7 @@ class Binary:
     def load_program(quokka_file: str | Path, exec_file: str | Path) -> 'Binary':
         """
         Load a binary file and its quokka file into a Binary object.
-        In order it performs the following actions:
+        In order, it performs the following actions:
         1. load the program object
         2. use lief to extract exported symbols
         3.
@@ -105,7 +105,7 @@ class Binary:
             call_graph[canon] = []
 
         # Iterate back the temporary dict to fill the real call graph
-        # The deal here is to fast forward call to imported function directly on the imported
+        # The deal here is to fast-forward call to imported function directly on the imported
         # symbol and not on the PLT (to make the graph more straightforward)
         for f_name, f_pp_name, f_addr, f_type, calls in _inter_cg.values():
 
@@ -173,14 +173,14 @@ class Binary:
             exports[s.value].append(s.name)  # !! Add mangled name !
 
         # Redefine exports mapping to choose a single name for all aliases
-        exports = {k: (Binary.desambiguate_export(names), names) for k, names in exports.items()}
+        exports = {k: (Binary.disambiguate_export(names), names) for k, names in exports.items()}
 
         demangled = {x.name: x.demangled_name for x in p.symbols if x.is_function and x.exported}
         return exports, demangled
 
 
     @staticmethod
-    def desambiguate_export(names: list[str]) -> str:
+    def disambiguate_export(names: list[str]) -> str:
         if len(names) == 1:
             return names[0]  # If only one no ambiguity
 
@@ -199,7 +199,7 @@ class Binary:
 
         # all exports starts with _
         if chosen is None:
-            logging.warning(f"cannot desambiguate: {names} (select shortest name)")
+            logging.warning(f"cannot disambiguate: {names} (select shortest name)")
             chosen = min(names, key=len)
         return chosen
 
