@@ -145,7 +145,7 @@ def load_decompiled(program: Program) -> dict[int, DecompiledFunction]:
 
 
 def load_program(bin_path: Path) -> Program:
-    quokka_file = Path(str(bin_path)+".quokka")
+    quokka_file = Path(f"{bin_path}.quokka")
     if quokka_file.exists():
         logging.info("loading existing Quokka file")
         return Program(quokka_file, bin_path)
