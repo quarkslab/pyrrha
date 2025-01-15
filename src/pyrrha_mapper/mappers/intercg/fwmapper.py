@@ -1,36 +1,32 @@
 import json
-from pathlib import Path
-from collections import defaultdict
 import logging
-
+from collections import defaultdict
+from pathlib import Path
 
 from numbat import SourcetrailDB
-from rich.progress import Progress
+from pyrrha_mapper.types import ResolveDuplicateOption
+from rich.progress import Progress, TextColumn, BarColumn, MofNCompleteColumn, TimeElapsedColumn
 
 from .binary import Binary
 from .pyrrha_dump import PyrrhaDump
 
-from pyrrha_mapper.types import ResolveDuplicateOption
-
-
-IGNORE_LIST = [
-    "__gmon_start__"
-]
+IGNORE_LIST = ["__gmon_start__"]
 
 QUOKKA_EXT = ".quokka"
+
 
 def load_file_system(dump: PyrrhaDump, root_path: Path) -> list[Binary]:
     tot = len(dump.bin_by_path)
 
     all_bins = []
 
-    for i, (pyr_id, bin_entry) in enumerate(dump.data['binaries'].items()):
-        bin_path = bin_entry['path']
+    for i, (pyr_id, bin_entry) in enumerate(dump.data["binaries"].items()):
+        bin_path = bin_entry["path"]
 
         rel_bin = str(bin_path[1:] if bin_path.startswith("/") else bin_path)
-        quokka_file = root_path / (rel_bin+QUOKKA_EXT)
+        quokka_file = root_path / (rel_bin + QUOKKA_EXT)
         exec_file = root_path / rel_bin
-        s = "SKIP" if not exec_file.exists() else ('LOAD' if quokka_file.exists() else 'CREATE')
+        s = "SKIP" if not exec_file.exists() else ("LOAD" if quokka_file.exists() else "CREATE")
         logging.info(f"[{i+1}/{tot}] process: {bin_path} [{s}]")
         if not exec_file.exists():
             logging.error(f"cannot find executable file mentioned in 'fs' mapper: {exec_file.name} (skip)")
@@ -83,21 +79,27 @@ def load_binaries(root_path: Path, dump: PyrrhaDump, cache_file: Path) -> list[B
         return all_bins
 
 
-def map_firmware(db: SourcetrailDB, root_path: Path, dump: PyrrhaDump, jobs: int, resolver: ResolveDuplicateOption) -> bool:
+def map_firmware(
+    db: SourcetrailDB, root_path: Path, dump: PyrrhaDump, jobs: int, resolver: ResolveDuplicateOption
+) -> bool:
 
     # Change some headers
     db.set_node_type("class", "Binaries", "binary")
 
-
     binary_mapping: dict[int, Binary] = {}  # pyrrha_id -> Binary
-    pid_to_nid: dict[int, int] = {}         # pyrrha_id -> numbat_id
-    symbol_ids = {}                         # (binary) numbat_id -> function name -> (symbol function) numbat_id
+    pid_to_nid: dict[int, int] = {}  # pyrrha_id -> numbat_id
+    symbol_ids = {}  # (binary) numbat_id -> function name -> (symbol function) numbat_id
 
     # Load binaries from the filesystem (or cache file)
     cache_file = db.path.with_suffix(".bins.json")
     all_bins = load_binaries(root_path, dump, cache_file)
 
-    with Progress() as progress:
+    with Progress(
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TimeElapsedColumn(),
+    ) as progress:
         binaries_map = progress.add_task("[deep_pink2]Binaries mapping", total=len(all_bins))
 
         # ---------- Iterate all binaries and add Nodes in the database ---------
@@ -105,14 +107,14 @@ def map_firmware(db: SourcetrailDB, root_path: Path, dump: PyrrhaDump, jobs: int
             logging.debug(f"[{i + 1}/{len(all_bins)}] index node: {binary.name}")
 
             # Create the node entry in numbat
-            bin_id = db.record_class(binary.path)      # record the path
-            pid_to_nid[binary.pyrrha_id] = bin_id      # fill pyrrha_id -> numbat_id
+            bin_id = db.record_class(binary.path)  # record the path
+            pid_to_nid[binary.pyrrha_id] = bin_id  # fill pyrrha_id -> numbat_id
             binary_mapping[binary.pyrrha_id] = binary  # fill index by pyrrha_id
 
             # Add custom command to open the sub-DB
-            #abs_path = Path(str(root_path) + binary.path).absolute()
-            #cmd = ["NumbatUi", str(abs_path)+".srctrlprj"]
-            #db.set_custom_command(bin_id, cmd, "Open in NumbatUI")
+            # abs_path = Path(str(root_path) + binary.path).absolute()
+            # cmd = ["NumbatUi", str(abs_path)+".srctrlprj"]
+            # db.set_custom_command(bin_id, cmd, "Open in NumbatUI")
             # -----------------
 
             symbol_ids[bin_id] = {}
@@ -122,13 +124,16 @@ def map_firmware(db: SourcetrailDB, root_path: Path, dump: PyrrhaDump, jobs: int
                 f_id = db.record_function(pp_name, parent_id=bin_id)  # register pp_name instead of mangled name
                 symbol_ids[bin_id][f_name] = f_id
 
-                if f_name in binary.exports: # Change if exported
-                    db.change_node_color(f_id, fill_color="#bee0af",
-                                         border_color="#395f33")  # text_color="brown", icon_color="brown", hatching_color="#FFEBCD")
+                if f_name in binary.exports:  # Change if exported
+                    db.change_node_color(
+                        f_id, fill_color="#bee0af", border_color="#395f33"
+                    )  # text_color="brown", icon_color="brown", hatching_color="#FFEBCD")
 
             # Iterate all exports to add additional (missing) export values in symbol_ids
             for exp_name, canonical_target in binary.exports.items():
-                if exp_name not in symbol_ids[bin_id]:  # The export 'name' was not part of functions visible in IDA (so add it)
+                if (
+                    exp_name not in symbol_ids[bin_id]
+                ):  # The export 'name' was not part of functions visible in IDA (so add it)
                     n_id = symbol_ids[bin_id][canonical_target]
                     symbol_ids[bin_id][exp_name] = n_id  # alias to the numbat_id
 
@@ -146,7 +151,9 @@ def map_firmware(db: SourcetrailDB, root_path: Path, dump: PyrrhaDump, jobs: int
             resolve_cache = set()
             num_id = pid_to_nid[binary.pyrrha_id]
 
-            logging.debug(f"-------------- [{i+1}/{tot}] index call graph {binary.path} [pyr_id:{pyr_id}] --------------")
+            logging.debug(
+                f"-------------- [{i+1}/{tot}] index call graph {binary.path} [pyr_id:{pyr_id}] --------------"
+            )
 
             # Create mapping of external functions
             deps_symbols = {}  # fun_name -> numbat_id
@@ -173,7 +180,7 @@ def map_firmware(db: SourcetrailDB, root_path: Path, dump: PyrrhaDump, jobs: int
                             good += 1
                         else:
                             if target not in IGNORE_LIST:
-                                served_by: list[Binary] = table[target] # sert à quoi ?
+                                served_by: list[Binary] = table[target]  # sert à quoi ?
 
                                 if len(served_by) > 1 and resolver == ResolveDuplicateOption.INTERACTIVE:
                                     print(f"cache: {[x.path for x in resolve_cache]}")
@@ -198,12 +205,16 @@ def map_firmware(db: SourcetrailDB, root_path: Path, dump: PyrrhaDump, jobs: int
                                     served_by = [arb_choice]  # Take the first one
 
                                 if len(served_by) == 1:  # Automatically add the lib to deps_symbols
-                                    logging.debug(f"symbol {target} served by {served_by[0].name} automatically add it!")
+                                    logging.debug(
+                                        f"symbol {target} served by {served_by[0].name} automatically add it!"
+                                    )
                                     deps_symbols.update(symbol_ids[pid_to_nid[served_by[0].pyrrha_id]])
                                     targets.append(target)  # Push back the target to try again
                                 else:  # if still not resolved
                                     bad += 1
-                                    logging.warning(f"can't resolve edge: {f_name} -> {target}: provided by {[x.name for x in table[target]] if target in table else '[EMPTY]'}")
+                                    logging.warning(
+                                        f"can't resolve edge: {f_name} -> {target}: provided by {[x.name for x in table[target]] if target in table else '[EMPTY]'}"
+                                    )
                     except KeyError as e:
                         logging.error(f"can't find symbols: {e}")
             logging.debug(f"Good: {good}, Bad: {bad}")
