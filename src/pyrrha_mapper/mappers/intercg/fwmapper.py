@@ -212,9 +212,16 @@ def map_firmware(
                                     targets.append(target)  # Push back the target to try again
                                 else:  # if still not resolved
                                     bad += 1
-                                    logging.warning(
-                                        f"can't resolve edge: {f_name} -> {target}: provided by {[x.name for x in table[target]] if target in table else '[EMPTY]'}"
-                                    )
+                                    if target in table and len(table[target]) > 1:
+                                        logging.warning(
+                                            f"{binary.path}: several matches for edge {f_name} -> {target}: {[x.name for x in table[target]]}"
+                                        )
+                                    else:
+                                        logging.debug(
+                                            f"{binary.path}: no match found for edge {f_name} -> {target}: {[x.name for x in table[target]]}"
+                                        )
+                                        tgt = db.record_function(target, is_indexed=False)
+                                        db.record_ref_call(cur_syms[f_name], tgt)
                     except KeyError as e:
                         logging.error(f"can't find symbols: {e}")
             logging.debug(f"Good: {good}, Bad: {bad}")

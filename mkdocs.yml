@@ -35,7 +35,9 @@ nav:
   - Installation: installation.md
   - Mappers:
       - mappers/mappers.md
-      - Filesystem: mappers/fs.md
+      - Filesystem (Quick): mappers/fs.md
+      - Filesystem (CallGraph): mappers/fs-cg.md
+      - Exe-Decomp: mappers/exe-decomp.md
   - Contributing:
       - Mapper Development: contributing/dev_mapper.md
   - Changelog: changelog.md

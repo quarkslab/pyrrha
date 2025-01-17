@@ -8,12 +8,12 @@ First, create your db with `pyrrha`. The `ROOT_DIRECTORY` should contain the who
 ```commandline
 Usage: Usage: pyrrha fs [OPTIONS] ROOT_DIRECTORY
 
-  Map a filesystem into a sourcetrail-compatible db. It maps ELF and PE files, their imports and their exports plus
+  Map a filesystem into a numbatui-compatible db. It maps ELF and PE files, their imports and their exports plus
   the symlinks that points on these executable files.
 
 Options:
   -d, --debug     Set log level to DEBUG
-  --db PATH       Sourcetrail DB file path (.srctrldb).  [default: pyrrha.srctrldb]
+  --db PATH       NumbatUI DB file path (.srctrldb).  [default: pyrrha.srctrldb]
   -e, --json      Create a JSON export of the resulting mapping.
   -j, --jobs INT  Number of parallel jobs created (threads).  [default: 1; 1<=x<=16]
   --ignore        When resolving duplicate imports, ignore them
@@ -24,14 +24,8 @@ Options:
 
 You can also export your Pyrrha results as a JSON file (option `-j`) to be able to postprocess them. For example, you can diff the results between two versions of the same system and list the binaries added/removed and which symbols has been added/removed (*cf* example script in `example`).
 
-### Visualization with Sourcetrail
-Open the resulting project with `sourcetrail`. You can now navigate on the resulting cartography. The user interface is described in depth in the [Sourcetrail documentation](https://github.com/CoatiSoftware/Sourcetrail/blob/master/DOCUMENTATION.md#user-interface).
-
-To match the Sourcetrail language, the binaries, the exported functions and symbols, and the symlinks are represented as follows in Sourcetrail.
-
-Binaries |    Exported functions    |     Exported symbols     | Symlinks
-:---:|:------------------------:|:------------------------:| :---:
-![](../img/classes.png) | ![](../img/function.png) | ![](../img/variable.png) | ![](../img/typedefs.png)
+### Visualization with NumbatUI
+Open the resulting project with `numbatui`. You can now navigate on the resulting cartography. The user interface is described in depth in the [NumbatUI documentation](https://github.com/quarkslab/NumbatUI/blob/main/DOCUMENTATION.md#user-interface).
 
 <figure markdown>
   ![](../img/imports.png)
@@ -43,10 +37,10 @@ Binaries |    Exported functions    |     Exported symbols     | Symlinks
   <figcaption> An example of the symlinks which point on <code>busybox</code>.</figcaption>
 </figure>
 
-Do not hesitate to take a look at [Sourcetrail documentation](https://github.com/CoatiSoftware/Sourcetrail/blob/master/DOCUMENTATION.md#graph-view-1) to explore all the possibilities offered by Sourcetrail. [Custom Trails](https://github.com/CoatiSoftware/Sourcetrail/blob/master/DOCUMENTATION.md#custom-trail-dialog) could be really useful in a lot of cases.
+Do not hesitate to take a look at [NumbatUI documentation](https://github.com/quarkslab/NumbatUI/blob/main/DOCUMENTATION.md#graph-view-1) to explore all the possibilities offered by Sourcetrail. [Custom Trails](https://github.com/quarkslab/NumbatUI/blob/main/DOCUMENTATION.md#custom-trail-dialog) could be really useful in a lot of cases.
 
 !!! example "Demo"
-    An live demo of how we can use Sourcetrail to visualize this mapper results is available [here](https://www.youtube.com/watch?v=-dMl-SvQl4k&t=12m33s).
+    An live demo of how we can use NumbatUI to visualize this mapper results is available [here](https://www.youtube.com/watch?v=-dMl-SvQl4k&t=12m33s).
 
 ##  Quick Start—Usage Example
 Let's take the example of an OpenWRT firmware which is a common Linux distribution for embedded targets like routers.
@@ -62,19 +56,19 @@ $ cd .. && rm openwrt_rootfs.tar.gz
 Then we can run Pyrrha on it. It will produce some logs indicating which symlinks or imports cannot be solved directly by the tool. 
 *(Do not forget to activate your virtualenv if you have created one for Pyrrha installation.)*
 ```commandline
-$ pyrrha fs --db openwrt_db openwrt_root_fs
-$ ls 
+> pyrrha fs --db openwrt_db openwrt_root_fs
+> ls 
 openwrt_root_fs openwrt_db.srctrldb  openwrt_db.srctrlprj
 ```
 
-You can now navigate into the resulting cartography with Sourcetrail.
+You can now navigate into the resulting cartography with NumbatUI.
 ```commandline
-$ sourcetrail openwrt_db.srctrlprj
+> numbatui openwrt_db.srctrlprj
 ```
 
 <figure markdown>
   ![](../img/example_sourcetrail.png)
-  <figcaption> Pyrrha result opened with Sourcetrail.</figcaption>
+  <figcaption> Pyrrha result opened with NumbatUI.</figcaption>
 </figure>
 
 
