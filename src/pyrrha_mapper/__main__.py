@@ -43,7 +43,7 @@ class MapperCommand(click.Command):
             0,
             click.core.Option(
                 ("--db",),
-                help="Sourcetrail DB file path (.srctrldb).",
+                help="NumbatUI DB file path (.srctrldb).",
                 type=click.Path(file_okay=True, dir_okay=True, path_type=Path),
                 default=Path() / "pyrrha.srctrldb",
                 show_default=True,
@@ -76,11 +76,11 @@ def setup_logs(is_debug_level: bool, db_path: str | Path = "") -> None:
     )
 
     if db_path:
-        log_file = str(db_path)+".log"
+        log_file = str(db_path) + ".log"
         # add file handler
         file_handler = logging.FileHandler(log_file, mode="w")
         file_handler.setLevel(level)
-        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
         logging.root.addHandler(file_handler)
 
 
@@ -121,8 +121,8 @@ def pyrrha():
 @pyrrha.command(
     "fs",
     cls=MapperCommand,
-    short_help="Map PE and ELF files of a filesystem into a sourcetrail-compatible db.",
-    help="Map a filesystem into a sourcetrail-compatible db. It maps ELF and PE files, \
+    short_help="Map PE and ELF files of a filesystem into a numbatui-compatible db.",
+    help="Map a filesystem into a numbatui-compatible db. It maps ELF and PE files, \
 their imports and their exports plus the symlinks that points on these executable files.",
 )
 @click.option(
@@ -178,22 +178,19 @@ def fs(debug: bool, db: Path, json, jobs, resolve_duplicates, root_directory):
     db_instance.close()
 
 
-
-
 @pyrrha.command(
     "fs-cg",
     cls=MapperCommand,
-    short_help="Map the Call Graph of every firmware executable a sourcetrail-compatible db.",
-    help="Map a the Inter-Image Call Graph of a whole filesystem into a sourcetrail-compatible"
-         "It disassembles executables using a disassembler and extract the call graph."
-         "It then results all call references accross binaries.",
+    short_help="Map the Call Graph of every firmware executable a numbatui-compatible db.",
+    help="Map a the Inter-Image Call Graph of a whole filesystem into a numbatui-compatible db."
+    "It disassembles executables using a disassembler and extract the call graph."
+    "It then results all call references across binaries.",
 )
-
 @click.option(
     "-j",
     "--jobs",
     help="Number of parallel jobs created (threads).",
-    type=click.IntRange(1, int(multiprocessing.cpu_count()*0.7), clamp=True), # 70% of threads
+    type=click.IntRange(1, int(multiprocessing.cpu_count() * 0.7), clamp=True),  # 70% of threads
     metavar="INT",
     default=1,
     show_default=True,
@@ -217,35 +214,43 @@ def fs(debug: bool, db: Path, json, jobs, resolve_duplicates, root_directory):
     flag_value=ResolveDuplicateOption.INTERACTIVE,
     help="When resolving duplicate imports, user manually select which one to use",
 )
-@click.option("--fs-mapper-dump",
-              required=True,
-              type=click.Path(file_okay=True, dir_okay=False, exists=True),
-              help="Pyrrha fs mapper dump.")
-@click.option("--disassembler",
-              required=False,
-              type=Disassembler,
-              default=Disassembler.AUTO,
-              show_default=True,
-              help="Disassembler to use for disassembly.")
-@click.option("--exporter",
-              required=False,
-              type=Exporters,
-              default=Exporters.AUTO,
-              show_default=True,
-              help="Binary exporter to use for binary analysis.")
+@click.option(
+    "--fs-mapper-dump",
+    required=True,
+    type=click.Path(file_okay=True, dir_okay=False, exists=True),
+    help="Pyrrha fs mapper dump.",
+)
+@click.option(
+    "--disassembler",
+    required=False,
+    type=Disassembler,
+    default=Disassembler.AUTO,
+    show_default=True,
+    help="Disassembler to use for disassembly.",
+)
+@click.option(
+    "--exporter",
+    required=False,
+    type=Exporters,
+    default=Exporters.AUTO,
+    show_default=True,
+    help="Binary exporter to use for binary analysis.",
+)
 @click.argument(
     "root_directory",
     # help='Path of the directory containing the filesystem to map.',
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
 )
-def fs_call_graph(debug: bool,
-                  db: Path,
-                  jobs: int,
-                  resolve_duplicates: ResolveDuplicateOption,
-                  fs_mapper_dump: str,
-                  disassembler: Disassembler,
-                  exporter: Exporters,
-                  root_directory):
+def fs_call_graph(
+    debug: bool,
+    db: Path,
+    jobs: int,
+    resolve_duplicates: ResolveDuplicateOption,
+    fs_mapper_dump: str,
+    disassembler: Disassembler,
+    exporter: Exporters,
+    root_directory,
+):
     setup_logs(debug, db)
     db_instance = setup_db(db)
 
@@ -268,34 +273,30 @@ def fs_call_graph(debug: bool,
     except RuntimeError:
         pass
 
-
     db_instance.commit()
     db_instance.close()
-
-
 
 
 @pyrrha.command(
     "exe-decomp",
     cls=MapperCommand,
     short_help="Map an executable call graph with its decompiled code.",
-    help="Map a single executable call graph into a sourcetrail-compatible database."
-         "It also index the decompiled code along with all call cross-references.",
+    help="Map a single executable call graph into a numbatui-compatible database."
+    "It also index the decompiled code along with all call cross-references.",
 )
-@click.option("--disassembler",
-              required=False,
-              type=Disassembler,
-              default=Disassembler.AUTO,
-              show_default=True,
-              help="Disassembler to use for disassembly.")
+@click.option(
+    "--disassembler",
+    required=False,
+    type=Disassembler,
+    default=Disassembler.AUTO,
+    show_default=True,
+    help="Disassembler to use for disassembly.",
+)
 @click.argument(
     "executable",
     type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
 )
-def fs_exe_decompiled(debug: bool,
-                  db: Path,
-                  disassembler: Disassembler,
-                  executable: Path):
+def fs_exe_decompiled(debug: bool, db: Path, disassembler: Disassembler, executable: Path):
     setup_logs(debug, db)
     db_instance = setup_db(db)
 
@@ -311,9 +312,6 @@ def fs_exe_decompiled(debug: bool,
 
     db_instance.commit()
     db_instance.close()
-
-
-
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 # Pyrrha: A mapper collection for firmware analysis
 
 Pyrrha is a filesystem cartography and correlation software focusing on visualization. It currently focuses on the relationship between executable files but aims at enabling anyone to map and visualize any relationship types. It uses the open-source code source
-explorer [Sourcetrail](https://github.com/CoatiSoftware/Sourcetrail) to provide users with an easy way to navigate through and search for 
+explorer [NumbatUI](https://github.com/quarkslab/NumbatUI) to provide users with an easy way to navigate through and search for 
 path to function.
 
 ![](img/imports.png)
@@ -18,33 +18,35 @@ path to function.
 ## Installation
 The installation is done in two parts:
 
-- Installing `Pyrrha` as a Python module (`pip install pyrrha-mapper`) or using its Docker image.
-- Installing `Sourcetrail` to be able to visualize Pyrrha's results. You can use [its last release](https://github.com/CoatiSoftware/Sourcetrail/releases/tag/2021.4.19) and its [documentation](https://github.com/CoatiSoftware/Sourcetrail/blob/master/DOCUMENTATION.md#installation).
+- Installing `Pyrrha` as a Python module (`pip install pyrrha-mapper` or from the sources).
+- Installing `NumbatUI` to be able to visualize Pyrrha's results. You need to compile it.
+
+!!! warning
+    To use the last two Pyrrha mappers, you should use the provided sources as a public package has not been released yet.
+
 
 ## Usage
 The usage workflow is composed of two steps which allow you to separate DB creation and result visualization.
 
-1. Run Pyrrha to obtain Sourcetrail compatible files (`*.srctrlprj` for the project file and `*.srctrldb` for the DB file). With the python package, you can just launch the command:
+1. Run Pyrrha to obtain NumbatUI compatible files (`*.srctrlprj` for the project file and `*.srctrldb` for the DB file). With the python package, you can just launch the command:
    ```
-   $ pyrrha
+   > pyrrha
    Usage: pyrrha [OPTIONS] COMMAND [ARGS]...
-   
-     Mapper collection for firmware analysis.
-   
+
+   Mapper collection for firmware analysis.
+
    Options:
-     -h, --help  Show this message and exit.
-   
+    -h, --help  Show this message and exit.
+
    Commands:
-     fs  Map PE and ELF files of a filesystem into a sourcetrail-compatible db.
+    exe-decomp  Map an executable call graph with its decompiled code.
+    fs          Map PE and ELF files of a filesystem into a sourcetrail-compatible db.
+    fs-cg       Map the Call Graph of every firmware executable a sourcetrail-compatible db.
 
    ```
-   or with the Docker
-   ```
-   $ docker run  --rm -t -v $PWD:/tmp/pyrrha ghcr.io/quarkslab/pyrrha:latest [OPTIONS] COMMAND [ARGS]...
-   ``` 
 2. Visualize your results with Sourcetrail
    ```
-   $ sourcetrail PROJECT_NAME.srctrlprj
+   $ numbatui PROJECT_NAME.srctrlprj
    ```
 
 The detailed documentation of each mapper is available in the [documentation](https://quarkslab.github.io/pyrrha/mappers/mappers/).
