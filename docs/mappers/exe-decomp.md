@@ -32,10 +32,10 @@ Options:
 After firmware analysis, you can the resulting project with `numbatui`. You can now navigate on the resulting cartography. The user interface is described in depth in the [NumbatUI documentation](https://github.com/quarkslab/NumbatUI/blob/main/DOCUMENTATION.md#user-interface).
 Do not hesitate to take a look at  all the possibilities offered by NumbatUI, especially [Custom Trails](https://github.com/quarkslab/NumbatUI/blob/main/DOCUMENTATION.md#custom-trail-dialog).
 
-## JumpTo Disassembler Feature
+<!-- ## JumpTo Disassembler Feature
 
 The mapper uses a NumbatUI feature to enable jumping from NumbatUI directly
 to the given function in a disassembler. This feature is useful if one need
 to perform more in-depth reverse-engineering of the given function. Such
 feature requires an IDA Pro plugin to be installed. It can be done by copying
-the ``numbatui_plugin.py`` in the IDA Pro plugin directory.
+the ``numbatui_plugin.py`` in the IDA Pro plugin directory. -->
