@@ -198,20 +198,20 @@ def fs(debug: bool, db: Path, json, jobs, resolve_duplicates, root_directory):
 @click.option(
     "--ignore",
     "resolve_duplicates",
-    flag_value=ResolveDuplicateOption.IGNORE,
+    flag_value="IGNORE",
     help="When resolving duplicate imports, ignore them",
     default=True,
 )
 @click.option(
     "--arbitrary",
     "resolve_duplicates",
-    flag_value=ResolveDuplicateOption.ARBITRARY,
+    flag_value="ARBITRARY",
     help="When resolving duplicate imports, select the first one available",
 )
 @click.option(
     "--interactive",
     "resolve_duplicates",
-    flag_value=ResolveDuplicateOption.INTERACTIVE,
+    flag_value="INTERACTIVE",
     help="When resolving duplicate imports, user manually select which one to use",
 )
 @click.option(
@@ -245,7 +245,7 @@ def fs_call_graph(
     debug: bool,
     db: Path,
     jobs: int,
-    resolve_duplicates: ResolveDuplicateOption,
+    resolve_duplicates: str,
     fs_mapper_dump: str,
     disassembler: Disassembler,
     exporter: Exporters,
@@ -268,8 +268,10 @@ def fs_call_graph(
 
     pyrrha_dump = intercg.PyrrhaDump(Path(fs_mapper_dump))
 
+    resolver = ResolveDuplicateOption[resolve_duplicates]
+
     try:
-        intercg.map_firmware(db_instance, root_directory, pyrrha_dump, jobs, resolve_duplicates)
+        intercg.map_firmware(db_instance, root_directory, pyrrha_dump, jobs, resolver)
     except RuntimeError:
         pass
 
