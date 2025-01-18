@@ -112,9 +112,9 @@ def map_firmware(
             binary_mapping[binary.pyrrha_id] = binary  # fill index by pyrrha_id
 
             # Add custom command to open the sub-DB
-            # abs_path = Path(str(root_path) + binary.path).absolute()
-            # cmd = ["NumbatUi", str(abs_path)+".srctrlprj"]
-            # db.set_custom_command(bin_id, cmd, "Open in NumbatUI")
+            abs_path = Path(str(root_path) + binary.path).absolute()
+            cmd = ["NumbatUi", str(abs_path)+".srctrlprj"]
+            db.set_custom_command(bin_id, cmd, "Open in NumbatUI")
             # -----------------
 
             symbol_ids[bin_id] = {}
