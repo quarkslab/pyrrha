@@ -7,6 +7,7 @@ class PyrrhaDump(object):
         self.data = json.load(file.open())
         self.sym_by_name = {x['name']: x for x in self.data['symbols'].values()}
         self.bin_by_path = {x['path']: x for x in self.data['binaries'].values()}
+        self.symlinks_by_path= {x['path']: x for x in self.data['symlinks'].values()}
 
     def get_path(self, id: str|int) -> str:
         return self.data['binaries'][str(id)]['path']
@@ -25,13 +26,12 @@ class PyrrhaDump(object):
 
     def get_exported_symbols(self, id: str | int) -> list[str]:
         entry = self.data['binaries'][str(id)]
-        return [self.data['symbols'][x]['name'] for x in entry['symbols']['ids']]
+        return [self.data['symbols'][str(x)]['name'] for x in entry['export_ids']]
 
     def get_dependencies(self, pyr_id: str | int) -> dict[int, dict]:
         entry = self.data['binaries'][str(pyr_id)]
         return {int(x): self.data['binaries'][str(x)] for x in entry['imports']['lib']['ids']}
 
-    def get_all_imported_symbols(self, id: str|int) -> set[str]:
-        entry = self.data['binaries'][str(id)]
-        return set([self.data['symbols'][sym_id]['name'] for lib_id in entry['imports']['lib']['ids'] for sym_id in self.data['binaries'][str(lib_id)]['symbols']['ids']])
-
+    def get_imported_symbols(self, pyr_id: str | int) -> dict[int, dict]:
+        entry = self.data['binaries'][str(pyr_id)]
+        return {int(x): self.data['symbols'][str(x)] for x in entry['imports']['symbols']['ids']}
