@@ -218,7 +218,7 @@ def map_firmware(
                                             choice_bin = table[target][val]
                                             resolve_cache.add(choice_bin)
                                             served_by = [choice_bin]
-                                elif len(served_by) > 1 and resolver == ResolveDuplicateOption.ARBITRARY:
+                                elif len(served_by) >= 1 and resolver == ResolveDuplicateOption.ARBITRARY:
                                     arb_choice = table[target][0]
                                     resolve_cache.add(arb_choice)
                                     served_by = [arb_choice]  # Take the first one
