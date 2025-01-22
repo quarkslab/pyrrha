@@ -26,6 +26,7 @@ from rich.progress import Progress, TextColumn, BarColumn, MofNCompleteColumn, T
 
 from pyrrha_mapper.types import ResolveDuplicateOption
 
+
 @dataclass
 class Binary(ABC):
     """
@@ -342,8 +343,8 @@ class FileSystemMapper(ABC):
                             self.db_interface.record_ref_import(binary.id, symb_id)
                             binary.non_resolved_symbol_imports.append(func_name)
                         elif (
-                                len(self.binary_names[lib_name]) > 1
-                                and resolve_duplicate_imports is ResolveDuplicateOption.IGNORE
+                            len(self.binary_names[lib_name]) > 1
+                            and resolve_duplicate_imports is ResolveDuplicateOption.IGNORE
                         ):
                             logging.warning(
                                 f"[symbol imports] {binary.fw_path}: several matches for importing lib {lib_name}, not put into DB"
@@ -420,10 +421,10 @@ class FileSystemMapper(ABC):
         :param resolve_duplicate_imports: the chosen option for duplicate import resolution
         """
         with Progress(
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
-                MofNCompleteColumn(),
-                TimeElapsedColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            TimeElapsedColumn(),
         ) as progress:
 
             binaries_map = progress.add_task("[deep_pink2]Binaries mapping", total=len(self.binaries))
@@ -461,7 +462,9 @@ class FileSystemMapper(ABC):
             else:
                 logging.debug("[main] One thread mode")
                 for path in self.binaries:
-                    self.map_binary(self.BINARY_CLASS(path, self.gen_fw_path(path)))
+                    binary = self.BINARY_CLASS(path, self.gen_fw_path(path))
+                    binary.load()
+                    self.map_binary(binary)
                     progress.update(binaries_map, advance=1)
             self.db_interface.commit()
 
