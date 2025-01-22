@@ -10,6 +10,6 @@ before_script:
 test:
   script:
     - pip install --editable ".[test]"
-    - pytest test/cli.py
+    - pytest tests/cli.py
 
 
