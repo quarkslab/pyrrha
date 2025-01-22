@@ -1,10 +1,12 @@
 import json
 import logging
 from collections import defaultdict
+from contextlib import contextmanager
 from pathlib import Path
 
 from numbat import SourcetrailDB
 from pyrrha_mapper.types import ResolveDuplicateOption
+from rich.prompt import Prompt
 from rich.progress import Progress, TextColumn, BarColumn, MofNCompleteColumn, TimeElapsedColumn
 
 from .binary import Binary
@@ -14,6 +16,19 @@ IGNORE_LIST = ["__gmon_start__"]
 
 QUOKKA_EXT = ".quokka"
 
+@contextmanager
+def hide(progress: Progress):
+    """from https://github.com/Textualize/rich/issues/1535#issuecomment-1745297594"""
+    transient = progress.live.transient # save the old value
+    progress.live.transient = True
+    progress.stop()
+    progress.live.transient = transient # restore the old value
+    try:
+        yield
+    finally:
+        # make space for the progress to use so it doesn't overwrite any previous lines
+        print("\n" * (len(progress.tasks) - 2))
+        progress.start()
 
 def load_file_system(dump: PyrrhaDump, root_path: Path) -> list[Binary]:
     tot = len(dump.bin_by_path)
@@ -183,26 +198,26 @@ def map_firmware(
                                 served_by: list[Binary] = table[target]  # sert à quoi ?
 
                                 if len(served_by) > 1 and resolver == ResolveDuplicateOption.INTERACTIVE:
-                                    print(f"cache: {[x.path for x in resolve_cache]}")
-                                    for cache_entry in resolve_cache:
-                                        if cache_entry in served_by:  # reuse already selected entry
-                                            logging.debug(f"reuse manually selected entry to disambiguate {target}")
-                                            served_by = [cache_entry]
-                                    if len(served_by) > 1:  # still not resolved
-                                        print(f"symbol {target} needed for {binary.path} served by multiple binaries:")
-                                        val=None
-                                        while val is None or val < 0 or val >= len(served_by):
-                                            for num, option in enumerate(table[target]):
-                                                print(f"* [{num}] {option.path}")
-
-                                            res = input("Select (default=0): ")
-                                            try:
-                                                val = int(res) if res else 0
-                                            except ValueError:
-                                                print("Enter a valid number")
-                                        choice_bin = table[target][val]
-                                        resolve_cache.add(choice_bin)
-                                        served_by = [choice_bin]
+                                    with hide(progress):
+                                        print(f"cache: {[x.path for x in resolve_cache]}")
+                                        for cache_entry in resolve_cache:
+                                            if cache_entry in served_by:  # reuse already selected entry
+                                                logging.debug(f"reuse manually selected entry to disambiguate {target}")
+                                                served_by = [cache_entry]
+                                        if len(served_by) > 1:  # still not resolved
+                                            print(f"symbol {target} needed for {binary.path} served by multiple binaries:")
+                                            val=None
+                                            while val is None or val < 0 or val >= len(served_by):
+                                                for num, option in enumerate(table[target]):
+                                                    print(f"* [{num}] {option.path}")
+                                                res = Prompt.ask("Select (default=0): ")
+                                                try:
+                                                    val = int(res) if res else 0
+                                                except ValueError:
+                                                    print("Enter a valid number")
+                                            choice_bin = table[target][val]
+                                            resolve_cache.add(choice_bin)
+                                            served_by = [choice_bin]
                                 elif resolver == ResolveDuplicateOption.ARBITRARY:
                                     arb_choice = table[target][0]
                                     resolve_cache.add(arb_choice)
