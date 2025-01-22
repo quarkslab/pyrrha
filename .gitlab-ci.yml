@@ -1,0 +1,15 @@
+image: python:latest
+
+
+before_script:
+  - python --version ; pip --version  # For debugging
+  - pip install virtualenv
+  - virtualenv venv
+  - source venv/bin/activate
+
+test:
+  script:
+    - pip install --editable ".[test]"
+    - pytest test/cli.py
+
+
