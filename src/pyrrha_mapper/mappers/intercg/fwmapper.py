@@ -190,12 +190,16 @@ def map_firmware(
                                             served_by = [cache_entry]
                                     if len(served_by) > 1:  # still not resolved
                                         print(f"symbol {target} needed for {binary.path} served by multiple binaries:")
+                                        val=None
+                                        while val is None or val < 0 or val >= len(served_by):
+                                            for num, option in enumerate(table[target]):
+                                                print(f"* [{num}] {option.path}")
 
-                                        for num, option in enumerate(table[target]):
-                                            print(f"* [{num}] {option.path}")
-
-                                        res = input("Select (default=0): ")
-                                        val = 0 if not res else int(res)
+                                            res = input("Select (default=0): ")
+                                            try:
+                                                val = int(res) if res else 0
+                                            except ValueError:
+                                                print("Enter a valid number")
                                         choice_bin = table[target][val]
                                         resolve_cache.add(choice_bin)
                                         served_by = [choice_bin]
