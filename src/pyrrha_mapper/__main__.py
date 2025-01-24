@@ -45,7 +45,7 @@ class MapperCommand(click.Command):
                 ("--db",),
                 help="NumbatUI DB file path (.srctrldb).",
                 type=click.Path(file_okay=True, dir_okay=True, path_type=Path),
-                default=Path() / "pyrrha.srctrldb",
+                default=Path() / f"{self.name}.srctrldb",
                 show_default=True,
             ),
         )
