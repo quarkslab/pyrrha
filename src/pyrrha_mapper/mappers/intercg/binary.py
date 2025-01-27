@@ -27,7 +27,7 @@ class Binary:
     pyrrha_id: int
     name: str
     path: str
-    calls: dict[str, list[str]]  # "
+    calls: dict[str, list[str]]
     exports: dict[str, str]  # Mangled -> Canonical
     demangled: dict[str, str]  # Mangled -> Demangled
 
