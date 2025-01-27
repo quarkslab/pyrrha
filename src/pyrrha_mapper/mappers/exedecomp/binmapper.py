@@ -101,6 +101,12 @@ def find_all_call_references(f: Function, source: str) -> tuple[Location, dict[i
 
 
 def decompile_program(program: Program) -> Path:
+    """
+    Generate a PROGRAM_NAME.decompiled file which contained the binary decompilee obtained
+    with IDA.
+    :param program: Program object of the file to decompiled
+    :return: path of the created decompiled file
+    """
     bin_path = program.executable.exec_file
     ida = IDA(bin_path,
               str(DECOMPILE_SCRIPT),
