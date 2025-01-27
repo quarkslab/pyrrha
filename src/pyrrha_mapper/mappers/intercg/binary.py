@@ -58,9 +58,9 @@ class Binary:
         2. use lief to extract exported symbols
         3.
 
-        :param quokka_file:
-        :param exec_file:
-        :return:
+        :param quokka_file: path to the quokka file
+        :param exec_file: path to the corresponding binary file
+        :return: a Program object corresponding to the given binary
         """
         # Load Quokka file to retrieve Program object
         quokka_file, exec_file = Path(quokka_file), Path(exec_file)
