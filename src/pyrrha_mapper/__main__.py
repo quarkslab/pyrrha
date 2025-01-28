@@ -22,7 +22,8 @@ import click
 import coloredlogs
 from numbat import SourcetrailDB
 
-from pyrrha_mapper.mappers import intercg, exedecomp, FileSystemImportsMapper
+from pyrrha_mapper import intercg, exedecomp
+from pyrrha_mapper.fs import FileSystemImportsMapper
 from pyrrha_mapper.types import Disassembler, Exporters, ResolveDuplicateOption
 
 # -------------------------------------------------------------------------------
@@ -53,7 +54,7 @@ class MapperCommand(click.Command):
         self.no_args_is_help = True
 
 
-def setup_logs(is_debug_level: bool, db_path: str | Path = "") -> None:
+def setup_logs(is_debug_level: bool, db_path: Path | None = None) -> None:
     """
     Setup logs.
 
@@ -76,7 +77,7 @@ def setup_logs(is_debug_level: bool, db_path: str | Path = "") -> None:
     )
 
     if db_path:
-        log_file = str(db_path) + ".log"
+        log_file = db_path.with_suffix(".log")
         # add file handler
         file_handler = logging.FileHandler(log_file, mode="w")
         file_handler.setLevel(level)
@@ -268,7 +269,7 @@ def fs_call_graph(
 
     pyrrha_dump = intercg.PyrrhaDump(Path(fs_mapper_dump))
 
-    resolver = ResolveDuplicateOption[resolve_duplicates]
+    resolver = ResolveDuplicateOption(resolve_duplicates)
 
     try:
         intercg.map_firmware(db_instance, root_directory, pyrrha_dump, jobs, resolver)

@@ -4,7 +4,7 @@ import pytest
 from click import BaseCommand
 from click.testing import CliRunner, Result
 from pyrrha_mapper import pyrrha
-from pyrrha_mapper.mappers.intercg.pyrrha_dump import PyrrhaDump
+from pyrrha_mapper.intercg.pyrrha_dump import PyrrhaDump
 
 
 class TestCLI:
