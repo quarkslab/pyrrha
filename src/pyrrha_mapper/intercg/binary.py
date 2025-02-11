@@ -55,8 +55,9 @@ class Binary:
         Load a binary file and its quokka file into a Binary object.
         In order, it performs the following actions:
         1. load the program object
-        2. use lief to extract exported symbols
-        3.
+        2. use lief to extract exported symbols (handle conflicts with IDA names)
+        3. checks if exported functions have been missed by IDA (but referenced in LIEF°
+        4. Mangle the call graph to make external call to .PLT to directly jump on the external symbol
 
         :param quokka_file: path to the quokka file
         :param exec_file: path to the corresponding binary file
@@ -160,7 +161,7 @@ class Binary:
         Get the export mapping of a file as given by LIEF.
 
         :param exec_file: executable file to analyse
-        :return: dictionary of  Address -> (favored_mangled_name, [mangled_names])
+        :return: tuple of exported symbols, and demangled names dictionary
         """
         if not re.match(".*\.so(\.\d*)*$", str(exec_file)):
             return {}, {}  # Only gather exports for .so files. Assume none are exported for the other binaries
@@ -202,23 +203,3 @@ class Binary:
             logging.warning(f"cannot disambiguate: {names} (select shortest name)")
             chosen = min(names, key=len)
         return chosen
-
-
-if __name__ == "__main__":
-    import sys
-    file = sys.argv[1]
-    print(file)
-    binary = Binary.load_program(file+".quokka", file)
-
-    symbol_ids = {}
-    # Add all functions within the binary as function of the module
-    for f_name, targets in binary.calls.items():
-        pp_name = binary.demangled[f_name]
-        # f_id = db.record_function(pp_name, parent_id=bin_id)  # register pp_name instead of mangled name
-        symbol_ids[f_name] = 0
-
-    # Iterate all exports to add additional (missing) export values in symbol_ids
-    for exp_name, canonical_target in binary.exports.items():
-        if exp_name not in symbol_ids:  # The export 'name' was not part of functions visible in IDA (so add it)
-            n_id = symbol_ids[canonical_target]
-            symbol_ids[exp_name] = n_id  # alias to the numbat_id

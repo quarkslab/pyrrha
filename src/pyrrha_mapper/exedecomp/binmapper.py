@@ -71,15 +71,21 @@ def find_all_call_references(f: Function, source: str) -> tuple[Location, dict[i
         #     if col != -1:
         #         refs[caddr].append(Location(idx+1, col+1, idx+1, col+len(cname)))
 
+        # For a given line, this dict keeps the column (index) of all call matched
+        matches: dict[int, tuple[int, str]] = {}
+
         # iterate each calls and try to find them in the line
-        matches = {}
         for cname, caddr in call_name_to_addr.items():
             col = line.find(cname)
             if col != -1:
                 matches[col] = (caddr, cname)
 
-        # Iterate all matches in a sorted manner to avoid having overlap matches e.g: lxstat() and xstat()
-        sorted_matches = sorted(list(matches.items()), key=lambda x:x[0])
+        # Iterate all matches in a sorted manner to avoid having overlap matches:
+        # e.g: If a function calls both lxstat() and xstat() for each line we search
+        # any occurence of this two functions. But if we have a line like: "int c = lxstats()"
+        # we will match both functions! Thus we sort them by the column index. In that case we
+        # keep lxstats().
+        sorted_matches = sorted(list(matches.items()), key=lambda x: x[0])
         cursor = 0
         previous = (0, '')
         while sorted_matches:
@@ -177,17 +183,29 @@ def set_function_color(db: SourcetrailDB, p: Program, fun: Function, f_id: int) 
         return
 
 
-def add_source_file(db: SourcetrailDB, mangled_name: str, symbol_id: int, info: DecompiledFunction) -> int:
+def add_source_file(db: SourcetrailDB, mangled_name: str, symbol_id: int, info: DecompiledFunction) -> bool:
     tmp = Path("/tmp/"+mangled_name)
     with open(tmp, "w") as f:
         f.write(info.text)
 
     # Record file
     file_id = db.record_file(Path(tmp)) #, indexed=False)
+    if file_id is None:
+        return False
     db.record_file_language(file_id, 'cpp')
+    tmp.unlink()  # QUESTION: Maybe we want to keep it for further analyses ?
 
-    tmp.unlink()  # Remove tempfile
-    return file_id
+    # Add the function to the file
+    logging.info(f"add function {mangled_name} to file {file_id}")
+    info.numbat_id = file_id
+    # record de symbol declaration
+    if info.location:
+        l1, col1, l2, col2 = info.location
+        db.record_symbol_location(symbol_id, file_id, l1, col1, l2, col2)
+    else:
+        logging.warning(f"{f.name} declaration not found in source code")
+
+    return True
 
 def is_thunk_to_import(p: Program, f: Function) -> bool:
     if f.type == FunctionType.THUNK:
@@ -237,21 +255,11 @@ def map_binary(db: SourcetrailDB, program_path: Path) -> bool:
         # Add source code if any
         if f_addr in decompiled and not is_imp:
             info = decompiled[f_addr]
-            if n_id := add_source_file(db, f.mangled_name, f_id, info):
-                logging.info(f"add function {f.mangled_name} to file {n_id}")
-                info.numbat_id = n_id
-                # record de symbol declaration
-                if info.location:
-                    l1, col1, l2, col2 = info.location
-                    db.record_symbol_location(f_id, n_id, l1, col1, l2, col2)
-                else:
-                    logging.warning(f"{f.name} declaration not found in source code")
-            else:
+            if not add_source_file(db, f.mangled_name, f_id, info):
                 logging.warning(f"failed to add decompiled code for: {f.name}")
         else:
             if f.type not in [FunctionType.EXTERN, FunctionType.IMPORTED]:
                 logging.warning(f"function {f.name} not in decompiled dict")
-
 
     # Index the call graph
     logging.info("============= start indexing call graph =============")
