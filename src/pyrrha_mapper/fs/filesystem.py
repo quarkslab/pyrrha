@@ -16,107 +16,23 @@
 """Base classes for mapping binaries of a filesystem"""
 import logging
 import queue
-from abc import abstractmethod, ABC
-from dataclasses import dataclass, field
-from multiprocessing import Pool, Queue, Manager
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from multiprocessing import Manager, Pool, Queue
 from pathlib import Path
+from typing import overload
 
 from numbat import SourcetrailDB
-from rich.progress import Progress, TextColumn, BarColumn, MofNCompleteColumn, TimeElapsedColumn
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    TextColumn,
+    TimeElapsedColumn,
+)
 
+from pyrrha_mapper.fs.filesystem_objects import Binary, FileSystem, Symlink
 from pyrrha_mapper.types import ResolveDuplicateOption
-
-
-@dataclass
-class Binary(ABC):
-    """
-    Abstract class that represents a binary. It stores symbols/lib imported
-    and exported
-    The following methods should be implemented in its subclasses:
-    - is_supported
-    - load
-    - record_in_db
-    """
-
-    file_path: Path
-    fw_path: Path
-    id: int = None
-    lib_names: list[str] = field(default_factory=list)
-    libs: list["Binary"] = field(default_factory=list)
-    imported_symbols: list[str] = field(default_factory=list)  # list(symbol names) symbols and functions
-    imported_symbol_ids: list[int] = field(default_factory=list)
-    non_resolved_libs: list[str] = field(default_factory=list)
-    non_resolved_symbol_imports: list[str] = field(default_factory=list)
-    exported_function_ids: dict[str, int | None] = field(default_factory=dict)  # dict(name, id)
-
-    # ELF specific fields
-    version_requirement: dict[str, list[str]] = field(default_factory=dict)  # dict(symbol_name, list(requirements))
-    exported_symbol_ids: dict[str, int | None] = field(default_factory=dict)  # dict(name, id)
-
-    @property
-    def name(self):
-        """:return: name of the binary without its path"""
-        return self.file_path.name
-
-    @staticmethod
-    @abstractmethod
-    def is_supported(p: Path) -> bool:
-        """
-        Check if the given path points on a file (NOT via a symlink) which is supported by the parser
-        :param p: the path of the file to analyzed
-        :return: True is the path point on a file
-        """
-        pass
-
-    @abstractmethod
-    def load(self):
-        """
-        parse the given path with lief to automatically fill the other fields
-        at the exception done of the ids (the object should be put on a DB)
-        """
-        pass
-
-    @abstractmethod
-    def record_in_db(self, db: SourcetrailDB) -> None:
-        """record the Binary and its components in the DB"""
-        pass
-
-
-@dataclass
-class Symlink:
-    """Class that represents a Symlink and store the associated DB id"""
-
-    path: Path
-    target_path: Path
-    target_id: int
-    id: int = None
-
-    @property
-    def name(self):
-        """:return: name of the symlink without its path"""
-        return self.path.name
-
-    def record_in_db(self, db: SourcetrailDB) -> None:
-        """
-        Record the symlink inside the given db as its link to its target.
-        Update 'self.id' with the id of the created object.
-        :param db: DB interface
-        """
-        self.id = db.record_typedef_node(self.name, prefix=f"{self.path.parent}/", delimiter=":")
-        db.record_ref_import(self.id, self.target_id)
-
-
-def gen_fw_path(path: Path, root_directory: Path) -> Path:
-    """
-    Generate the path of a given file inside a firmware
-    :param path: path of the file inside the local system
-    :param root_directory: path of the virtual root of the firmware
-    :return: path of the file inside the firmware
-    """
-    return Path(root_directory.anchor).joinpath(path.relative_to(root_directory))
-
-
-# TODO FILESYSTEM
 
 
 class FileSystemMapper(ABC):
@@ -130,14 +46,9 @@ class FileSystemMapper(ABC):
     To change the behavior of these mapping you can reimplement the
     map_* corresponding method.
 
-    The following methods should be implemented:
-    - create_export
-
     Warning: you can change the class used to represent a binary with the
     cls.BINARY_CLASS field.
     """
-
-    BINARY_CLASS = Binary
 
     def __init__(self, root_directory: Path, db: SourcetrailDB):
         """
@@ -146,14 +57,7 @@ class FileSystemMapper(ABC):
         """
         self.root_directory = root_directory.resolve().absolute()
         self.db_interface = db
-        self.binaries: set[Path] = set(
-            filter(lambda p: self.BINARY_CLASS.is_supported(p), self.root_directory.rglob("*"))
-        )
-        self.binary_names: dict[str, list[Binary]] = dict()
-        self.binary_paths: dict[Path, Binary] = dict()
-        self.symlinks: set[Path] = set(filter(lambda p: p.is_symlink(), self.root_directory.rglob("*")))
-        self.symlink_names: dict[str, list[Symlink]] = dict()
-        self.symlink_paths: dict[Path, Symlink] = dict()
+        self.fs = FileSystem()
 
         # Setup graph customisation in NumbatUI
         db.set_node_type("class", "Binaries", "binary")
@@ -167,7 +71,56 @@ class FileSystemMapper(ABC):
         :param path: path of the file inside the local system
         :return: path of the file inside the firmware
         """
-        return gen_fw_path(path, self.root_directory)
+        return FileSystem.gen_fw_path(path, self.root_directory)
+
+    @staticmethod
+    @abstractmethod
+    def is_binary_supported(p: Path) -> bool:
+        """
+        Check if the given path points on a file (NOT via a symlink) which is
+        supported by the parser
+        :param p: the path of the file to analyzed
+        :return: True is the path point on a file
+        """
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def load_binary(root_directory: Path, file_path: Path) -> Binary:
+        """
+        Create a Binary object from the file pointed by file_path. It uses lief
+        to analyze it.
+        """
+        pass
+
+    def record_import(
+        self, source_id: int | None, dest_id: int | None, log_prefix: str = ""
+    ) -> None:
+        """Record in DB the import of dest by source."""
+        if source_id is None or dest_id is None:
+            logging.error(
+                f"{log_prefix}: Cannot record import, src and/or dest are unknown"
+            )
+        else:
+            self.db_interface.record_ref_import(source_id, dest_id)
+
+    @abstractmethod
+    def record_binary_in_db(self, binary: Binary) -> Binary:
+        """record the Binary and its components in the DB"""
+        pass
+
+    def record_symlink_in_db(self, sym: Symlink) -> Symlink:
+        """
+        Record the symlink inside the given db as its link to its target.
+        Update 'sym.id' with the id of the created object.
+        :param sym: symlink object
+        :return: the updated object
+        """
+        sym.id = self.db_interface.record_typedef_node(
+            sym.name, prefix=f"{sym.path.parent}/", delimiter=":"
+        )
+        self.record_import(sym.id, sym.target_id)
+        return sym
 
     @classmethod
     def parse_binary_job(cls, ingress: Queue, egress: Queue, root_directory: Path) -> None:
@@ -183,8 +136,7 @@ class FileSystemMapper(ABC):
             try:
                 path = ingress.get(timeout=0.5)
                 try:
-                    res = cls.BINARY_CLASS(path, gen_fw_path(path, root_directory))
-                    res.load()
+                    res = cls.load_binary(root_directory, path)
                 except Exception as e:
                     res = e
                 egress.put((path, res))
@@ -196,73 +148,193 @@ class FileSystemMapper(ABC):
     def map_binary(self, bin_object: Binary) -> None:
         """
         Given a Binary object add it to the DB.
-        This function updates the fields 'self.binary_paths' and 'self.binary_names'
-        which are respectively binary paths and names dictionaries pointing on
-        the created Binary objects.
+        This function updates the filesystem representation stored as `self.fs`.
         :param bin_object: Binary object
         """
-        bin_object.record_in_db(self.db_interface)
-        self.binary_paths[bin_object.fw_path] = bin_object
-        if bin_object.name in self.binary_names:
-            self.binary_names[bin_object.name].append(bin_object)
-        else:
-            self.binary_names[bin_object.name] = [bin_object]
+        self.fs.add_binary(self.record_binary_in_db(bin_object))
 
     def map_symlink(self, path) -> None:
         """
          Given a symlink, resolve it and if it points on a binary file, add it to the DB and create
          the associated Symlink object. Also add in db a link between the Symlink object
          and the Binary object corresponding to its target.
-         This function updates the fields 'self.symlink_paths' and 'self.symlink_names'
-         which are respectively symlink paths and names dictionaries pointing on
-         the created Symlink objects.
+         This function updates the filesystem representation stored as `self.fs`.
         :param path: Symlink path
         """
+        log_prefix = f"[symlinks] '{path.name}'"
         target = path.readlink()
         if not target.is_absolute():
             target = path.resolve()
             if not target.is_relative_to(self.root_directory):
                 logging.warning(
-                    f"[symlinks] cannot resolve '{path.name}': path '{target}' does not exist in {self.root_directory}"
+                    f"{log_prefix}: points outside of root directory '{target}'"
                 )
                 return
-            if not target.exists():
-                target = self.gen_fw_path(target)
-                logging.warning(f"[symlinks] path {target} does not exist")
-                return
-            if not self.BINARY_CLASS.is_supported(target):
-                target = self.gen_fw_path(target)
-                logging.debug(f"path {target} does not correspond to a supported binary")
-                return
+            if not target.exists() or not self.is_binary_supported(target):
+                return None
             target = self.gen_fw_path(target)
-        elif target == Path("/dev/null"):
-            logging.debug(f"[symlinks] '{path.name}': path '{path}' points on '/dev/null'")
-            return
-        elif not target.exists():
-            logging.warning(f"[symlinks] path {target} does not exist")
-            return
-        elif not self.BINARY_CLASS.is_supported(target):
-            logging.debug(f"path {target} does not correspond to a supported binary")
-            return
-        if target in self.binary_paths:
-            target_obj = self.binary_paths[target]
-            path = self.gen_fw_path(path)
-            symlink_obj = Symlink(path, target_obj.fw_path, target_obj.id)
-            symlink_obj.record_in_db(self.db_interface)
-            self.symlink_paths[path] = symlink_obj
-            if symlink_obj.name in self.symlink_names:
-                self.symlink_names[symlink_obj.name].append(symlink_obj)
-            else:
-                self.symlink_names[symlink_obj.name] = [symlink_obj]
+        elif (
+            target == Path("/dev/null")
+            or not target.exists()
+            or not self.is_binary_supported(target)
+        ):
+            return None
+        if self.fs.binary_exists(target):
+            target_obj = self.fs.get_binary_by_path(target)
+            if target_obj.id is None:
+                logging.warning(
+                    f"{log_prefix}: '{target}' does not correspond to a recorded binary"
+                )
+                return None
+            symlink_obj = self.record_symlink_in_db(
+                Symlink(
+                    path=self.gen_fw_path(path),
+                    target_path=target_obj.path,
+                    target_id=target_obj.id,
+                )
+            )
+            self.fs.add_symlink(symlink_obj)
         else:
             logging.warning(
-                f"[symlinks] cannot resolve '{path.name}': path '{target}' does not correspond to a recorded binary"
+                f"{log_prefix}: '{target}' does not correspond to a recorded binary"
             )
 
-    def map_lib_imports(self, binary, resolve_duplicate_imports=ResolveDuplicateOption.IGNORE) -> None:
+    @overload
+    @staticmethod
+    def _select_fs_component(
+        strategy: ResolveDuplicateOption,
+        matching_objects: list[Binary],
+        log_prefix: str,
+        target_name: str,
+    ) -> Binary | None: ...
+
+    @overload
+    @staticmethod
+    def _select_fs_component(
+        strategy: ResolveDuplicateOption,
+        matching_objects: list[Symlink],
+        log_prefix: str,
+        target_name: str,
+    ) -> Symlink | None: ...
+
+    @staticmethod
+    def _select_fs_component(
+        strategy: ResolveDuplicateOption,
+        matching_objects: list[Binary] | list[Symlink],
+        log_prefix: str,
+        target_name: str,
+    ) -> Binary | Symlink | None:
+        """Choice of one element of a given list according to the strategy.
+
+        Given a list of objects which match a target, select one or None among
+        the given list according the strategy given It also logs the choice made
+        (debug level). If requireds by the strategy, an interaction with the user could
+        be made.
+        :param strategy: the resolution strategy
+        :param matching_objects: a list of FileSystemComponents (NOT empty, not
+           check by the function)
+        :param log_prefix: Prefix used at the beginning of each log
+        :param target_name: Target name, used in logs (and user interaction)
+        :return: the selected FileSystemComponent | None if resolution strategy
+           is IGNORE
         """
-        Given an already mapped binary, resolve its library
-        imports using the following heuristics:
+        if len(matching_objects) > 1 and strategy is ResolveDuplicateOption.IGNORE:
+            logging.debug(
+                f"{log_prefix}: several matches for {target_name} but strategy is \
+{ResolveDuplicateOption.IGNORE.name} so nothing selected"
+            )
+            return None
+        selected_index = None
+        if len(matching_objects) > 1 and strategy is ResolveDuplicateOption.INTERACTIVE:
+            while (
+                selected_index is None
+                or selected_index < 0
+                or selected_index >= len(matching_objects)
+            ):
+                print(f"{log_prefix}: several matches for {target_name}, select one\n")
+                for i in range(len(matching_objects)):
+                    print(f"{i}: {matching_objects[i].path}")
+                try:
+                    selected_index = int(input())
+                except ValueError:
+                    print("Enter a valid number")
+        else:  # "arbitrary" option
+            selected_index = 0
+        selected_bin = matching_objects[selected_index]
+        return selected_bin
+
+    @dataclass(frozen=True)
+    class _LibImport(ABC):
+        initial_import: Symlink | Binary | None
+        final_import: Binary | None
+
+    class _SolvedLibImport(_LibImport):
+        initial_import: Symlink | Binary
+        final_import: Binary
+
+        def __init__(
+            self, initial_import: Symlink | Binary, final_import: Binary
+        ) -> None:
+            super().__init__(initial_import=initial_import, final_import=final_import)
+
+    class _PartialLibImport(_LibImport):
+        initial_import: Symlink | Binary
+
+        def __init__(self, initial_import: Symlink | Binary) -> None:
+            super().__init__(initial_import=initial_import, final_import=None)
+
+    class _FailedLibImport(_LibImport):
+        initial_import = None
+        final_import = None
+
+        def __init__(self):
+            pass
+
+    class _UndecidedLibImport(_FailedLibImport):
+        pass
+
+    def _resolve_lib_import(
+        self, lib_name: str, strategy: ResolveDuplicateOption, log_prefix: str
+    ) -> _SolvedLibImport | _PartialLibImport | _FailedLibImport | _UndecidedLibImport:
+        """Based on its name, find a library.
+
+        Given a library name, it resolve its imports using the following heuristics:
+         - look for a binary which have the looked name, if there is a match,
+           it is considered as solved, if there is several matches, the mapping will
+           depend on the chosen resolution
+         - if no binary match, the same heuristics are applied to symlinks. The final
+           import will be the target of the symlink (recursively if needed)
+        """
+        if self.fs.binary_name_exists(lib_name):
+            matching_binaries = self.fs.get_binaries_by_name(lib_name)
+            lib_obj: Binary | None = self._select_fs_component(
+                strategy, matching_binaries, log_prefix, lib_name
+            )
+            if lib_obj is None:
+                return self._FailedLibImport()
+            return self._SolvedLibImport(initial_import=lib_obj, final_import=lib_obj)
+        elif self.fs.symlink_name_exists(lib_name):
+            matching_symlinks = self.fs.get_symlink_by_name(lib_name)
+            sym_obj: Symlink | None = self._select_fs_component(
+                strategy, matching_symlinks, log_prefix, lib_name
+            )
+            if sym_obj is None:
+                return self._UndecidedLibImport()
+            dest = self.fs.resolve_symlink(sym_obj)
+            if dest is None:
+                return self._PartialLibImport(initial_import=sym_obj)
+            return self._SolvedLibImport(initial_import=sym_obj, final_import=dest)
+        else:
+            return self._FailedLibImport()
+
+    def map_lib_imports(
+        self,
+        binary: Binary,
+        resolution_strategy: ResolveDuplicateOption = ResolveDuplicateOption.IGNORE,
+    ) -> None:
+        """Given an already mapped binary, resolve its libraryimports.
+
+        The following heuristics are used:
          - look for a binary which have the looked name, if there is a match,
            it is considered as solved, if there is several matches, no mapping is
            done and a warning log is printed
@@ -271,141 +343,98 @@ class FileSystemMapper(ABC):
         'imported libs' field with the corresponding ElfBinary objects (or the
         targeted Binary object in the case of a Symlink)
         """
-        for lib_name in binary.lib_names:
-            if lib_name in self.binary_names:
-                if len(self.binary_names[lib_name]) > 1 and resolve_duplicate_imports is ResolveDuplicateOption.IGNORE:
+        log_prefix = f"[lib imports] {binary.path}"
+        for lib_name in binary.imported_library_names:
+            res = self._resolve_lib_import(lib_name, resolution_strategy, log_prefix)
+            match res:
+                case self._SolvedLibImport():
+                    # For symlinks, we record a ref to the symlink but to ease symbol
+                    # resolution, the final target of the symlink is considered to be
+                    # imported and not the symlink itself
+                    self.record_import(binary.id, res.initial_import.id, log_prefix)
+                    binary.add_imported_library(res.final_import)
+                case self._PartialLibImport():
+                    self.record_import(binary.id, res.initial_import.id, log_prefix)
                     logging.warning(
-                        f"[lib imports] {binary.fw_path}: several matches for importing lib {lib_name}, not put into DB"
+                        f"{log_prefix}: import {res.initial_import.path} symlink which \
+does not point on a recorded bin"
                     )
-                else:
-                    to_import = None
-                    if (
-                        len(self.binary_names[lib_name]) > 1
-                        and resolve_duplicate_imports is ResolveDuplicateOption.INTERACTIVE
-                    ):
-                        while to_import is None or to_import < 0 or to_import >= len(self.binary_names[lib_name]):
-                            print(f"several matches for importing lib {lib_name}, choose one to keep\n")
-                            for i in range(len(self.binary_names[lib_name])):
-                                print(f"{i}: {self.binary_names[lib_name][i].file_path}")
-                            try:
-                                to_import = int(input())
-                            except ValueError:
-                                print("Enter a valid number")
-                    else:  # "arbitrary" option
-                        to_import = 0
-                    lib_obj = self.binary_names[lib_name][to_import]
-                    self.db_interface.record_ref_import(binary.id, lib_obj.id)
-                    binary.libs.append(lib_obj)
-            elif lib_name in self.symlink_names:
-                if len(self.symlink_names[lib_name]) > 1 and resolve_duplicate_imports is ResolveDuplicateOption.IGNORE:
+                case self._UndecidedLibImport():
                     logging.warning(
-                        f"[lib imports] {binary.fw_path}: several matches for importing lib {lib_name}, not put into DB"
+                        f"{log_prefix}: {lib_name} import undecided, not recorded in DB"
                     )
-                else:
-                    to_import = None
-                    if (
-                        len(self.symlink_names[lib_name]) > 1
-                        and resolve_duplicate_imports is ResolveDuplicateOption.INTERACTIVE
-                    ):
-                        while to_import is None or to_import < 0 or to_import >= len(self.symlink_names[lib_name]):
-                            print(f"several matches for importing lib {lib_name}, choose one to keep\n")
-                            for i in range(len(self.symlink_names[lib_name])):
-                                print(f"{i}: {self.symlink_names[lib_name][i].target_path}")
-                            try:
-                                to_import = int(input())
-                            except ValueError:
-                                print("Enter a valid number")
-                    else:  # "arbitrary" option
-                        to_import = 0
-                    sym_obj = self.symlink_names[lib_name][to_import]
-                    self.db_interface.record_ref_import(binary.id, sym_obj.id)
-                    binary.libs.append(self.binary_paths[sym_obj.target_path])
-            else:
-                logging.debug(f"[lib imports] {binary.fw_path}: lib '{lib_name}' not found in DB")
-                lib_id = self.db_interface.record_class(lib_name, is_indexed=False)
-                self.db_interface.record_ref_import(binary.id, lib_id)
-                binary.non_resolved_libs.append(lib_name)
+                case self._FailedLibImport():
+                    logging.warning(f"{log_prefix}: lib '{lib_name}' not found in DB")
+                    lib_id = self.db_interface.record_class(lib_name, is_indexed=False)
+                    self.record_import(binary.id, lib_id, log_prefix)
+                    binary.add_non_resolved_imported_library(lib_name)
+                case _:
+                    logging.error(
+                        f"{log_prefix}: Unknown resolution status for lib {lib_name} \
+import, drop case"
+                    )
 
-    def map_symbol_imports(self, binary: Binary, resolve_duplicate_imports=ResolveDuplicateOption.IGNORE) -> None:
-        """
-        Given an already mapped binary, resolve its symbols.
+    def _record_non_resolved_symbol_import(
+        self, binary: Binary, symbol_name: str
+    ) -> None:
+        logging.warning(f"[symbol imports] {binary.name}: cannot resolve {symbol_name}")
+        symb_id = self.db_interface.record_field(symbol_name, is_indexed=False)
+        self.record_import(binary.id, symb_id, f"[symbol imports] {binary.name}")
+        binary.add_non_resolved_imported_symbol(symbol_name)
+
+    def map_symbol_imports(
+        self,
+        binary: Binary,
+        resolution_strategy: ResolveDuplicateOption = ResolveDuplicateOption.IGNORE,
+    ) -> None:
+        """Given an already mapped binary, resolve its symbols.
+
         This function update the DB with the import links found.
+        It is able to treat versionned symbolfs from ELF binaries (e.g. SYMBOL@@GLIBC.1)
+        First the version part of the symbol should be resolved, using symbol version
+        auxiliary symbols (here GLIBC.1 could be associated to several libs), then we
+        could simply solve the symbol import using its name (part before the `@@`) and
+        the list of possible libraries it could come from.
         """
-        for func_name in binary.imported_symbols:
+        log_prefix = f"[lib imports] {binary.path}"
+        for func_name in binary.imported_symbol_names:
             if len(func_name.split("@@")) == 2:  # symbols with a specific version
                 symb_name, symb_version = func_name.split("@@")
                 if symb_version in binary.version_requirement:
+                    found = False
                     for lib_name in binary.version_requirement[symb_version]:
-                        if lib_name not in self.binary_names:
-                            logging.debug(f"[symbol imports] {binary.fw_path}: lib '{lib_name}' not found in DB")
-                            lib_id = self.db_interface.record_class(lib_name, is_indexed=False)
-                            symb_id = self.db_interface.record_field(symb_name, parent_id=lib_id, is_indexed=False)
-                            self.db_interface.record_ref_import(binary.id, symb_id)
-                            binary.non_resolved_symbol_imports.append(func_name)
-                        elif (
-                            len(self.binary_names[lib_name]) > 1
-                            and resolve_duplicate_imports is ResolveDuplicateOption.IGNORE
-                        ):
-                            logging.warning(
-                                f"[symbol imports] {binary.fw_path}: several matches for importing lib {lib_name}, not put into DB"
-                            )
-                        else:
-                            to_import = None
-                            if (
-                                len(self.binary_names[lib_name]) > 1
-                                and resolve_duplicate_imports is ResolveDuplicateOption.INTERACTIVE
-                            ):
-                                while (
-                                    to_import is None or to_import < 0 or to_import >= len(self.binary_names[lib_name])
-                                ):
-                                    print(f"several matches for importing lib {lib_name}, choose one to keep\n")
-                                    for i in range(len(self.binary_names[lib_name])):
-                                        print(f"{i}: {self.binary_names[lib_name][i].file_path}")
-                                    try:
-                                        to_import = int(input())
-                                    except ValueError:
-                                        print("Enter a valid number")
-                            else:  # "arbitrary" option
-                                to_import = 0
-                            lib: Binary = self.binary_names[lib_name][to_import]
-                            if symb_name in lib.exported_symbol_ids:
-                                symb_id = lib.exported_symbol_ids[symb_name]
-                                self.db_interface.record_ref_import(binary.id, symb_id)
-                                binary.imported_symbol_ids.append(symb_id)
-                            elif symb_name in lib.exported_function_ids:
-                                symb_id = lib.exported_function_ids[symb_name]
-                                self.db_interface.record_ref_import(binary.id, symb_id)
-                                binary.imported_symbol_ids.append(symb_id)
-                            else:
-                                symb_id = self.db_interface.record_field(symb_name, parent_id=lib.id, is_indexed=False)
-                                self.db_interface.record_ref_import(binary.id, symb_id)
-                                binary.non_resolved_symbol_imports.append(func_name)
+                        res = self._resolve_lib_import(
+                            lib_name, resolution_strategy, log_prefix
+                        )
+                        if isinstance(res, self._SolvedLibImport):
+                            lib = res.final_import
+                            if lib.exported_symbol_exists(symb_name):
+                                symb = lib.get_exported_symbol(symb_name)
+                                self.record_import(binary.id, symb.id)
+                                found = True
+                                break
+                    if not found:
+                        self._record_non_resolved_symbol_import(binary, func_name)
+                else:
+                    self._record_non_resolved_symbol_import(binary, func_name)
             else:
                 found = False
-                for lib in binary.libs:
-                    if func_name in lib.exported_symbol_ids:
-                        symb_id = lib.exported_symbol_ids[func_name]
-                        self.db_interface.record_ref_import(binary.id, symb_id)
-                        binary.imported_symbol_ids.append(symb_id)
-                        found = True
-                        break
-                    elif func_name in lib.exported_function_ids:
-                        symb_id = lib.exported_function_ids[func_name]
-                        self.db_interface.record_ref_import(binary.id, symb_id)
-                        binary.imported_symbol_ids.append(symb_id)
+                for lib in binary.iter_imported_libraries():
+                    if lib.exported_symbol_exists(func_name):
+                        symbol = lib.get_exported_symbol(func_name)
+                        self.record_import(binary.id, symbol.id)
+                        binary.add_imported_symbol(symbol)
                         found = True
                         break
                 if found is False:
-                    logging.debug(f"[symbol imports] {binary.name}: cannot resolve {func_name}")
-                    symb_id = self.db_interface.record_field(func_name, is_indexed=False)
-                    self.db_interface.record_ref_import(binary.id, symb_id)
-                    binary.non_resolved_symbol_imports.append(func_name)
+                    self._record_non_resolved_symbol_import(binary, func_name)
 
-    @abstractmethod
     def create_export(self):
-        """Abstract class which should be implemented in order to know how
-        to export the current pyrrha results"""
-        pass
+        """Create a JSON export of the current Pyrrha results"""
+        logging.debug("Start export")
+        json_path = self.db_interface.path.with_suffix(".json")
+        self.fs.json_export(json_path)
+        logging.info(f"Export saved: {json_path}")
 
     def map(self, threads: int, export: bool = False, resolve_duplicate_imports=ResolveDuplicateOption.IGNORE) -> None:
         """
@@ -418,22 +447,29 @@ class FileSystemMapper(ABC):
         :param threads: number of threads to use
         :param export: if True create a JSON export of the mapping. It will be stored
             at the same place as the DB (file name: DB_NAME.json)
-        :param resolve_duplicate_imports: the chosen option for duplicate import resolution
+        :param resolution_strategy: the chosen option for duplicate import resolution
         """
+        binary_paths = set(
+            filter(
+                lambda p: self.is_binary_supported(p), self.root_directory.rglob("*")
+            )
+        )
+        symlink_paths = set(
+            filter(lambda p: p.is_symlink(), self.root_directory.rglob("*"))
+        )
         with Progress(
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             MofNCompleteColumn(),
             TimeElapsedColumn(),
         ) as progress:
-
-            binaries_map = progress.add_task("[deep_pink2]Binaries mapping", total=len(self.binaries))
-            symlinks_map = progress.add_task("[orange_red1]Symlinks mapping", total=len(self.symlinks))
-            lib_imports = progress.add_task("[orange1]Library imports mapping", total=len(self.binaries))
-            symbol_imports = progress.add_task("[gold1]Symbol imports mapping", total=len(self.binaries))
-
             # Parse binaries
-            logging.debug(f"[main] Start Binaries parsing: {len(self.binaries)} binaries to parse")
+            logging.debug(
+                f"[main] Start Binaries parsing: {len(binary_paths)} binaries to parse"
+            )
+            binaries_map = progress.add_task(
+                "[deep_pink2]Binaries mapping", total=len(binary_paths)
+            )
             if threads > 1:  # multiprocessed case
                 manager = Manager()
                 ingress = manager.Queue()
@@ -442,8 +478,10 @@ class FileSystemMapper(ABC):
 
                 # Launch all workers and fill input queue
                 for _ in range(threads - 1):
-                    pool.apply_async(self.parse_binary_job, (ingress, egress, self.root_directory))
-                for path in self.binaries:
+                    pool.apply_async(
+                        self.parse_binary_job, (ingress, egress, self.root_directory)
+                    )
+                for path in binary_paths:
                     ingress.put(path)
                 logging.debug(f"[main] {threads - 1} threads created")
 
@@ -451,39 +489,50 @@ class FileSystemMapper(ABC):
                 while True:
                     path, res = egress.get()
                     i += 1
-                    if isinstance(res, self.BINARY_CLASS):
+                    if isinstance(res, Binary):
                         self.map_binary(res)
                     else:
                         logging.warning(f"Error while parsing {path}: {res}")
                     progress.update(binaries_map, advance=1)
-                    if i == len(self.binaries):
+                    if i == len(binary_paths):
                         break
                 pool.terminate()
             else:
                 logging.debug("[main] One thread mode")
-                for path in self.binaries:
-                    binary = self.BINARY_CLASS(path, self.gen_fw_path(path))
-                    binary.load()
+                for path in binary_paths:
+                    binary = self.load_binary(self.root_directory, path)
                     self.map_binary(binary)
                     progress.update(binaries_map, advance=1)
             self.db_interface.commit()
 
             # Parse and resolve symlinks
-            logging.debug(f"[main] Start Symlinks parsing: {len(self.symlinks)} symlinks to parse")
-            for path in self.symlinks:
+            logging.debug(
+                f"[main] Start Symlinks parsing: {len(symlink_paths)} symlinks to parse"
+            )
+            symlinks_map = progress.add_task(
+                "[orange_red1]Symlinks mapping", total=len(symlink_paths)
+            )
+            for path in symlink_paths:
                 self.map_symlink(path)
                 progress.update(symlinks_map, advance=1)
             self.db_interface.commit()
 
             # Handle imports
             logging.debug("[main] Start Libraries imports resolution")
-            for binary in self.binary_paths.values():
-                self.map_lib_imports(binary, resolve_duplicate_imports)
+            lib_imports = progress.add_task(
+                "[orange1]Library imports mapping", total=len(binary_paths)
+            )
+            for binary in self.fs.iter_binaries():
+                self.map_lib_imports(binary, resolution_strategy)
                 progress.update(lib_imports, advance=1)
             self.db_interface.commit()
-            logging.debug(f"[main] Start Symbols imports resolution")
-            for binary in self.binary_paths.values():
-                self.map_symbol_imports(binary, resolve_duplicate_imports)
+
+            logging.debug("[main] Start Symbols imports resolution")
+            symbol_imports = progress.add_task(
+                "[gold1]Symbol imports mapping", total=len(binary_paths)
+            )
+            for binary in self.fs.iter_binaries():
+                self.map_symbol_imports(binary, resolution_strategy)
                 progress.update(symbol_imports, advance=1)
             self.db_interface.commit()
 
