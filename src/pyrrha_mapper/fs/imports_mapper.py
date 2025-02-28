@@ -1,4 +1,20 @@
-"""Filesystem mapper based on Lief, which computes imports and exports"""
+# -*- coding: utf-8 -*-
+
+#  Copyright 2023-2025 Quarkslab
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+"""Filesystem mapper based on Lief, which computes imports and exports."""
+
 from pathlib import Path
 
 import lief
@@ -12,25 +28,25 @@ lief.logging.disable()
 
 
 class FileSystemImportsMapper(FileSystemMapper):
+    """Filesystem mapper based on Lief, which computes imports and exports."""
+
     @staticmethod
     def is_binary_supported(p: Path) -> bool:
-        """
-        Check if the given path points on a file (NOT via a symlink) which is
-        of a format handled by this parser.
+        """Check if the path points on a supported file.
+
+        It will return False if the path correspond to a symlink.
         :param p: the path of the file to analyzed
         :return: True is the path point on a file
         """
-        return p.is_file() and not p.is_symlink() and (lief.is_elf(str(p)) or lief.is_pe(str(p)))
+        return (
+            p.is_file()
+            and not p.is_symlink()
+            and (lief.is_elf(str(p)) or lief.is_pe(str(p)))
+        )
 
     @staticmethod
-    def load_binary(root_directory: Path, file_path: Path):
-        """
-        Create a Binary object from the file pointed by file_path. It uses lief
-        to analyze it.
-        """
-        bin_obj = Binary(file_path=file_path, path = FileSystem.gen_fw_path(file_path, root_directory))
-        lief_obj: lief.Binary = lief.parse(str(bin_obj.file_path))
-        is_elf = isinstance(lief_obj, lief.ELF.Binary)
+    def load_binary(root_directory: Path, file_path: Path) -> Binary:
+        """Create a Binary object from a given file using lief.
 
         raise: FsMapperError if cannot load it
         """
@@ -85,14 +101,12 @@ class FileSystemImportsMapper(FileSystemMapper):
 
         return bin_obj
 
-    def record_binary_in_db(self, bin_obj: Binary) -> Binary:
-        """
-        Record the binary inside the given db as well as its exported
-        symbols/functions and its internal functions.
-        Update 'bin_obj.id' with the id of the created object in DB as well as
-        'bin_obj.exported_symbol/function_ids' and 'bin_obj.local_function_ids'
-        dictionaries.
-        :param bin_obj: the Binary object to map
+    def record_binary_in_db(self, binary: Binary) -> Binary:
+        """Record the binary inside the DB as well as its internal symbols.
+
+        Update 'bin_obj.id' with the id of the created object in DB and does the same
+        thing for its symbol.
+        :param binary: the Binary object to map
         :return: the updated object
         """
         binary.id = self.db_interface.record_class(
