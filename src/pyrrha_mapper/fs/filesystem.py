@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-#  Copyright 2023-2024 Quarkslab
+#  Copyright 2023-2025 Quarkslab
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -13,7 +13,8 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-"""Base classes for mapping binaries of a filesystem"""
+"""Base classes for mapping binaries of a filesystem."""
+
 import logging
 import queue
 from abc import ABC, abstractmethod
@@ -36,8 +37,8 @@ from pyrrha_mapper.types import ResolveDuplicateOption
 
 
 class FileSystemMapper(ABC):
-    """
-    Abstract class which is a base mapper to binaries of a filesystem.
+    """Abstract class which is a base mapper to binaries of a filesystem.
+
     It maps a filesystem in the following order:
     - binaries
     - symlinks
@@ -46,15 +47,12 @@ class FileSystemMapper(ABC):
     To change the behavior of these mapping you can reimplement the
     map_* corresponding method.
 
-    Warning: you can change the class used to represent a binary with the
-    cls.BINARY_CLASS field.
+    Init params
+    :param root_directory: directory containing the filesystem to map
+    :param db: interface to the DB
     """
 
     def __init__(self, root_directory: Path, db: SourcetrailDB):
-        """
-        :param root_directory: directory containing the filesystem to map
-        :param db: interface to the DB
-        """
         self.root_directory = root_directory.resolve().absolute()
         self.db_interface = db
         self.fs = FileSystem()
@@ -66,8 +64,8 @@ class FileSystemMapper(ABC):
         db.set_node_type("field", hover_display="exported symbol")
 
     def gen_fw_path(self, path: Path) -> Path:
-        """
-        Generate the path of a given file inside a firmware
+        """Generate the path of a given file inside a firmware.
+
         :param path: path of the file inside the local system
         :return: path of the file inside the firmware
         """
@@ -76,9 +74,9 @@ class FileSystemMapper(ABC):
     @staticmethod
     @abstractmethod
     def is_binary_supported(p: Path) -> bool:
-        """
-        Check if the given path points on a file (NOT via a symlink) which is
-        supported by the parser
+        """Check if the path points on a supported file.
+
+        It will return False if the path correspond to a symlink.
         :param p: the path of the file to analyzed
         :return: True is the path point on a file
         """
@@ -87,9 +85,9 @@ class FileSystemMapper(ABC):
     @staticmethod
     @abstractmethod
     def load_binary(root_directory: Path, file_path: Path) -> Binary:
-        """
-        Create a Binary object from the file pointed by file_path. It uses lief
-        to analyze it.
+        """Create a Binary object from a given file using lief.
+
+        raise: FsMapperError if cannot load it
         """
         pass
 
@@ -106,12 +104,18 @@ class FileSystemMapper(ABC):
 
     @abstractmethod
     def record_binary_in_db(self, binary: Binary) -> Binary:
-        """record the Binary and its components in the DB"""
+        """Record the binary inside the DB as well as its internal symbols.
+
+        Update 'bin_obj.id' with the id of the created object in DB and does the same
+        thing for its symbol.
+        :param binary: the Binary object to map
+        :return: the updated object
+        """
         pass
 
     def record_symlink_in_db(self, sym: Symlink) -> Symlink:
-        """
-        Record the symlink inside the given db as its link to its target.
+        """Record into DB the symlink and its link to its target.
+
         Update 'sym.id' with the id of the created object.
         :param sym: symlink object
         :return: the updated object
@@ -123,9 +127,11 @@ class FileSystemMapper(ABC):
         return sym
 
     @classmethod
-    def parse_binary_job(cls, ingress: Queue, egress: Queue, root_directory: Path) -> None:
-        """
-        Parse an executable file and create the associated Binary object.
+    def parse_binary_job(
+        cls, ingress: Queue, egress: Queue, root_directory: Path
+    ) -> None:
+        """Parse an executable file and create the associated Binary object.
+
         It is used for multiprocessing.
         :param ingress: input Queue, contain a Path
         :param egress: output Queue, send back (file path, Binary result or
@@ -136,29 +142,29 @@ class FileSystemMapper(ABC):
             try:
                 path = ingress.get(timeout=0.5)
                 try:
-                    res = cls.load_binary(root_directory, path)
+                    egress.put((path, cls.load_binary(root_directory, path)))
                 except Exception as e:
-                    res = e
-                egress.put((path, res))
+                    egress.put((path, e))
             except queue.Empty:
                 pass
             except KeyboardInterrupt:
                 break
 
     def map_binary(self, bin_object: Binary) -> None:
-        """
-        Given a Binary object add it to the DB.
+        """Given a Binary object add it to the DB.
+
         This function updates the filesystem representation stored as `self.fs`.
         :param bin_object: Binary object
         """
         self.fs.add_binary(self.record_binary_in_db(bin_object))
 
-    def map_symlink(self, path) -> None:
-        """
-         Given a symlink, resolve it and if it points on a binary file, add it to the DB and create
-         the associated Symlink object. Also add in db a link between the Symlink object
-         and the Binary object corresponding to its target.
-         This function updates the filesystem representation stored as `self.fs`.
+    def map_symlink(self, path: Path) -> None:
+        """Given a symlink, resolve it and create the associated objects if needed.
+
+        If it points on a binary file, add it to the DB and create the associated
+        Symlink object. Also add in db a link between the Symlink object and the Binary
+        object corresponding to its target.
+        This function updates the filesystem representation stored as `self.fs`.
         :param path: Symlink path
         """
         log_prefix = f"[symlinks] '{path.name}'"
@@ -336,8 +342,8 @@ class FileSystemMapper(ABC):
 
         The following heuristics are used:
          - look for a binary which have the looked name, if there is a match,
-           it is considered as solved, if there is several matches, no mapping is
-           done and a warning log is printed
+           it is considered as solved, if there is several matches, the mapping will
+           depend on the chosen resolution
          - if no binary match, the same heuristics are applied to symlinks
         This function update the DB with the import links found and each binary's
         'imported libs' field with the corresponding ElfBinary objects (or the
@@ -430,15 +436,21 @@ import, drop case"
                     self._record_non_resolved_symbol_import(binary, func_name)
 
     def create_export(self):
-        """Create a JSON export of the current Pyrrha results"""
+        """Create a JSON export of the current Pyrrha results."""
         logging.debug("Start export")
         json_path = self.db_interface.path.with_suffix(".json")
         self.fs.json_export(json_path)
         logging.info(f"Export saved: {json_path}")
 
-    def map(self, threads: int, export: bool = False, resolve_duplicate_imports=ResolveDuplicateOption.IGNORE) -> None:
-        """
-        Map all the content of 'self.root_directory', in the order:
+    def map(
+        self,
+        threads: int,
+        export: bool = False,
+        resolution_strategy: ResolveDuplicateOption = ResolveDuplicateOption.IGNORE,
+    ) -> None:
+        """Map recursively the content of a given directory.
+
+        Main mapper function, map the content of 'self.root_directory', in the order:
         - binaries;
         - symlinks (and resolve them);
         - lib imports;
