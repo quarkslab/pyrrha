@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-#  Copyright 2023-2024 Quarkslab
+#  Copyright 2023-2025 Quarkslab
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -13,16 +13,17 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+"""CLI Module."""
 
 import logging
 import multiprocessing
 from pathlib import Path
 
 import click
-import coloredlogs
+import coloredlogs  # type: ignore # no typing used in this library
 from numbat import SourcetrailDB
 
-from pyrrha_mapper import intercg, exedecomp
+from pyrrha_mapper import exedecomp, intercg
 from pyrrha_mapper.fs import FileSystemImportsMapper
 from pyrrha_mapper.types import Disassembler, Exporters, ResolveDuplicateOption
 
@@ -32,8 +33,7 @@ from pyrrha_mapper.types import Disassembler, Exporters, ResolveDuplicateOption
 
 
 class MapperCommand(click.Command):
-    """
-    Common class to add shared options for mapper
+    """Common class to add shared options for mapper.
 
     Code from: https://stackoverflow.com/a/53875557
     """
@@ -50,18 +50,24 @@ class MapperCommand(click.Command):
                 show_default=True,
             ),
         )
-        self.params.insert(0, click.core.Option(("-d", "--debug"), is_flag=True, help="Set log level to DEBUG"))
+        self.params.insert(
+            0,
+            click.core.Option(
+                ("-d", "--debug"), is_flag=True, help="Set log level to DEBUG"
+            ),
+        )
         self.no_args_is_help = True
 
 
 def setup_logs(is_debug_level: bool, db_path: Path | None = None) -> None:
-    """
-    Setup logs.
+    """Set up logs.
 
     :param is_debug_level: if True set the log level as DEBUG else INFO
     :param db_path: if provided, save a collocated log file.
     """
-    log_format = dict(fmt="[%(asctime)s][%(levelname)s]: %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    log_format = dict(
+        fmt="[%(asctime)s][%(levelname)s]: %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    )
     level = logging.DEBUG if is_debug_level else logging.INFO
     coloredlogs.install(
         level=level,
@@ -81,15 +87,18 @@ def setup_logs(is_debug_level: bool, db_path: Path | None = None) -> None:
         # add file handler
         file_handler = logging.FileHandler(log_file, mode="w")
         file_handler.setLevel(level)
-        file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+        file_handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        )
         logging.root.addHandler(file_handler)
 
 
 def setup_db(db_path, overwrite_db: bool = True) -> SourcetrailDB:
-    """
-    Create and/or open the corresponding Sourcetrail DB.
+    """Create and/or open the corresponding Sourcetrail DB.
+
     :param db_path: path of the db to open/create
-    :param overwrite_db: if the path corresponds to an existing db, if True, it will be cleared else not
+    :param overwrite_db: if the path corresponds to an existing db, if True, it will be
+        cleared else not
     :return: the created or opened Sourcetrail DB
     """
     # db creation/and or opening
@@ -107,8 +116,12 @@ def setup_db(db_path, overwrite_db: bool = True) -> SourcetrailDB:
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"], max_content_width=120)
 
 
-@click.group(context_settings=CONTEXT_SETTINGS, help="Mapper collection for firmware analysis.", no_args_is_help=True)
-def pyrrha():
+@click.group(
+    context_settings=CONTEXT_SETTINGS,
+    help="Mapper collection for firmware analysis.",
+    no_args_is_help=True,
+)
+def pyrrha():  # noqa: D103
     pass
 
 
@@ -124,7 +137,7 @@ def pyrrha():
     cls=MapperCommand,
     short_help="Map PE and ELF files of a filesystem into a numbatui-compatible db.",
     help="Map a filesystem into a numbatui-compatible db. It maps ELF and PE files, \
-their imports and their exports plus the symlinks that points on these executable files.",
+their imports/exports plus the symlinks that points on these executable files.",
 )
 @click.option(
     "-e",
@@ -167,7 +180,7 @@ their imports and their exports plus the symlinks that points on these executabl
     # help='Path of the directory containing the filesystem to map.',
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
 )
-def fs(debug: bool, db: Path, json, jobs, resolve_duplicates, root_directory):
+def fs(debug: bool, db: Path, json, jobs, resolve_duplicates, root_directory):  # noqa: D103
     setup_logs(debug)
     db_instance = setup_db(db)
 
@@ -182,8 +195,8 @@ def fs(debug: bool, db: Path, json, jobs, resolve_duplicates, root_directory):
 @pyrrha.command(
     "fs-cg",
     cls=MapperCommand,
-    short_help="Map the Call Graph of every firmware executable a numbatui-compatible db.",
-    help="Map a the Inter-Image Call Graph of a whole filesystem into a numbatui-compatible db."
+    short_help="Map the Call Graph of every firmware executable into  a NumbatUI db.",
+    help="Map a the Inter-Image Call Graph of a whole filesystem into a NumbatUI db."
     "It disassembles executables using a disassembler and extract the call graph."
     "It then results all call references across binaries.",
 )
@@ -191,7 +204,9 @@ def fs(debug: bool, db: Path, json, jobs, resolve_duplicates, root_directory):
     "-j",
     "--jobs",
     help="Number of parallel jobs created (threads).",
-    type=click.IntRange(1, int(multiprocessing.cpu_count() * 0.7), clamp=True),  # 70% of threads
+    type=click.IntRange(
+        1, int(multiprocessing.cpu_count() * 0.7), clamp=True
+    ),  # 70% of threads
     metavar="INT",
     default=1,
     show_default=True,
@@ -242,7 +257,7 @@ def fs(debug: bool, db: Path, json, jobs, resolve_duplicates, root_directory):
     # help='Path of the directory containing the filesystem to map.',
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
 )
-def fs_call_graph(
+def fs_call_graph(  # noqa: D103
     debug: bool,
     db: Path,
     jobs: int,
@@ -256,7 +271,7 @@ def fs_call_graph(
     db_instance = setup_db(db)
 
     if disassembler not in [Disassembler.AUTO, Disassembler.IDA]:
-        click.echo(f"disassembler not yet supported")
+        click.echo("disassembler not yet supported")
         # TODO: add support for other disassembler
         return 1
 
@@ -299,12 +314,14 @@ def fs_call_graph(
     "executable",
     type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
 )
-def fs_exe_decompiled(debug: bool, db: Path, disassembler: Disassembler, executable: Path):
+def fs_exe_decompiled(  # noqa: D103
+    debug: bool, db: Path, disassembler: Disassembler, executable: Path
+):
     setup_logs(debug, db)
     db_instance = setup_db(db)
 
     if disassembler not in [Disassembler.AUTO, Disassembler.IDA]:
-        click.echo(f"disassembler not yet supported")
+        click.echo("disassembler not yet supported")
         # TODO: add support for other disassembler (forward parameter to mapper)
         return 1
 
