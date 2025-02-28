@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-#  Copyright 2023-2024 Quarkslab
+#  Copyright 2023-2025 Quarkslab
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ requires = ['setuptools']
 
 [project]
 name = 'pyrrha-mapper'
-version = '0.4.3'
 authors = [
     { name = 'Eloïse Brocas', email = 'ebrocas@quarkslab.com' },
     { name = "Robin David", email = "rdavid@quarkslab.com" },
@@ -47,6 +46,7 @@ dependencies = [
     # Exedecomp mapper
     'idascript',
 ]
+dynamic = ['version']
 
 [project.urls]
 Homepage = "https://github.com/quarkslab/pyrrha"
@@ -66,4 +66,40 @@ doc = [
     'mkdocs-material',
     'mkdocs-section-index',
 ]
+linting = ['ruff']
 test = ['pytest']
+typechecking = ['mypy']
+
+[tool.setuptools.dynamic]
+version = {attr = "pyrrha_mapper.__version__"} 
+
+[tool.mypy]
+plugins = ['pydantic.mypy']
+
+[tool.pytest.ini_options]
+addopts = ["--import-mode=importlib"]
+pythonpath = "src"
+testpaths = ["tests"]
+norecursedirs = ["tests/pyrrha_files", "tests/test_fw", "data"]
+
+
+[tool.ruff]
+# Same as Black.
+line-length = 88
+indent-width = 4
+
+
+[tool.ruff.lint]
+select = ["D", "E", "F", "B", "Q", "I"]
+ignore = [
+  "D107", # missing docstring in __init__, we add docstrings to the class
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.format]
+line-ending = "auto"
+docstring-code-format = true
+
+
