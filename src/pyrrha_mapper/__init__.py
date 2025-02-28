@@ -19,3 +19,4 @@
 from .__main__ import pyrrha
 
 __all__ = ["pyrrha"]
+__version__ = "0.4.3"
