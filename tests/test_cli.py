@@ -39,7 +39,7 @@ class TestCLI:
         for res in [res_long, res_short]:
             assert res.exit_code == 0
             assert res.output.startswith(f"Usage: {self.COMMAND.name}")
-        assert res_short.output == res_long.output
+        assert res_short.output == res_long.output, "Usage different with -h/--help"
 
     @pytest.mark.parametrize("subcommand", SUBCOMMANDS)
     def test_subcommand_usage(self, subcommand: str):
@@ -50,10 +50,10 @@ class TestCLI:
         for res in [res_long, res_short]:
             assert res.exit_code == 0
             assert res.output.startswith(f"Usage: {self.COMMAND.name} {subcommand}")
-        assert res_short.output == res_long.output
+        assert res_short.output == res_long.output, "Usage different with -h/--help"
 
 
-class TestFSMapper:
+class TestFSMapper(TestCLI):
     """Main functional test class for the FS mapper. Tests are done from the CLI."""
 
     COMMAND = pyrrha
@@ -92,8 +92,8 @@ class TestFSMapper:
         res = runner.invoke(self.COMMAND, args)
         assert res.exit_code == 0
         assert db_path.exists()
-        assert db_path.with_suffix(".srctrldb").exists()
-        assert db_path.with_suffix(".srctrlprj").exists()
+        assert db_path.with_suffix(".srctrldb").exists(), "Missing DB file"
+        assert db_path.with_suffix(".srctrlprj").exists(), "Missing project file"
 
     @pytest.fixture
     def export_path(self, db_path: Path) -> Path:
@@ -119,7 +119,7 @@ class TestFSMapper:
     def test_export_creation(self, export_res: Result, export_path: Path) -> None:
         """Export file exist."""
         assert export_res.exit_code == 0
-        assert export_path.exists()
+        assert export_path.exists(), "Export file does not exist"
 
     @pytest.fixture
     def export_dump(self, export_res, export_path: Path) -> FileSystem:
@@ -128,36 +128,46 @@ class TestFSMapper:
 
     def test_export_format(self, export_dump: FileSystem) -> None:
         """JSON export is loaded as a Filesystem object."""
-        assert isinstance(export_dump, FileSystem)
+        assert isinstance(export_dump, FileSystem), "Export cannot be loaded correctly"
 
     def test_binary_list(self, export_dump: FileSystem) -> None:
         """Firmware binaries are present in results."""
         assert {
             _bin.path for _bin in export_dump.iter_binaries()
-        } == self.FW_TEST_BIN_PATHS
+        } == self.FW_TEST_BIN_PATHS, "Missing binaries"
 
     def test_symlink_list(self, export_dump: FileSystem) -> None:
         """Firmware symlinks are present in results."""
         assert {
             sym.path for sym in export_dump.iter_symlinks()
-        } == self.FW_TEST_SYMLINKS_PATHS
+        } == self.FW_TEST_SYMLINKS_PATHS, "Missing symlinks"
 
-    @pytest.mark.parametrize("bin_path", FW_TEST_BIN_PATHS)
+    @staticmethod
+    def _path_id(val):
+        if isinstance(val, Path):
+            return str(val)
+        return val
+
+    @pytest.mark.parametrize("bin_path", FW_TEST_BIN_PATHS, ids=_path_id)
     def test_exported_symbols(self, bin_path: Path, export_dump: FileSystem) -> None:
         """Exported symbols exist for each binary of the firware."""
         _bin = export_dump.get_binary_by_path(bin_path)
-        assert len(list(_bin.iter_exported_symbols())) > 0
+        assert len(list(_bin.iter_exported_symbols())) > 0, "Missing exported symbols"
 
-    @pytest.mark.parametrize("bin_path", FW_TEST_BIN_PATHS)
+    @pytest.mark.parametrize("bin_path", FW_TEST_BIN_PATHS, ids=_path_id)
     def test_dependencies(self, bin_path: Path, export_dump: FileSystem) -> None:
         """Imported libraries exist for each binary of the firware except ldd."""
         _bin = export_dump.get_binary_by_path(bin_path)
         if bin_path == self.FW_TEST_LD:
-            assert len(list(_bin.iter_imported_libraries())) == 0
+            assert len(list(_bin.iter_imported_libraries())) == 0, (
+                "Create false imported libraries"
+            )
         else:
-            assert len(list(_bin.iter_imported_libraries())) > 0
+            assert len(list(_bin.iter_imported_libraries())) > 0, (
+                "Missing imported libraries"
+            )
 
-    @pytest.mark.parametrize("bin_path", FW_TEST_BIN_PATHS)
+    @pytest.mark.parametrize("bin_path", FW_TEST_BIN_PATHS, ids=_path_id)
     def test_resolved_dependencies(
         self, bin_path: Path, export_dump: FileSystem
     ) -> None:
@@ -165,18 +175,18 @@ class TestFSMapper:
         _bin = export_dump.get_binary_by_path(bin_path)
         assert len(list(_bin.iter_imported_libraries())) == len(
             _bin.imported_library_names
-        )
+        ), "Some imported libraries have not been resolved"
 
-    @pytest.mark.parametrize("bin_path", FW_TEST_BIN_PATHS)
+    @pytest.mark.parametrize("bin_path", FW_TEST_BIN_PATHS, ids=_path_id)
     def test_imported_symbols(self, bin_path: Path, export_dump: FileSystem) -> None:
         """Imported symbols exist for each binary of the firware except ldd."""
         _bin = export_dump.get_binary_by_path(bin_path)
         if bin_path == self.FW_TEST_LD:
-            assert len(_bin.imported_symbol_names) == 0
+            assert len(_bin.imported_symbol_names) == 0, "Create false imported symbols"
         else:
-            assert len(_bin.imported_symbol_names) > 0
+            assert len(_bin.imported_symbol_names) > 0, "Missing imported symbols"
 
-    @pytest.mark.parametrize("bin_path", FW_TEST_BIN_PATHS)
+    @pytest.mark.parametrize("bin_path", FW_TEST_BIN_PATHS, ids=_path_id)
     def test_resolved_imported_symbols(
         self, bin_path: Path, export_dump: FileSystem
     ) -> None:
@@ -184,4 +194,4 @@ class TestFSMapper:
         _bin = export_dump.get_binary_by_path(bin_path)
         assert len(list(_bin.iter_imported_symbols())) == len(
             _bin.imported_symbol_names
-        )
+        ), "Some imported symbols have not been resolved"
