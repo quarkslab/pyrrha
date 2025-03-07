@@ -328,7 +328,7 @@ class FileSystem(BaseModel):
         """:return: the binary with the given path."""
         return self.binaries[path]
 
-    def get_symlink_by_name(self, name: str) -> list[Symlink]:
+    def get_symlinks_by_name(self, name: str) -> list[Symlink]:
         """:return: the symlinks with the given path."""
         return self._symlink_names[name]
 
