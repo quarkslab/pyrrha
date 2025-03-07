@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable
+from functools import reduce
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +41,19 @@ class Symbol(BaseModel):
     is_func: bool = False
     id: int | None = None
 
+    # from https://github.com/pydantic/pydantic/discussions/2910
+    def __lt__(self, other):  # noqa: D105
+        return tuple(self.model_dump().values()) < tuple(other.model_dump().values())
+
+    def __le__(self, other):  # noqa: D105
+        return tuple(self.model_dump().values()) <= tuple(other.model_dump().values())
+
+    def __gt__(self, other):  # noqa: D105
+        return tuple(self.model_dump().values()) > tuple(other.model_dump().values())
+
+    def __ge__(self, other):  # noqa: D105
+        return tuple(self.model_dump().values()) >= tuple(other.model_dump().values())
+
 
 class FileSystemComponent(BaseModel):
     """Base class representing any filesystem object (including its optionnal DB id)."""
@@ -51,6 +65,19 @@ class FileSystemComponent(BaseModel):
     def model_post_init(self, __context: Any) -> None:
         """Enforce object name based on its path."""
         self.name = self.path.name
+
+    # from https://github.com/pydantic/pydantic/discussions/2910
+    def __lt__(self, other):  # noqa: D105
+        return tuple(self.model_dump().values()) < tuple(other.model_dump().values())
+
+    def __le__(self, other):  # noqa: D105
+        return tuple(self.model_dump().values()) <= tuple(other.model_dump().values())
+
+    def __gt__(self, other):  # noqa: D105
+        return tuple(self.model_dump().values()) > tuple(other.model_dump().values())
+
+    def __ge__(self, other):  # noqa: D105
+        return tuple(self.model_dump().values()) >= tuple(other.model_dump().values())
 
 
 class Binary(FileSystemComponent):
@@ -171,8 +198,7 @@ class FileSystem(BaseModel):
             if info.mode_is_json():
                 path = str(path)  # type: ignore[assignment]
             if binary is None:
-                res[path] = None
-                continue
+                raise ValueError(f"{path} has no data associated")
             res[path] = binary.model_dump(
                 mode=mode,
                 include={
@@ -199,6 +225,18 @@ class FileSystem(BaseModel):
         """Validate a dict dump and transform it into an FS instance."""
         if not isinstance(data, dict):
             raise ValueError("provided data is not a dict")
+        if info.field_name == "binaries" and reduce(
+            lambda x, y: x and isinstance(y[0], Path) and isinstance(y[1], Binary),
+            data.items(),
+            True,  # correct equivalent to `isinstance(data, dict[Path, Binary])`
+        ):
+            return data
+        elif info.field_name == "symlinks" and reduce(
+            lambda x, y: x and isinstance(y[0], Path) and isinstance(y[1], Symlink),
+            data.items(),
+            True,  # correct equivalent to `isinstance(data, dict[Path, Symlink])`
+        ):
+            return data
         imported_libs = dict()
         imported_symbols = dict()
         res = dict()
@@ -237,12 +275,20 @@ class FileSystem(BaseModel):
                 if _id is None:
                     res[path].add_imported_library_name(name)
                 else:
+                    if _id["id"] not in bin_by_ids:
+                        raise ValueError(
+                            f"Imported lib '{name}' not listed in binaries"
+                        )
                     res[path].add_imported_library(bin_by_ids[_id["id"]])
         for path, symbols in imported_symbols.items():
             for name, _id in symbols.items():
                 if _id is None:
                     res[path].add_imported_symbol_name(name)
                 else:
+                    if _id["id"] not in symbols_by_ids:
+                        raise ValueError(
+                            f"Imported symbol '{name}' not listed in filesystem symbols"
+                        )
                     res[path].add_imported_symbol(symbols_by_ids[_id["id"]])
         return res
 
