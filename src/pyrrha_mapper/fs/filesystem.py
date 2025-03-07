@@ -320,7 +320,7 @@ class FileSystemMapper(ABC):
                 return self._FailedLibImport()
             return self._SolvedLibImport(initial_import=lib_obj, final_import=lib_obj)
         elif self.fs.symlink_name_exists(lib_name):
-            matching_symlinks = self.fs.get_symlink_by_name(lib_name)
+            matching_symlinks = self.fs.get_symlinks_by_name(lib_name)
             sym_obj: Symlink | None = self._select_fs_component(
                 strategy, matching_symlinks, log_prefix, lib_name
             )
