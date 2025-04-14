@@ -16,8 +16,6 @@
 
 """Pyrrha is a mapper collection for firmware analysis."""
 
-from .__main__ import pyrrha
-
 from pyrrha_mapper.common import FileSystemMapper, FileSystem, Symbol, Symlink, Binary
 
 

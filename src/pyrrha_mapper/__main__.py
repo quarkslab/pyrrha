@@ -23,8 +23,7 @@ import click
 import coloredlogs  # type: ignore # no typing used in this library
 from numbat import SourcetrailDB
 
-from pyrrha_mapper import exedecomp, intercg
-from pyrrha_mapper.fs import FileSystemImportsMapper
+from pyrrha_mapper import exedecomp, intercg, fs
 from pyrrha_mapper.types import Disassembler, Exporters, ResolveDuplicateOption
 
 # -------------------------------------------------------------------------------
@@ -180,12 +179,12 @@ their imports/exports plus the symlinks that points on these executable files.",
     # help='Path of the directory containing the filesystem to map.',
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
 )
-def fs(debug: bool, db: Path, json, jobs, resolve_duplicates, root_directory):  # noqa: D103
+def fs_mapper(debug: bool, db: Path, json, jobs, resolve_duplicates, root_directory):  # noqa: D103
     setup_logs(debug)
     db_instance = setup_db(db)
 
     root_directory = root_directory.absolute()
-    fs_mapper = FileSystemImportsMapper(root_directory, db_instance)
+    fs_mapper = fs.FileSystemImportsMapper(root_directory, db_instance)
 
     fs_mapper.map(jobs, json, resolve_duplicates)
 
@@ -257,7 +256,7 @@ def fs(debug: bool, db: Path, json, jobs, resolve_duplicates, root_directory):  
     # help='Path of the directory containing the filesystem to map.',
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
 )
-def fs_call_graph(  # noqa: D103
+def fs_call_graph_mapper(  # noqa: D103
     debug: bool,
     db: Path,
     jobs: int,
@@ -314,7 +313,7 @@ def fs_call_graph(  # noqa: D103
     "executable",
     type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
 )
-def fs_exe_decompiled(  # noqa: D103
+def fs_exe_decompiled_mapper(  # noqa: D103
     debug: bool, db: Path, disassembler: Disassembler, executable: Path
 ):
     setup_logs(debug, db)

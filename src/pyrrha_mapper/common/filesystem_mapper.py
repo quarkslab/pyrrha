@@ -55,21 +55,13 @@ class FileSystemMapper(ABC):
     def __init__(self, root_directory: Path, db: SourcetrailDB):
         self.root_directory = root_directory.resolve().absolute()
         self.db_interface = db
-        self.fs = FileSystem()
+        self.fs = FileSystem(root_dir=self.root_directory)
 
         # Setup graph customisation in NumbatUI
         db.set_node_type("class", "Binaries", "binary")
         db.set_node_type("typedef", "Symlinks", "symlink")
         db.set_node_type("method", hover_display="exported function")
         db.set_node_type("field", hover_display="exported symbol")
-
-    def gen_fw_path(self, path: Path) -> Path:
-        """Generate the path of a given file inside a firmware.
-
-        :param path: path of the file inside the local system
-        :return: path of the file inside the firmware
-        """
-        return FileSystem.gen_fw_path(path, self.root_directory)
 
     @staticmethod
     @abstractmethod
@@ -178,7 +170,7 @@ class FileSystemMapper(ABC):
                 return
             if not target.exists() or not self.is_binary_supported(target):
                 return None
-            target = self.gen_fw_path(target)
+            target = self.fs.gen_fw_path(target)
         elif (
             target == Path("/dev/null")
             or not target.exists()
@@ -194,7 +186,7 @@ class FileSystemMapper(ABC):
                 return None
             symlink_obj = self.record_symlink_in_db(
                 Symlink(
-                    path=self.gen_fw_path(path),
+                    path=self.fs.gen_fw_path(path),
                     target_path=target_obj.path,
                     target_id=target_obj.id,
                 )
