@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-from pyrrha_mapper.fs.filesystem_objects import Binary, FileSystem, Symbol, Symlink
+from pyrrha_mapper import Binary, FileSystem, Symbol, Symlink
 
 
 @pytest.fixture

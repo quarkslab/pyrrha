@@ -32,7 +32,7 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 
-from pyrrha_mapper.fs.filesystem_objects import Binary, FileSystem, Symlink
+from pyrrha_mapper.common.objects import Binary, FileSystem, Symlink
 from pyrrha_mapper.types import ResolveDuplicateOption
 
 
