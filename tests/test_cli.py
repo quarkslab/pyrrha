@@ -21,7 +21,8 @@ import pytest
 from click import BaseCommand
 from click.testing import CliRunner, Result
 
-from pyrrha_mapper import pyrrha, FileSystem
+from pyrrha_mapper import FileSystem
+from pyrrha_mapper.__main__ import pyrrha
 
 
 class TestCLI:

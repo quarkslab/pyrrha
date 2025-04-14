@@ -54,6 +54,9 @@ class Symbol(BaseModel):
     def __ge__(self, other):  # noqa: D105
         return tuple(self.model_dump().values()) >= tuple(other.model_dump().values())
 
+    def __repr__(self):
+        return f"Symbol('{self.name}')"
+
 
 class FileSystemComponent(BaseModel):
     """Base class representing any filesystem object (including its optionnal DB id)."""
@@ -61,6 +64,7 @@ class FileSystemComponent(BaseModel):
     path: Path
     id: int | None = None
     name: str = ""
+    real_path: Path | None = None  # Path on host filesystem computed at load time
 
     def model_post_init(self, __context: Any) -> None:
         """Enforce object name based on its path."""
@@ -83,7 +87,6 @@ class FileSystemComponent(BaseModel):
 class Binary(FileSystemComponent):
     """Class that represents a binary. It stores symbols/lib imported and exported."""
 
-    file_path: Path | None = Field(exclude=True, default=None)
     imported_libraries: dict[str, Binary | None] = Field(default_factory=dict)
     imported_symbols: dict[str, Symbol | None] = Field(default_factory=dict)
     exported_symbols: dict[str, Symbol] = Field(default_factory=dict)
@@ -159,12 +162,18 @@ class Binary(FileSystemComponent):
         """:return: the list of the imported symbols names."""
         return list(self.imported_symbols.keys())
 
+    def __repr__(self):
+        return f"Binary('{self.path}')"
+
 
 class Symlink(FileSystemComponent):
     """Class that represents a Symlink and store the associated DB id."""
 
     target_path: Path
     target_id: int
+
+    def __repr__(self):
+        return f"Symlink({self.path} ->{self.target_path})"
 
 
 class FileSystem(BaseModel):
@@ -175,6 +184,7 @@ class FileSystem(BaseModel):
     dumps.
     """
 
+    root_dir: Path
     binaries: dict[Path, Binary] = Field(default_factory=dict)
     symlinks: dict[Path, Symlink] = Field(default_factory=dict)
     _binary_names: dict[str, list[Binary]] = PrivateAttr(
@@ -183,6 +193,10 @@ class FileSystem(BaseModel):
     _symlink_names: dict[str, list[Symlink]] = PrivateAttr(
         default_factory=dict, init=False
     )
+
+    def __repr__(self):
+        return (f"FileSystem(root='{self.root_dir}',"
+                f"bins={len(self.binaries)}, symlinks={len(self.symlinks)})")
 
     # ------------------------------ Overload Pydantic methods -------------------------
     # Always export by aliases, set always excluded attributes
@@ -295,8 +309,10 @@ class FileSystem(BaseModel):
     def model_post_init(self, __context: Any) -> None:
         """Automatically called after class instanciation, compute internal dicts."""
         for binary in self.binaries.values():
+            self._set_object_realpath(binary)
             self._record_component_name(binary)
         for link in self.symlinks.values():
+            self._set_object_realpath(link)
             self._record_component_name(link)
 
     def model_dump_json(self, **args) -> str:
@@ -313,16 +329,13 @@ class FileSystem(BaseModel):
         return cls.model_validate_json(export_path.read_text())
 
     # -------------------------- Firmware manipulation helpers -------------------------
-
-    @staticmethod
-    def gen_fw_path(path: Path, root_directory: Path) -> Path:
+    def gen_fw_path(self, path: Path) -> Path:
         """Generate the path of a given file inside the firmware.
 
-        :param path: path of the file inside the local system
-        :param root_directory: path of the virtual root of the firmware
+        :param path: path of the file on the local system
         :return: path of the file inside the firmware
         """
-        return Path(root_directory.anchor).joinpath(path.relative_to(root_directory))
+        return Path(self.root_dir.anchor).joinpath(path.relative_to(self.root_dir))
 
     def _record_component_name(self, fs_object: Binary | Symlink) -> None:
         if isinstance(fs_object, Binary):
@@ -334,15 +347,20 @@ class FileSystem(BaseModel):
         else:
             names_dict[fs_object.name] = [fs_object]  # type: ignore
 
+    def _set_object_realpath(self, obj: FileSystemComponent) -> None:
+        obj.real_path = Path(self.root_dir) / ("."+str(obj.path))
+
     # --------------------- Add/get/manipulate data (binary & symlinks) ----------------
 
     def add_binary(self, binary: Binary) -> None:
         """Record binary in the current FS object."""
+        self._set_object_realpath(binary)
         self.binaries[binary.path] = binary
         self._record_component_name(binary)
 
     def add_symlink(self, symlink: Symlink) -> None:
         """Record symlink in the current FS object."""
+        self._set_object_realpath(symlink)
         self.symlinks[symlink.path] = symlink
         self._record_component_name(symlink)
 

@@ -49,19 +49,21 @@ class FileSystemImportsMapper(FileSystemMapper):
 
         raise: FsMapperError if cannot load it
         """
-        bin_obj = Binary(
-            file_path=file_path, path=FileSystem.gen_fw_path(file_path, root_directory)
-        )
+        # compute absolute path but from root_directory base
+        base = Path(root_directory.anchor)
+        rel_path = base.joinpath(file_path.relative_to(root_directory))
+
+        bin_obj = Binary(path=rel_path)
         is_elf = lief.is_elf(str(file_path))
         if is_elf:
             parser_config = lief.ELF.ParserConfig()
             if bin_obj.name.startswith("libcrypto"):
                 parser_config.count_mtd = lief.ELF.ParserConfig.DYNSYM_COUNT.HASH
             parsing_res: lief.ELF.Binary | None = lief.ELF.parse(
-                str(bin_obj.file_path), parser_config
+                str(file_path), parser_config
             )
             if parsing_res is None:
-                raise FsMapperError(f"Lief cannot parse {bin_obj.file_path}")
+                raise FsMapperError(f"Lief cannot parse {file_path}")
 
             # parse imported libs
             for lib in parsing_res.libraries:
@@ -87,9 +89,9 @@ class FileSystemImportsMapper(FileSystemMapper):
                         bin_obj.version_requirement[name] = [req.name]
         else:
             # PE parsing
-            res: lief.Binary | None = lief.parse(str(bin_obj.file_path))
+            res: lief.Binary | None = lief.parse(str(file_path))
             if res is None:
-                raise FsMapperError(f"Lief cannot parse {bin_obj.file_path}")
+                raise FsMapperError(f"Lief cannot parse {file_path}")
             # parse imported libs
             for lib in res.libraries:
                 bin_obj.add_imported_library_name(str(lib))

@@ -56,7 +56,7 @@ Tracker = "https://github.com/quarkslab/pyrrha/issues"
 Changelog = "https://github.com/quarkslab/pyrrha/CHANGELOG.md"
 
 [project.scripts]
-pyrrha = 'pyrrha_mapper:pyrrha'
+pyrrha = 'pyrrha_mapper.__main__:pyrrha'
 
 [project.optional-dependencies]
 doc = [
