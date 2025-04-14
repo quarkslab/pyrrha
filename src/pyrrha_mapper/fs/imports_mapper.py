@@ -21,8 +21,7 @@ import lief
 
 from pyrrha_mapper.exceptions import FsMapperError
 
-from .filesystem import FileSystemMapper
-from .filesystem_objects import Binary, FileSystem, Symbol
+from pyrrha_mapper import Binary, FileSystem, Symbol, FileSystemMapper
 
 lief.logging.disable()
 

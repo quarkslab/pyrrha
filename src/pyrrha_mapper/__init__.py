@@ -18,5 +18,7 @@
 
 from .__main__ import pyrrha
 
-__all__ = ["pyrrha"]
+from pyrrha_mapper.common import FileSystemMapper, FileSystem, Symbol, Symlink, Binary
+
+
 __version__ = "0.4.3"
