@@ -90,7 +90,7 @@ def example_bin(
 @pytest.fixture
 def empty_fs():
     """:return: a FileSystem instance with no binaries or symlinks"""
-    return FileSystem()
+    return FileSystem(root_dir="/tmp/foo")
 
 
 @pytest.fixture
@@ -108,6 +108,7 @@ def example_sym(example_bin):
 def example_fs(empty_bin, example_bin, example_sym, example_imp_lib):
     """:return: an FileSystem instance with two binaries and one symlink"""
     return FileSystem(
+        root_dir="/tmp/foo",
         binaries={
             empty_bin.path: empty_bin,
             example_bin.path: example_bin,
