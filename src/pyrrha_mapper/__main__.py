@@ -23,7 +23,7 @@ import click
 import coloredlogs  # type: ignore # no typing used in this library
 from numbat import SourcetrailDB
 
-from pyrrha_mapper import exedecomp, intercg, fs
+from pyrrha_mapper import exedecomp, intercg, fs, FileSystem
 from pyrrha_mapper.types import Disassembler, Exporters, ResolveDuplicateOption
 
 # -------------------------------------------------------------------------------
@@ -241,12 +241,6 @@ def fs_mapper(debug: bool,
     help="When resolving duplicate imports, user manually select which one to use",
 )
 @click.option(
-    "--fs-mapper-dump",
-    required=True,
-    type=click.Path(file_okay=True, dir_okay=False, exists=True),
-    help="Pyrrha fs mapper dump.",
-)
-@click.option(
     "--disassembler",
     required=False,
     type=Disassembler,
@@ -272,7 +266,6 @@ def fs_call_graph_mapper(  # noqa: D103
     db: Path,
     jobs: int,
     resolve_duplicates: str,
-    fs_mapper_dump: str,
     disassembler: Disassembler,
     exporter: Exporters,
     root_directory,
@@ -291,13 +284,16 @@ def fs_call_graph_mapper(  # noqa: D103
         return 1
 
     root_directory = root_directory.absolute()
-
-    pyrrha_dump = intercg.PyrrhaDump(Path(fs_mapper_dump))
-
     resolver = ResolveDuplicateOption(resolve_duplicates)
 
+    # First launch FS-mapper in (dry-mode) to obtain base FS
+    fs_mapper = fs.FileSystemImportsMapper(root_directory, None)
+    fs_object: FileSystem = fs_mapper.map(jobs)
+
+    # Create InterCG mapper and launch mapping
     try:
-        intercg.map_firmware(db_instance, root_directory, pyrrha_dump, jobs, resolver)
+        intercg_mapper = intercg.InterImageCGMapper(root_directory, fs_object, db_instance)
+        intercg_mapper.map(jobs, resolver)
     except RuntimeError:
         pass
 
