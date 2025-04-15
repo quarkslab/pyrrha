@@ -58,13 +58,6 @@ class FileSystemMapper(ABC):
         self.fs = FileSystem(root_dir=self.root_directory)
         self._dry_run = not bool(db)
 
-        if not self.dry_run_mode:
-            # Setup graph customisation in NumbatUI
-            self.db_interface.set_node_type("class", "Binaries", "binary")
-            self.db_interface.set_node_type("typedef", "Symlinks", "symlink")
-            self.db_interface.set_node_type("method", hover_display="exported function")
-            self.db_interface.set_node_type("field", hover_display="exported symbol")
-
     @property
     def dry_run_mode(self) -> bool:
         """

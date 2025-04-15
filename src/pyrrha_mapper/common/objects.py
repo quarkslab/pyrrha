@@ -40,6 +40,7 @@ class Symbol(BaseModel):
     name: str
     is_func: bool = False
     id: int | None = None
+    demangled_name: str | None = None
 
     # from https://github.com/pydantic/pydantic/discussions/2910
     def __lt__(self, other):  # noqa: D105
@@ -90,6 +91,11 @@ class Binary(FileSystemComponent):
     imported_libraries: dict[str, Binary | None] = Field(default_factory=dict)
     imported_symbols: dict[str, Symbol | None] = Field(default_factory=dict)
     exported_symbols: dict[str, Symbol] = Field(default_factory=dict)
+
+    # Fields for call graph representation
+    # functions is both: internal functions + exported functions
+    functions: dict[str, Symbol] = Field(default_factory=dict)
+    calls: dict[str, list[str]] = Field(default_factory=list)
 
     # ELF specific fields
     version_requirement: dict[str, list[str]] = Field(
@@ -164,6 +170,24 @@ class Binary(FileSystemComponent):
 
     def __repr__(self):
         return f"Binary('{self.path}')"
+
+    def auxiliary_file(self, extension="", append="") -> Path:
+        """
+        Get the Path object of an auxiliary file located in the
+        same directory directory than the current binary. This
+        utility function enables accessing quickly files stored
+        along a binary.
+
+        :param extension: file extension that shall be returned
+        :param append: suffix that will be added to the current file name
+        :return: new Path object (as on the host)
+        """
+        if extension:
+            return self.real_path.with_suffix(extension)
+        elif append:
+            return Path(str(self.real_path)+append)
+        else:
+            raise NameError("auxiliary file requires either extension or append argument")
 
 
 class Symlink(FileSystemComponent):

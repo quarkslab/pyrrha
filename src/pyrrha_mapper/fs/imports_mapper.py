@@ -17,10 +17,12 @@
 
 from pathlib import Path
 
+# third-party import
+from numbat import SourcetrailDB
 import lief
 
+# local imports
 from pyrrha_mapper.exceptions import FsMapperError
-
 from pyrrha_mapper import Binary, FileSystem, Symbol, FileSystemMapper
 
 lief.logging.disable()
@@ -28,6 +30,15 @@ lief.logging.disable()
 
 class FileSystemImportsMapper(FileSystemMapper):
     """Filesystem mapper based on Lief, which computes imports and exports."""
+    def __init__(self, root_directory: Path | str, db: SourcetrailDB | None):
+        super(FileSystemImportsMapper, self).__init__(root_directory, db)
+
+        if not self.dry_run_mode:
+            # Setup graph customisation in NumbatUI
+            self.db_interface.set_node_type("class", "Binaries", "binary")
+            self.db_interface.set_node_type("typedef", "Symlinks", "symlink")
+            self.db_interface.set_node_type("method", hover_display="exported function")
+            self.db_interface.set_node_type("field", hover_display="exported symbol")
 
     @staticmethod
     def is_binary_supported(p: Path) -> bool:
