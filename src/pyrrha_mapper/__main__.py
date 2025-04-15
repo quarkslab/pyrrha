@@ -140,8 +140,8 @@ their imports/exports plus the symlinks that points on these executable files.",
 )
 @click.option(
     "-e",
-    "--json",
-    help="Create a JSON export of the resulting mapping.",
+    "--export",
+    help="Create an export of the resulting FileSystem mapping (in JSON).",
     is_flag=True,
     default=False,
     show_default=False,
@@ -179,14 +179,25 @@ their imports/exports plus the symlinks that points on these executable files.",
     # help='Path of the directory containing the filesystem to map.',
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
 )
-def fs_mapper(debug: bool, db: Path, json, jobs, resolve_duplicates, root_directory):  # noqa: D103
+def fs_mapper(debug: bool,
+              db: Path,
+              export: bool,
+              jobs: int,
+              resolve_duplicates: ResolveDuplicateOption,
+              root_directory: Path):  # noqa: D103
     setup_logs(debug)
     db_instance = setup_db(db)
 
     root_directory = root_directory.absolute()
     fs_mapper = fs.FileSystemImportsMapper(root_directory, db_instance)
 
-    fs_mapper.map(jobs, json, resolve_duplicates)
+    filesystem = fs_mapper.map(jobs, resolve_duplicates)
+
+    # if enabled export enabled, save FileSystem object in a JSON
+    if export:
+        # maybe in the future a user can choose the output path ?
+        output_file = db_instance.path.with_suffix(".json")
+        filesystem.write(output_file)
 
     db_instance.close()
 

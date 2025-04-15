@@ -319,7 +319,7 @@ class FileSystem(BaseModel):
         """Override classic pydantic model_dump_json with preselected arguments."""
         return json.dumps(self.model_dump(mode="json", **args))
 
-    def json_export(self, export_path: Path):
+    def write(self, export_path: Path) -> None:
         """Dump content of the instance into a JSON file."""
         export_path.write_text(self.model_dump_json())
 
