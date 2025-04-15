@@ -110,6 +110,10 @@ class FileSystemImportsMapper(FileSystemMapper):
         :param binary: the Binary object to map
         :return: the updated object
         """
+        # If dry run do not store the binary in DB
+        if self.dry_run_mode:
+            return binary
+
         binary.id = self.db_interface.record_class(
             binary.name, prefix=f"{binary.path.parent}/", delimiter=":"
         )

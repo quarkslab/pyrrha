@@ -52,16 +52,27 @@ class FileSystemMapper(ABC):
     :param db: interface to the DB
     """
 
-    def __init__(self, root_directory: Path, db: SourcetrailDB):
-        self.root_directory = root_directory.resolve().absolute()
+    def __init__(self, root_directory: Path | str, db: SourcetrailDB | None):
+        self.root_directory = Path(root_directory).resolve().absolute()
         self.db_interface = db
         self.fs = FileSystem(root_dir=self.root_directory)
+        self._dry_run = not bool(db)
 
-        # Setup graph customisation in NumbatUI
-        db.set_node_type("class", "Binaries", "binary")
-        db.set_node_type("typedef", "Symlinks", "symlink")
-        db.set_node_type("method", hover_display="exported function")
-        db.set_node_type("field", hover_display="exported symbol")
+        if not self.dry_run_mode:
+            # Setup graph customisation in NumbatUI
+            self.db_interface.set_node_type("class", "Binaries", "binary")
+            self.db_interface.set_node_type("typedef", "Symlinks", "symlink")
+            self.db_interface.set_node_type("method", hover_display="exported function")
+            self.db_interface.set_node_type("field", hover_display="exported symbol")
+
+    @property
+    def dry_run_mode(self) -> bool:
+        """
+        Returns whether a Sourcetrail DB as been provided or not.
+        If not, only produce the FileSystem object that can also
+        be used independently.
+        """
+        return self._dry_run
 
     @staticmethod
     @abstractmethod
@@ -87,6 +98,8 @@ class FileSystemMapper(ABC):
         self, source_id: int | None, dest_id: int | None, log_prefix: str = ""
     ) -> None:
         """Record in DB the import of dest by source."""
+        if self.dry_run_mode:
+            return
         if source_id is None or dest_id is None:
             logging.error(
                 f"{log_prefix}: Cannot record import, src and/or dest are unknown"
@@ -112,6 +125,8 @@ class FileSystemMapper(ABC):
         :param sym: symlink object
         :return: the updated object
         """
+        if self.dry_run_mode:
+            return sym
         sym.id = self.db_interface.record_typedef_node(
             sym.name, prefix=f"{sym.path.parent}/", delimiter=":"
         )
@@ -363,8 +378,9 @@ does not point on a recorded bin"
                     )
                 case self._FailedLibImport():
                     logging.warning(f"{log_prefix}: lib '{lib_name}' not found in DB")
-                    lib_id = self.db_interface.record_class(lib_name, is_indexed=False)
-                    self.record_import(binary.id, lib_id, log_prefix)
+                    if not self.dry_run_mode:
+                        lib_id = self.db_interface.record_class(lib_name, is_indexed=False)
+                        self.record_import(binary.id, lib_id, log_prefix)
                     binary.add_non_resolved_imported_library(lib_name)
                 case _:
                     logging.error(
@@ -376,8 +392,9 @@ import, drop case"
         self, binary: Binary, symbol_name: str
     ) -> None:
         logging.warning(f"[symbol imports] {binary.name}: cannot resolve {symbol_name}")
-        symb_id = self.db_interface.record_field(symbol_name, is_indexed=False)
-        self.record_import(binary.id, symb_id, f"[symbol imports] {binary.name}")
+        if not self.dry_run_mode:
+            symb_id = self.db_interface.record_field(symbol_name, is_indexed=False)
+            self.record_import(binary.id, symb_id, f"[symbol imports] {binary.name}")
         binary.add_non_resolved_imported_symbol(symbol_name)
 
     def map_symbol_imports(
@@ -427,19 +444,18 @@ import, drop case"
                 if found is False:
                     self._record_non_resolved_symbol_import(binary, func_name)
 
-    def create_export(self):
-        """Create a JSON export of the current Pyrrha results."""
-        logging.debug("Start export")
-        json_path = self.db_interface.path.with_suffix(".json")
-        self.fs.json_export(json_path)
-        logging.info(f"Export saved: {json_path}")
+    def commit(self) -> None:
+        """
+        Commit changes in database.
+        """
+        if not self.dry_run_mode:
+            self.db_interface.commit()
 
     def map(
         self,
         threads: int,
-        export: bool = False,
         resolution_strategy: ResolveDuplicateOption = ResolveDuplicateOption.IGNORE,
-    ) -> None:
+    ) -> FileSystem:
         """Map recursively the content of a given directory.
 
         Main mapper function, map the content of 'self.root_directory', in the order:
@@ -452,6 +468,7 @@ import, drop case"
         :param export: if True create a JSON export of the mapping. It will be stored
             at the same place as the DB (file name: DB_NAME.json)
         :param resolution_strategy: the chosen option for duplicate import resolution
+        :return: The FileSystem object filled
         """
         binary_paths = set(
             filter(
@@ -507,7 +524,7 @@ import, drop case"
                     binary = self.load_binary(self.root_directory, path)
                     self.map_binary(binary)
                     progress.update(binaries_map, advance=1)
-            self.db_interface.commit()
+            self.commit()
 
             # Parse and resolve symlinks
             logging.debug(
@@ -519,7 +536,7 @@ import, drop case"
             for path in symlink_paths:
                 self.map_symlink(path)
                 progress.update(symlinks_map, advance=1)
-            self.db_interface.commit()
+            self.commit()
 
             # Handle imports
             logging.debug("[main] Start Libraries imports resolution")
@@ -529,7 +546,7 @@ import, drop case"
             for binary in self.fs.iter_binaries():
                 self.map_lib_imports(binary, resolution_strategy)
                 progress.update(lib_imports, advance=1)
-            self.db_interface.commit()
+            self.commit()
 
             logging.debug("[main] Start Symbols imports resolution")
             symbol_imports = progress.add_task(
@@ -538,7 +555,8 @@ import, drop case"
             for binary in self.fs.iter_binaries():
                 self.map_symbol_imports(binary, resolution_strategy)
                 progress.update(symbol_imports, advance=1)
-            self.db_interface.commit()
+            self.commit()
 
-            if export:
-                self.create_export()
+        # Return the internal object. The caller can do whathever
+        # we wants with it, like saving it to a file etc.
+        return self.fs

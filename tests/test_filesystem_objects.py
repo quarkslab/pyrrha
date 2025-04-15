@@ -383,7 +383,7 @@ class TestFileSystem:
         """Check if json export create a JSON file."""
         fs = request.getfixturevalue(fs)  # type: ignore
         export_path = tmp_path / "export.json"
-        fs.json_export(export_path)
+        fs.write(export_path)
         assert export_path.exists(), "JSON export file not created"
         assert json.loads(export_path.read_text()), (
             "exported data cannot be loaded as JSON"
