@@ -18,6 +18,7 @@
 import logging
 import queue
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
 from dataclasses import dataclass
 from multiprocessing import Manager, Pool, Queue
 from pathlib import Path
@@ -34,6 +35,24 @@ from rich.progress import (
 
 from pyrrha_mapper.common.objects import Binary, FileSystem, Symlink
 from pyrrha_mapper.types import ResolveDuplicateOption
+
+
+@contextmanager
+def hide(progress: Progress):
+    """Context Manager which temporally hide a `rich` progress bar.
+
+    Code from https://github.com/Textualize/rich/issues/1535#issuecomment-1745297594
+    """
+    transient = progress.live.transient  # save the old value
+    progress.live.transient = True
+    progress.stop()
+    progress.live.transient = transient  # restore the old value
+    try:
+        yield
+    finally:
+        # make space for the progress to use so it doesn't overwrite any previous lines
+        print("\n" * (len(progress.tasks) - 2))
+        progress.start()
 
 
 class FileSystemMapper(ABC):
@@ -60,8 +79,8 @@ class FileSystemMapper(ABC):
 
     @property
     def dry_run_mode(self) -> bool:
-        """
-        Returns whether a Sourcetrail DB as been provided or not.
+        """Returns whether a Sourcetrail DB as been provided or not.
+
         If not, only produce the FileSystem object that can also
         be used independently.
         """
@@ -91,8 +110,8 @@ class FileSystemMapper(ABC):
         self, source_id: int | None, dest_id: int | None, log_prefix: str = ""
     ) -> None:
         """Record in DB the import of dest by source."""
-        if self.dry_run_mode:
-            return
+        if self.dry_run_mode or self.db_interface is None:
+            return None
         if source_id is None or dest_id is None:
             logging.error(
                 f"{log_prefix}: Cannot record import, src and/or dest are unknown"
@@ -118,7 +137,7 @@ class FileSystemMapper(ABC):
         :param sym: symlink object
         :return: the updated object
         """
-        if self.dry_run_mode:
+        if self.dry_run_mode or self.db_interface is None:
             return sym
         sym.id = self.db_interface.record_typedef_node(
             sym.name, prefix=f"{sym.path.parent}/", delimiter=":"
@@ -371,8 +390,10 @@ does not point on a recorded bin"
                     )
                 case self._FailedLibImport():
                     logging.warning(f"{log_prefix}: lib '{lib_name}' not found in DB")
-                    if not self.dry_run_mode:
-                        lib_id = self.db_interface.record_class(lib_name, is_indexed=False)
+                    if not self.dry_run_mode and self.db_interface is not None:
+                        lib_id = self.db_interface.record_class(
+                            lib_name, is_indexed=False
+                        )
                         self.record_import(binary.id, lib_id, log_prefix)
                     binary.add_non_resolved_imported_library(lib_name)
                 case _:
@@ -385,7 +406,7 @@ import, drop case"
         self, binary: Binary, symbol_name: str
     ) -> None:
         logging.warning(f"[symbol imports] {binary.name}: cannot resolve {symbol_name}")
-        if not self.dry_run_mode:
+        if not self.dry_run_mode and self.db_interface is not None:
             symb_id = self.db_interface.record_field(symbol_name, is_indexed=False)
             self.record_import(binary.id, symb_id, f"[symbol imports] {binary.name}")
         binary.add_non_resolved_imported_symbol(symbol_name)
@@ -438,10 +459,8 @@ import, drop case"
                     self._record_non_resolved_symbol_import(binary, func_name)
 
     def commit(self) -> None:
-        """
-        Commit changes in database.
-        """
-        if not self.dry_run_mode:
+        """Commit changes in database."""
+        if not self.dry_run_mode and self.db_interface is not None:
             self.db_interface.commit()
 
     def map(
