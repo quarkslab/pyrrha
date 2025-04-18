@@ -55,7 +55,7 @@ class Symbol(BaseModel):
     def __ge__(self, other):  # noqa: D105
         return tuple(self.model_dump().values()) >= tuple(other.model_dump().values())
 
-    def __repr__(self):
+    def __repr__(self):  # noqa: D105
         return f"Symbol('{self.name}')"
 
 
@@ -95,7 +95,7 @@ class Binary(FileSystemComponent):
     # Fields for call graph representation
     # functions is both: internal functions + exported functions
     functions: dict[str, Symbol] = Field(default_factory=dict)
-    calls: dict[str, list[str]] = Field(default_factory=list)
+    calls: dict[str, list[str]] = Field(default_factory=dict)
 
     # ELF specific fields
     version_requirement: dict[str, list[str]] = Field(
@@ -168,26 +168,31 @@ class Binary(FileSystemComponent):
         """:return: the list of the imported symbols names."""
         return list(self.imported_symbols.keys())
 
-    def __repr__(self):
+    def __repr__(self):  # noqa: D105
         return f"Binary('{self.path}')"
 
     def auxiliary_file(self, extension="", append="") -> Path:
-        """
+        """Compute path of an auxiliary file next to the current one.
+
         Get the Path object of an auxiliary file located in the
         same directory directory than the current binary. This
         utility function enables accessing quickly files stored
-        along a binary.
+        along a binary. 
 
         :param extension: file extension that shall be returned
         :param append: suffix that will be added to the current file name
         :return: new Path object (as on the host)
         """
+        if self.real_path is None:
+            raise AttributeError("real path should be set to compute auxiliary file")
         if extension:
             return self.real_path.with_suffix(extension)
         elif append:
-            return Path(str(self.real_path)+append)
+            return Path(str(self.real_path) + append)
         else:
-            raise NameError("auxiliary file requires either extension or append argument")
+            raise NameError(
+                "auxiliary file requires either extension or append argument"
+            )
 
 
 class Symlink(FileSystemComponent):
@@ -196,8 +201,8 @@ class Symlink(FileSystemComponent):
     target_path: Path
     target_id: int
 
-    def __repr__(self):
-        return f"Symlink({self.path} ->{self.target_path})"
+    def __repr__(self):   # noqa: D105
+        return f"Symlink({self.path} -> {self.target_path})"
 
 
 class FileSystem(BaseModel):
@@ -218,9 +223,11 @@ class FileSystem(BaseModel):
         default_factory=dict, init=False
     )
 
-    def __repr__(self):
-        return (f"FileSystem(root='{self.root_dir}',"
-                f"bins={len(self.binaries)}, symlinks={len(self.symlinks)})")
+    def __repr__(self):   # noqa: D105
+        return (
+            f"FileSystem(root='{self.root_dir}',"
+            f"bins={len(self.binaries)}, symlinks={len(self.symlinks)})"
+        )
 
     # ------------------------------ Overload Pydantic methods -------------------------
     # Always export by aliases, set always excluded attributes
@@ -372,7 +379,7 @@ class FileSystem(BaseModel):
             names_dict[fs_object.name] = [fs_object]  # type: ignore
 
     def _set_object_realpath(self, obj: FileSystemComponent) -> None:
-        obj.real_path = Path(self.root_dir) / ("."+str(obj.path))
+        obj.real_path = Path(self.root_dir) / ("." + str(obj.path))
 
     # --------------------- Add/get/manipulate data (binary & symlinks) ----------------
 
