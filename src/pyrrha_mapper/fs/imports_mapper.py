@@ -15,25 +15,25 @@
 #  limitations under the License.
 """Filesystem mapper based on Lief, which computes imports and exports."""
 
+import logging
 from pathlib import Path
 
-# third-party import
-from numbat import SourcetrailDB
 import lief
+from numbat import SourcetrailDB
 
-# local imports
+from pyrrha_mapper.common import Binary, FileSystemMapper, Symbol
 from pyrrha_mapper.exceptions import FsMapperError
-from pyrrha_mapper import Binary, FileSystem, Symbol, FileSystemMapper
 
 lief.logging.disable()
 
 
 class FileSystemImportsMapper(FileSystemMapper):
     """Filesystem mapper based on Lief, which computes imports and exports."""
+
     def __init__(self, root_directory: Path | str, db: SourcetrailDB | None):
         super(FileSystemImportsMapper, self).__init__(root_directory, db)
 
-        if not self.dry_run_mode:
+        if not self.dry_run_mode and self.db_interface is not None:
             # Setup graph customisation in NumbatUI
             self.db_interface.set_node_type("class", "Binaries", "binary")
             self.db_interface.set_node_type("typedef", "Symlinks", "symlink")
@@ -87,7 +87,11 @@ class FileSystemImportsMapper(FileSystemMapper):
             # parse exported symbols
             for s in parsing_res.exported_symbols:
                 bin_obj.add_exported_symbol(
-                    Symbol(name=str(s.name), is_func=s.is_function)
+                    Symbol(
+                        name=str(s.name),
+                        is_func=s.is_function,
+                        demangled_name=s.demangled_name,
+                    )
                 )
 
             # parse version requirements
@@ -100,7 +104,7 @@ class FileSystemImportsMapper(FileSystemMapper):
                         bin_obj.version_requirement[name] = [req.name]
         else:
             # PE parsing
-            res: lief.Binary | None = lief.parse(str(file_path))
+            res: lief.PE.Binary | None = lief.PE.parse(str(file_path))
             if res is None:
                 raise FsMapperError(f"Lief cannot parse {file_path}")
             # parse imported libs
@@ -109,7 +113,9 @@ class FileSystemImportsMapper(FileSystemMapper):
             for f in res.imported_functions:
                 bin_obj.add_imported_symbol_name(str(f.name))
             for f in res.exported_functions:
-                bin_obj.add_exported_symbol(Symbol(name=str(f.name), is_func=True))
+                bin_obj.add_exported_symbol(
+                    Symbol(name=str(f.name), demangled_name=str(f.name), is_func=True)
+                )
 
         return bin_obj
 
@@ -122,7 +128,7 @@ class FileSystemImportsMapper(FileSystemMapper):
         :return: the updated object
         """
         # If dry run do not store the binary in DB
-        if self.dry_run_mode:
+        if self.dry_run_mode or self.db_interface is None:
             return binary
 
         binary.id = self.db_interface.record_class(
@@ -137,5 +143,11 @@ class FileSystemImportsMapper(FileSystemMapper):
                 symbol.id = self.db_interface.record_field(
                     symbol.name, parent_id=binary.id
                 )
-            self.db_interface.record_public_access(symbol.id)
+            if symbol.id is None:
+                logging.error(
+                    f"[bin mapping] Record of symbol '{symbol.name}' of binary \
+'{binary.name}' failed."
+                )
+            else:
+                self.db_interface.record_public_access(symbol.id)
         return binary
