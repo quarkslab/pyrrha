@@ -231,6 +231,7 @@ class FileSystemMapper(ABC):
         matching_objects: list[Binary],
         log_prefix: str,
         target_name: str,
+        cache: set[Binary] | None = None,
     ) -> Binary | None: ...
 
     @overload
@@ -240,6 +241,7 @@ class FileSystemMapper(ABC):
         matching_objects: list[Symlink],
         log_prefix: str,
         target_name: str,
+        cache: set[Symlink] | None = None,
     ) -> Symlink | None: ...
 
     @staticmethod
@@ -248,6 +250,7 @@ class FileSystemMapper(ABC):
         matching_objects: list[Binary] | list[Symlink],
         log_prefix: str,
         target_name: str,
+        cache: set[Binary] | set[Symlink] | None = None,
     ) -> Binary | Symlink | None:
         """Choice of one element of a given list according to the strategy.
 
@@ -260,6 +263,7 @@ class FileSystemMapper(ABC):
            check by the function)
         :param log_prefix: Prefix used at the beginning of each log
         :param target_name: Target name, used in logs (and user interaction)
+        :param resolve_cache: cache of previously selected choices for this target
         :return: the selected FileSystemComponent | None if resolution strategy
            is IGNORE
         """
@@ -271,6 +275,11 @@ class FileSystemMapper(ABC):
             return None
         selected_index = None
         if len(matching_objects) > 1 and strategy is ResolveDuplicateOption.INTERACTIVE:
+            for cache_entry in cache or []:
+                if cache_entry in matching_objects:  # reuse already selected entry
+                    logging.debug(
+                        f"{log_prefix}: manually selected entry to disambiguate {target_name}"
+                    )
             while (
                 selected_index is None
                 or selected_index < 0
