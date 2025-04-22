@@ -64,7 +64,7 @@ class FileSystemImportsMapper(FileSystemMapper):
         base = Path(root_directory.anchor)
         rel_path = base.joinpath(file_path.relative_to(root_directory))
 
-        bin_obj = Binary(path=rel_path)
+        bin_obj = Binary(path=rel_path, real_path=file_path)
         is_elf = lief.is_elf(str(file_path))
         if is_elf:
             parser_config = lief.ELF.ParserConfig()
@@ -80,19 +80,35 @@ class FileSystemImportsMapper(FileSystemMapper):
             for lib in parsing_res.libraries:
                 bin_obj.add_imported_library_name(str(lib))
 
-            # parse imported symbols
-            for s in parsing_res.imported_symbols:
-                bin_obj.add_imported_symbol_name(str(s.name))
-
-            # parse exported symbols
-            for s in parsing_res.exported_symbols:
-                bin_obj.add_exported_symbol(
-                    Symbol(
-                        name=str(s.name),
-                        is_func=s.is_function,
-                        demangled_name=s.demangled_name,
+            # parse symbols
+            # store name of imported ones and internal functions
+            # store exported symbols only for libs
+            is_lib = (
+                parsing_res.abstract.header.object_type
+                == lief.Header.OBJECT_TYPES.LIBRARY
+            )
+            s: lief.ELF.Symbol
+            for s in parsing_res.it_symbols():
+                if s.imported:
+                    bin_obj.add_imported_symbol_name(str(s.name))
+                elif s.exported and is_lib:
+                    bin_obj.add_exported_symbol(
+                        Symbol(
+                            name=str(s.name),
+                            is_func=s.is_function,
+                            demangled_name=s.demangled_name,
+                            addr=s.value,
+                        )
                     )
-                )
+                elif s.is_function:
+                    bin_obj.add_function(
+                        Symbol(
+                            name=str(s.name),
+                            is_func=s.is_function,
+                            demangled_name=s.demangled_name,
+                            addr=s.value,
+                        )
+                    )
 
             # parse version requirements
             for req in parsing_res.symbols_version_requirement:
@@ -104,7 +120,7 @@ class FileSystemImportsMapper(FileSystemMapper):
                         bin_obj.version_requirement[name] = [req.name]
         else:
             # PE parsing
-            res: lief.PE.Binary | None = lief.PE.parse(str(file_path))
+            res: lief.Binary | None = lief.parse(str(file_path))
             if res is None:
                 raise FsMapperError(f"Lief cannot parse {file_path}")
             # parse imported libs
@@ -112,10 +128,16 @@ class FileSystemImportsMapper(FileSystemMapper):
                 bin_obj.add_imported_library_name(str(lib))
             for f in res.imported_functions:
                 bin_obj.add_imported_symbol_name(str(f.name))
-            for f in res.exported_functions:
-                bin_obj.add_exported_symbol(
-                    Symbol(name=str(f.name), demangled_name=str(f.name), is_func=True)
-                )
+            if res.abstract.header.OBJECT_TYPES == lief.Header.OBJECT_TYPES.LIBRARY:
+                for f in res.exported_functions:
+                    bin_obj.add_exported_symbol(
+                        Symbol(
+                            name=str(f.name),
+                            demangled_name=str(f.name),
+                            is_func=True,
+                            addr=f.address,
+                        )
+                    )
 
         return bin_obj
 
