@@ -38,9 +38,10 @@ class Symbol(BaseModel):
     """Class to represent a Symbol of a binary."""
 
     name: str
+    demangled_name: str
     is_func: bool = False
     id: int | None = None
-    demangled_name: str | None = None
+    addr: int | None = Field(frozen=True, default=None)
 
     # from https://github.com/pydantic/pydantic/discussions/2910
     def __lt__(self, other):  # noqa: D105
@@ -95,12 +96,46 @@ class Binary(FileSystemComponent):
     # Fields for call graph representation
     # functions is both: internal functions + exported functions
     functions: dict[str, Symbol] = Field(default_factory=dict)
-    calls: dict[str, list[str]] = Field(default_factory=dict)
+    calls: dict[Symbol, list[Symbol]] = Field(default_factory=dict)
+
+    _func_addr: dict[int, list[Symbol]] = PrivateAttr(default_factory=dict, init=False)
 
     # ELF specific fields
     version_requirement: dict[str, list[str]] = Field(
         default_factory=dict
     )  # dict(symbol_name, list(requirements))
+
+    @field_validator("functions", mode="after")
+    @classmethod
+    def validate_functions_field(cls, value: dict[str, Symbol]) -> dict[str, Symbol]:
+        """Ensure that each member of the functions field is a function."""
+        for symb in value.values():
+            if not symb.is_func:
+                raise ValueError(
+                    f"symbol '{symb}' cannot be a function as 'is_func' is set to False"
+                )
+        return value
+
+    def model_post_init(self, __context: Any) -> None:
+        """Automatically called after class instanciation, compute internal dicts."""
+        for func in self.functions.values():
+            self._record_func_addr(func)
+
+    def _record_func_addr(self, func: Symbol) -> None:
+        assert func.is_func
+        if func.addr is not None:
+            if func.addr in self._func_addr:
+                self._func_addr[func.addr].append(func)
+            else:
+                self._func_addr[func.addr] = [func]
+
+    def add_call(self,caller: Symbol, callee: Symbol) -> None:
+        """Add a call to the callee from the caller function."""
+        assert caller.is_func and callee.is_func
+        if caller not in self.calls:
+            self.calls[caller] = [callee]
+        elif callee not in self.calls[caller]:
+            self.calls[caller].append(callee)
 
     def add_imported_library_name(self, name: str) -> None:
         """Add an imported library name."""
@@ -127,8 +162,19 @@ class Binary(FileSystemComponent):
         self.imported_symbols[symbol_name] = None
 
     def add_exported_symbol(self, symbol: Symbol) -> None:
-        """Record a Symbol in the current binary and flag it as exported."""
+        """Record a Symbol in the current binary and flag it as exported.
+
+        If the symbol is a function, record it also in the binary's functions.
+        """
         self.exported_symbols[symbol.name] = symbol
+        if symbol.is_func:
+            self.add_function(symbol)
+
+    def add_function(self, func: Symbol) -> None:
+        """Record a Function in the current binary."""
+        assert func.is_func
+        self.functions[func.name] = func
+        self._record_func_addr(func)
 
     def exported_symbol_exists(self, symbol_name: str) -> bool:
         """:return: true if an exported symbol exists in the current Binary."""
@@ -137,14 +183,48 @@ class Binary(FileSystemComponent):
             and self.exported_symbols[symbol_name] is not None
         )
 
+    def exported_function_exists(self, symbol_name: str) -> bool:
+        """:return: true if an exported function exists in the current Binary."""
+        return (
+            self.exported_symbol_exists(symbol_name)
+            and self.get_exported_symbol(symbol_name).is_func
+        )
+    
+    def function_exists(self, symbol_name: str) -> bool:
+        """:return: true if an function exists in the current Binary."""
+        return (
+            symbol_name in self.functions
+            and self.functions[symbol_name] is not None
+        )
+
+    def get_calls_from(self, caller: Symbol) -> list[Symbol]:
+        """:return: list of functions called by the given function"""
+        if caller in self.calls:
+            return self.calls[caller]
+        return []
+    
     def get_exported_symbol(self, symbol_name: str) -> Symbol:
-        """:return: the exported symbol ewith the given name."""
+        """:return: the exported symbol with the given name."""
         return self.exported_symbols[symbol_name]
+
+    def get_function_by_name(self, func_name: str) -> Symbol:
+        """:return: the function with the given name."""
+        return self.functions[func_name]
+
+    def get_functions_by_addr(self, addr: int) -> list[Symbol]:
+        """:return: the functions at the given address"""
+        return self._func_addr[addr]
 
     def iter_exported_symbols(self) -> Iterable[Symbol]:
         """:return: an iterable over the exported symbols stored in the Binary."""
         for symbol in self.exported_symbols.values():
             yield symbol
+
+    def iter_exported_functions(self) -> Iterable[Symbol]:
+        """:return: an iterable over the exported functions stored in the Binary."""
+        for symbol in self.exported_symbols.values():
+            if symbol.is_func:
+                yield symbol
 
     def iter_imported_libraries(self) -> Iterable[Binary]:
         """:return: an iterable over the imported libraries stored in the Binary."""
@@ -155,6 +235,12 @@ class Binary(FileSystemComponent):
     def iter_imported_symbols(self) -> Iterable[Symbol]:
         """:return: an iterable over the imported symbols stored in the Binary."""
         for symbol in self.imported_symbols.values():
+            if symbol is not None:
+                yield symbol
+
+    def iter_functions(self) -> Iterable[Symbol]:
+        """:return: an iterable over the functions in the Binary."""
+        for symbol in self.functions.values():
             if symbol is not None:
                 yield symbol
 
@@ -177,7 +263,7 @@ class Binary(FileSystemComponent):
         Get the Path object of an auxiliary file located in the
         same directory directory than the current binary. This
         utility function enables accessing quickly files stored
-        along a binary. 
+        along a binary.
 
         :param extension: file extension that shall be returned
         :param append: suffix that will be added to the current file name
@@ -201,7 +287,7 @@ class Symlink(FileSystemComponent):
     target_path: Path
     target_id: int
 
-    def __repr__(self):   # noqa: D105
+    def __repr__(self):  # noqa: D105
         return f"Symlink({self.path} -> {self.target_path})"
 
 
@@ -223,7 +309,7 @@ class FileSystem(BaseModel):
         default_factory=dict, init=False
     )
 
-    def __repr__(self):   # noqa: D105
+    def __repr__(self):  # noqa: D105
         return (
             f"FileSystem(root='{self.root_dir}',"
             f"bins={len(self.binaries)}, symlinks={len(self.symlinks)})"
