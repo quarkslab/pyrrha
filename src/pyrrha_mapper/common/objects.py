@@ -118,6 +118,7 @@ class Binary(FileSystemComponent):
 
     def model_post_init(self, __context: Any) -> None:
         """Automatically called after class instanciation, compute internal dicts."""
+        super().model_post_init(__context)
         for func in self.functions.values():
             self._record_func_addr(func)
 
