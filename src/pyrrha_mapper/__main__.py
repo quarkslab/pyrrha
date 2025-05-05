@@ -23,7 +23,8 @@ import click
 import coloredlogs  # type: ignore # no typing used in this library
 from numbat import SourcetrailDB
 
-from pyrrha_mapper import exedecomp, intercg, fs, FileSystem
+from pyrrha_mapper import exedecomp, fs, intercg
+from pyrrha_mapper.common import FileSystem
 from pyrrha_mapper.types import Disassembler, Exporters, ResolveDuplicateOption
 
 # -------------------------------------------------------------------------------
@@ -179,7 +180,7 @@ their imports/exports plus the symlinks that points on these executable files.",
     # help='Path of the directory containing the filesystem to map.',
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
 )
-def fs_mapper(debug: bool,
+def fs_mapper(debug: bool,  # noqa: D103
               db: Path,
               export: bool,
               jobs: int,
