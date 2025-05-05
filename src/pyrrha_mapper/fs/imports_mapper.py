@@ -82,16 +82,12 @@ class FileSystemImportsMapper(FileSystemMapper):
 
             # parse symbols
             # store name of imported ones and internal functions
-            # store exported symbols only for libs
-            is_lib = (
-                parsing_res.abstract.header.object_type
-                == lief.Header.OBJECT_TYPES.LIBRARY
-            )
+            # store exported symbols
             s: lief.ELF.Symbol
-            for s in parsing_res.it_symbols():
+            for s in parsing_res.symbols:
                 if s.imported:
                     bin_obj.add_imported_symbol_name(str(s.name))
-                elif s.exported and is_lib:
+                elif s.exported:
                     bin_obj.add_exported_symbol(
                         Symbol(
                             name=str(s.name),
