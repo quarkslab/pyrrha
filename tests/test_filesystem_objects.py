@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-from pyrrha_mapper import Binary, FileSystem, Symbol, Symlink
+from pyrrha_mapper.common import Binary, FileSystem, Symbol, Symlink
 
 
 @pytest.fixture
@@ -32,7 +32,7 @@ def empty_bin() -> Binary:
 @pytest.fixture
 def example_imp_symb() -> Symbol:
     """:return: the symbol used as imported symbol in example_bin"""
-    return Symbol(name="exemple", is_func=False, id=1)
+    return Symbol(name="exemple", is_func=False, id=1, demangled_name="exemple")
 
 
 @pytest.fixture
@@ -54,13 +54,13 @@ def example_imp_non_resolved_lib() -> Binary:
 @pytest.fixture
 def example_imp_non_resolved_symb() -> Symbol:
     """:return: the binary used of an non resolved imported symbol in example_bin"""
-    return Symbol(name="non_resolved_symb")
+    return Symbol(name="non_resolved_symb", demangled_name="non_resolved_symb")
 
 
 @pytest.fixture
 def example_exp_symb() -> Symbol:
     """:return: the symbol used as exported symbol in example_bin"""
-    return Symbol(name="my_func", is_func=True, id=2)
+    return Symbol(name="my_func", is_func=True, id=2, demangled_name="my_func")
 
 
 @pytest.fixture
@@ -84,13 +84,14 @@ def example_bin(
             example_imp_non_resolved_symb.name: None,
         },
         exported_symbols={example_exp_symb.name: example_exp_symb},
+        functions={example_exp_symb.name: example_exp_symb}
     )
 
 
 @pytest.fixture
 def empty_fs():
     """:return: a FileSystem instance with no binaries or symlinks"""
-    return FileSystem(root_dir="/tmp/foo")
+    return FileSystem(root_dir=Path("/tmp/foo"))
 
 
 @pytest.fixture
@@ -108,7 +109,7 @@ def example_sym(example_bin):
 def example_fs(empty_bin, example_bin, example_sym, example_imp_lib):
     """:return: an FileSystem instance with two binaries and one symlink"""
     return FileSystem(
-        root_dir="/tmp/foo",
+        root_dir=Path("/tmp/foo"),
         binaries={
             empty_bin.path: empty_bin,
             example_bin.path: example_bin,
@@ -186,7 +187,7 @@ class TestBinary:
     ):
         """Check if the symbol is added correctly and can be retrieved."""
         _bin: Binary = request.getfixturevalue(_bin)  # type: ignore
-        imported_symbol = Symbol(name="imported_symb")
+        imported_symbol = Symbol(name="imported_symb", demangled_name="imported symbol")
         expected_imports = list(_bin.iter_imported_symbols()) + [imported_symbol]
         expected__names = _bin.imported_symbol_names + [imported_symbol.name]
         _bin.add_imported_symbol(imported_symbol)
@@ -250,7 +251,7 @@ class TestBinary:
     ):
         """Check if the symbol is added correctly and can be retrieved."""
         _bin: Binary = request.getfixturevalue(_bin)  # type: ignore
-        symbol = Symbol(name="imported_symb")
+        symbol = Symbol(name="imported_symb", demangled_name="IMported symb")
         expected_imports = list(_bin.iter_exported_symbols()) + [symbol]
         _bin.add_exported_symbol(symbol)
         assert sorted(list(_bin.iter_exported_symbols())) == sorted(expected_imports), (
@@ -549,7 +550,7 @@ class TestFileSystem:
             id=29,
             path=Path("/tmp/rec_symlink"),
             target_path=example_sym.path,
-            target_id=example_sym.id,
+            target_id=example_sym.id, # type: ignore
         )
         example_fs.add_symlink(rec_sym)
         assert example_fs.resolve_symlink(rec_sym) == example_bin
