@@ -89,7 +89,7 @@ def compute_call_graph(binary: Binary, program: Program) -> dict[Symbol, list[st
             f_addr in exports or f_addr + 1 in exports
         ):  # If the function is somewhat exported (and visible in LIEF)
             all_symbs = exports.get(
-                f_addr, exports[f_addr + 1]
+                f_addr, exports.get(f_addr + 1, [])
             )  # In THUMB mode address is address+1
 
             canonical = disambiguate_export(all_symbs)
