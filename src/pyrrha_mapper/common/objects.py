@@ -58,6 +58,9 @@ class Symbol(BaseModel):
 
     def __repr__(self):  # noqa: D105
         return f"Symbol('{self.name}')"
+    
+    def __hash__(self) -> int: # noqa: D105
+        return hash(tuple(self.model_dump().values()))
 
 
 class FileSystemComponent(BaseModel):
