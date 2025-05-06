@@ -91,12 +91,15 @@ class Binary(FileSystemComponent):
 
     imported_libraries: dict[str, Binary | None] = Field(default_factory=dict)
     imported_symbols: dict[str, Symbol | None] = Field(default_factory=dict)
-    exported_symbols: dict[str, Symbol] = Field(default_factory=dict)
+    exported_symbols: dict[str, Symbol] = Field(
+        default_factory=dict
+    )  # warning only symbols which are not functions
+    exported_functions: dict[str, Symbol] = Field(default_factory=dict)
 
     # Fields for call graph representation
     # functions is both: internal functions + exported functions
-    functions: dict[str, Symbol] = Field(default_factory=dict)
-    calls: dict[Symbol, list[Symbol]] = Field(default_factory=dict)
+    internal_functions: dict[str, Symbol] = Field(default_factory=dict)
+    calls: dict[str, list[Symbol]] = Field(default_factory=dict)
 
     _func_addr: dict[int, list[Symbol]] = PrivateAttr(default_factory=dict, init=False)
 
@@ -105,7 +108,7 @@ class Binary(FileSystemComponent):
         default_factory=dict
     )  # dict(symbol_name, list(requirements))
 
-    @field_validator("functions", mode="after")
+    @field_validator("internal_functions", "exported_functions", mode="after")
     @classmethod
     def validate_functions_field(cls, value: dict[str, Symbol]) -> dict[str, Symbol]:
         """Ensure that each member of the functions field is a function."""
@@ -119,7 +122,7 @@ class Binary(FileSystemComponent):
     def model_post_init(self, __context: Any) -> None:
         """Automatically called after class instanciation, compute internal dicts."""
         super().model_post_init(__context)
-        for func in self.functions.values():
+        for func in self.iter_functions():
             self._record_func_addr(func)
 
     def _record_func_addr(self, func: Symbol) -> None:
@@ -130,9 +133,14 @@ class Binary(FileSystemComponent):
             else:
                 self._func_addr[func.addr] = [func]
 
-    def add_call(self,caller: Symbol, callee: Symbol) -> None:
-        """Add a call to the callee from the caller function."""
-        assert caller.is_func and callee.is_func
+    def add_call(self, caller: Symbol | str, callee: Symbol) -> None:
+        """Add a call to the callee from the caller function.
+
+        Caller should be in the current binary.
+        """
+        if isinstance(caller, Symbol):
+            caller = caller.name
+        assert self.function_exists(caller)
         if caller not in self.calls:
             self.calls[caller] = [callee]
         elif callee not in self.calls[caller]:
@@ -166,51 +174,65 @@ class Binary(FileSystemComponent):
         """Record a Symbol in the current binary and flag it as exported.
 
         If the symbol is a function, record it also in the binary's functions.
+        It overrides old symbol with the same name
         """
-        self.exported_symbols[symbol.name] = symbol
         if symbol.is_func:
-            self.add_function(symbol)
+            self._record_func_addr(symbol)
+            self.exported_functions[symbol.name] = symbol
+            self.exported_symbols.pop(symbol.name, None)
+        else:
+            self.exported_symbols[symbol.name] = symbol
+            self.exported_functions.pop(symbol.name, None)
 
     def add_function(self, func: Symbol) -> None:
         """Record a Function in the current binary."""
         assert func.is_func
-        self.functions[func.name] = func
+        self.internal_functions[func.name] = func
         self._record_func_addr(func)
 
     def exported_symbol_exists(self, symbol_name: str) -> bool:
         """:return: true if an exported symbol exists in the current Binary."""
         return (
             symbol_name in self.exported_symbols
-            and self.exported_symbols[symbol_name] is not None
+            or symbol_name in self.exported_functions
         )
 
     def exported_function_exists(self, symbol_name: str) -> bool:
         """:return: true if an exported function exists in the current Binary."""
-        return (
-            self.exported_symbol_exists(symbol_name)
-            and self.get_exported_symbol(symbol_name).is_func
-        )
-    
+        return symbol_name in self.exported_functions
+
     def function_exists(self, symbol_name: str) -> bool:
         """:return: true if an function exists in the current Binary."""
         return (
-            symbol_name in self.functions
-            and self.functions[symbol_name] is not None
+            symbol_name in self.exported_functions
+            or symbol_name in self.internal_functions
         )
 
-    def get_calls_from(self, caller: Symbol) -> list[Symbol]:
+    def get_calls_from(self, caller: Symbol | str) -> list[Symbol]:
         """:return: list of functions called by the given function"""
+        if isinstance(caller, Symbol):
+            caller = caller.name
         if caller in self.calls:
             return self.calls[caller]
         return []
-    
+
     def get_exported_symbol(self, symbol_name: str) -> Symbol:
         """:return: the exported symbol with the given name."""
-        return self.exported_symbols[symbol_name]
+        res = self.exported_functions.get(
+            symbol_name, self.exported_symbols.get(symbol_name)
+        )
+        if res is None:
+            raise KeyError(symbol_name)
+        return res
 
     def get_function_by_name(self, func_name: str) -> Symbol:
         """:return: the function with the given name."""
-        return self.functions[func_name]
+        res = self.exported_functions.get(
+            func_name, self.internal_functions.get(func_name)
+        )
+        if res is None:
+            raise KeyError(func_name)
+        return res
 
     def get_functions_by_addr(self, addr: int) -> list[Symbol]:
         """:return: the functions at the given address"""
@@ -218,14 +240,12 @@ class Binary(FileSystemComponent):
 
     def iter_exported_symbols(self) -> Iterable[Symbol]:
         """:return: an iterable over the exported symbols stored in the Binary."""
-        for symbol in self.exported_symbols.values():
-            yield symbol
+        yield from self.exported_symbols.values()
+        yield from self.exported_functions.values()
 
     def iter_exported_functions(self) -> Iterable[Symbol]:
         """:return: an iterable over the exported functions stored in the Binary."""
-        for symbol in self.exported_symbols.values():
-            if symbol.is_func:
-                yield symbol
+        yield from self.exported_functions.values()
 
     def iter_imported_libraries(self) -> Iterable[Binary]:
         """:return: an iterable over the imported libraries stored in the Binary."""
@@ -241,9 +261,8 @@ class Binary(FileSystemComponent):
 
     def iter_functions(self) -> Iterable[Symbol]:
         """:return: an iterable over the functions in the Binary."""
-        for symbol in self.functions.values():
-            if symbol is not None:
-                yield symbol
+        yield from self.internal_functions.values()
+        yield from self.exported_functions.values()
 
     @property
     def imported_library_names(self) -> list[str]:
@@ -337,8 +356,11 @@ class FileSystem(BaseModel):
                     "id": True,
                     "path": True,
                     "name": True,
-                    "imported_symbols": {"__all__": {"id": True}},
+                    "imported_symbols": True,
                     "exported_symbols": True,
+                    "exported_functions": True,
+                    "internal_functions": True,
+                    "calls": True,
                 },
             )
             res[path]["imported_libraries"] = dict()
@@ -347,7 +369,7 @@ class FileSystem(BaseModel):
                     res[path]["imported_libraries"][n] = None
                 else:
                     res[path]["imported_libraries"][n] = _bin.model_dump(
-                        mode=mode, include={"id": True}
+                        mode=mode, include={"path": True}
                     )
         return res
 
@@ -369,11 +391,11 @@ class FileSystem(BaseModel):
             True,  # correct equivalent to `isinstance(data, dict[Path, Symlink])`
         ):
             return data
-        imported_libs = dict()
-        imported_symbols = dict()
-        res = dict()
-        bin_by_ids = dict()
-        symbols_by_ids = dict()
+
+        # generate first version of res
+        res: dict[Path, Binary] = dict()
+        imported_libs: dict[Path, dict[str, dict[str,Any]]] = dict()
+        # first part: automatic conversion
         for path, content in data.items():
             try:
                 path = Path(path)
@@ -385,43 +407,50 @@ class FileSystem(BaseModel):
                 raise ValueError(
                     f"There is no content associated to {path} in the provided data"
                 )
+            # save imported libs separetely as it should be treated manually
             imported_libs[path] = (
                 content.pop("imported_libraries")
                 if "imported_libraries" in content
                 else dict()
             )
-            imported_symbols[path] = (
-                content.pop("imported_symbols")
-                if "imported_symbols" in content
-                else dict()
-            )
+            # convert the content into a Binary object
             bin_obj = Binary.model_validate(content)
             if bin_obj.path != path:
                 raise ValueError("path mismatches between binary object and its export")
             res[path] = bin_obj
-            bin_by_ids[bin_obj.id] = bin_obj
-            symbols_by_ids.update({s.id: s for s in bin_obj.exported_symbols.values()})
+        # second part: manually generate imported_libs field of each Binary object
+        for bin_path, libs in imported_libs.items():
+            for name, lib_path in libs.items():
+                if lib_path is None:
+                    res[bin_path].add_imported_library_name(name)
+                else:
+                    try:
+                        lib_path_obj = Path(lib_path["path"])
+                    except TypeError as e:
+                        raise ValueError(
+                            f"Cannot convert '{lib_path['path']}' into Path object: {e}"
+                        ) from e
+                    if lib_path_obj not in res:
+                        raise ValueError(
+                            f"Imported lib '{lib_path}' not listed in binaries"
+                        )
+                    res[bin_path].add_imported_library(res[lib_path_obj])
 
-        for path, libs in imported_libs.items():
-            for name, _id in libs.items():
-                if _id is None:
-                    res[path].add_imported_library_name(name)
-                else:
-                    if _id["id"] not in bin_by_ids:
-                        raise ValueError(
-                            f"Imported lib '{name}' not listed in binaries"
-                        )
-                    res[path].add_imported_library(bin_by_ids[_id["id"]])
-        for path, symbols in imported_symbols.items():
-            for name, _id in symbols.items():
-                if _id is None:
-                    res[path].add_imported_symbol_name(name)
-                else:
-                    if _id["id"] not in symbols_by_ids:
-                        raise ValueError(
-                            f"Imported symbol '{name}' not listed in filesystem symbols"
-                        )
-                    res[path].add_imported_symbol(symbols_by_ids[_id["id"]])
+        # optmimize version by replacing every iteration of the same symbol (same id)
+        # by one object
+        # 1. generate dict of symbols by ids
+        symbols_by_ids: dict[int, Symbol] = {
+            s.id: s
+            for bin in res.values()
+            for s in bin.iter_exported_symbols()
+            if s.id is not None
+        }
+        # 2. Replace same symbols objects by one object
+        for bin in res.values():
+            for symb in bin.iter_imported_symbols():
+                if symb.id is not None and symb.id in symbols_by_ids:
+                    bin.add_imported_symbol(symbols_by_ids[symb.id])
+
         return res
 
     def model_post_init(self, __context: Any) -> None:
