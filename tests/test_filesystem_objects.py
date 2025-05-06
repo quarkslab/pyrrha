@@ -32,7 +32,7 @@ def empty_bin() -> Binary:
 @pytest.fixture
 def example_imp_symb() -> Symbol:
     """:return: the symbol used as imported symbol in example_bin"""
-    return Symbol(name="exemple", is_func=False, id=1, demangled_name="exemple")
+    return Symbol(name="exemple", is_func=True, id=1, demangled_name="exemple", addr=12)
 
 
 @pytest.fixture
@@ -41,7 +41,7 @@ def example_imp_lib(example_imp_symb) -> Binary:
     return Binary(
         id=3,
         path=Path("/lib/my_lib"),
-        exported_symbols={example_imp_symb.name: example_imp_symb},
+        exported_functions={example_imp_symb.name: example_imp_symb},
     )
 
 
@@ -58,9 +58,25 @@ def example_imp_non_resolved_symb() -> Symbol:
 
 
 @pytest.fixture
+def example_exp_func() -> Symbol:
+    """:return: the symbol used as exported func in example_bin"""
+    return Symbol(name="my_func", is_func=True, id=2, demangled_name="my_func", addr=24)
+
+
+@pytest.fixture
+def example_int_func() -> Symbol:
+    """:return: the symbol used as internal func in example_bin"""
+    return Symbol(
+        name="my_int_func", is_func=True, id=200, demangled_name="my_int_func", addr=25
+    )
+
+
+@pytest.fixture
 def example_exp_symb() -> Symbol:
     """:return: the symbol used as exported symbol in example_bin"""
-    return Symbol(name="my_func", is_func=True, id=2, demangled_name="my_func")
+    return Symbol(
+        name="my_symb_exp", is_func=False, id=20, demangled_name="my_symb_expo"
+    )
 
 
 @pytest.fixture
@@ -70,6 +86,8 @@ def example_bin(
     example_imp_non_resolved_symb,
     example_imp_non_resolved_lib,
     example_exp_symb,
+    example_exp_func,
+    example_int_func,
 ) -> Binary:
     """:return: a binary for tests"""
     return Binary(
@@ -84,7 +102,9 @@ def example_bin(
             example_imp_non_resolved_symb.name: None,
         },
         exported_symbols={example_exp_symb.name: example_exp_symb},
-        functions={example_exp_symb.name: example_exp_symb}
+        exported_functions={example_exp_func.name: example_exp_func},
+        internal_functions={example_int_func.name: example_int_func},
+        calls={example_int_func.name: [example_imp_symb]},
     )
 
 
@@ -284,7 +304,7 @@ class TestBinary:
 
     @pytest.mark.parametrize(
         ["_bin", "expected"],
-        [("empty_bin", []), ("example_bin", ["example_exp_symb"])],
+        [("empty_bin", []), ("example_bin", ["example_exp_symb", "example_exp_func"])],
         ids=["Empty bin", "Example bin"],
     )
     def test_iter_exported_symbol(
@@ -550,7 +570,7 @@ class TestFileSystem:
             id=29,
             path=Path("/tmp/rec_symlink"),
             target_path=example_sym.path,
-            target_id=example_sym.id, # type: ignore
+            target_id=example_sym.id,  # type: ignore
         )
         example_fs.add_symlink(rec_sym)
         assert example_fs.resolve_symlink(rec_sym) == example_bin
