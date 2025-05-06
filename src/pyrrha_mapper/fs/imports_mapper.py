@@ -137,35 +137,3 @@ class FileSystemImportsMapper(FileSystemMapper):
 
         return bin_obj
 
-    def record_binary_in_db(self, binary: Binary) -> Binary:
-        """Record the binary inside the DB as well as its internal symbols.
-
-        Update 'bin_obj.id' with the id of the created object in DB and does the same
-        thing for its symbol.
-        :param binary: the Binary object to map
-        :return: the updated object
-        """
-        # If dry run do not store the binary in DB
-        if self.dry_run_mode or self.db_interface is None:
-            return binary
-
-        binary.id = self.db_interface.record_class(
-            binary.name, prefix=f"{binary.path.parent}/", delimiter=":"
-        )
-        for symbol in binary.iter_exported_symbols():
-            if symbol.is_func:
-                symbol.id = self.db_interface.record_method(
-                    symbol.name, parent_id=binary.id
-                )
-            else:
-                symbol.id = self.db_interface.record_field(
-                    symbol.name, parent_id=binary.id
-                )
-            if symbol.id is None:
-                logging.error(
-                    f"[bin mapping] Record of symbol '{symbol.name}' of binary \
-'{binary.name}' failed."
-                )
-            else:
-                self.db_interface.record_public_access(symbol.id)
-        return binary

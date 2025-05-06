@@ -161,22 +161,10 @@ class InterImageCGMapper(FileSystemMapper):
                 logging.debug(f"[{i + 1}/{bins_count}] index node: {binary.name}")
 
                 # Create the node entry in numbat and create the custom command
-                self._record_binary(binary)
-                self._record_custom_command(binary)
-
-                # symbol_ids[bin_id] = {}
-
-                # Add all functions within the binary as function of the binary
-                for fun_symbol in binary.functions.values():
-                    self._record_symbol_binary(binary, fun_symbol)
-
-                # TODO: Removed for the moment
-                # Iterate all exports to add additional (missing) export values in symbol_ids
-                # for exp_name, canonical_target in binary.exports.items():
-                #     # The export 'name' was not part of functions visible in IDA (so add it)
-                #     if exp_name not in symbol_ids[bin_id]:
-                #         n_id = symbol_ids[bin_id][canonical_target]
-                #         symbol_ids[bin_id][exp_name] = n_id  # alias to the numbat_id
+                self.record_binary_in_db(binary)
+                if binary.id is not None:
+                    self.node_ids[binary.id] = binary
+                    self._record_custom_command(binary)
 
                 progress.update(binaries_map, advance=1)
             # ---------------------------------------------------------------
@@ -229,24 +217,6 @@ class InterImageCGMapper(FileSystemMapper):
         # return the filesystem object
         return self.fs
 
-    def _record_binary(self, binary: Binary) -> None:
-        """Add a binary into database.
-
-        It will also set the newly created id into the object.
-
-        :param binary: Binary to insert in database
-        """
-        if self.dry_run_mode or self.db_interface is None:
-            return None
-        bin_id = self.db_interface.record_class(str(binary.path))  # record the path
-        if bin_id is not None:
-            binary.id = bin_id  # set the id to the object
-            # pid_to_nid[binary.pyrrha_id] = bin_id  # fill pyrrha_id -> numbat_id
-            # binary_mapping[binary.pyrrha_id] = binary  # fill index by pyrrha_id
-            self.node_ids[bin_id] = binary
-        else:
-            logging.warning(f"Cannot record binary {binary.name} in DB")
-
     def _record_custom_command(self, binary: Binary) -> None:
         """Add a custom command to call numbat-ui on the underlying Sourcetrail.
 
@@ -261,29 +231,6 @@ class InterImageCGMapper(FileSystemMapper):
             )
         else:
             self.db_interface.set_custom_command(binary.id, cmd, "Open in NumbatUI")
-
-    def _record_symbol_binary(self, binary: Binary, symbol: Symbol) -> None:
-        """Add a function symbol to the given binary in DB.
-
-        :param binary: Binary hosting the symbol
-        :param symbol: Symbol to add to the binary
-        """
-        if self.dry_run_mode or self.db_interface is None:
-            return None
-        # register demangled name instead of mangled name
-        f_id = self.db_interface.record_function(
-            symbol.demangled_name, parent_id=binary.id
-        )
-        symbol.id = f_id
-        # FIXME: To nodes with the same name will result in the same ID.
-        # FIXME: Maybe shall be fixed at Numbat level ?
-        # symbol_ids[bin_id][f_name] = f_id
-
-        # If exported change its color
-        if symbol.name in binary.exported_symbols and f_id is not None:
-            self.db_interface.change_node_color(
-                f_id, fill_color="#bee0af", border_color="#395f33"
-            )  # text_color="brown", icon_color="brown", hatching_color="#FFEBCD")
 
     def _record_call_ref(self, src: Symbol, dst: Symbol) -> bool:
         """Add call reference between two symbols in DB.

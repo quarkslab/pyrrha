@@ -106,7 +106,7 @@ class FileSystemMapper(ABC):
         """
         pass
 
-    def record_import(
+    def record_import_in_db(
         self, source_id: int | None, dest_id: int | None, log_prefix: str = ""
     ) -> None:
         """Record in DB the import of dest by source."""
@@ -119,18 +119,59 @@ class FileSystemMapper(ABC):
         else:
             self.db_interface.record_ref_import(source_id, dest_id)
 
-    @abstractmethod
-    def record_binary_in_db(self, binary: Binary) -> Binary:
+    def record_binary_in_db(self, binary: Binary, log_prefix: str = "") -> Binary:
         """Record the binary inside the DB as well as its internal symbols.
 
         Update 'bin_obj.id' with the id of the created object in DB and does the same
-        thing for its symbol.
+        thing for its symbol. It will record symbols using their demangled names.
+
+        :warning: do not record calls as well as any links between several binaries
+
         :param binary: the Binary object to map
         :return: the updated object
         """
-        pass
+        # If dry run do not store the binary in DB
+        if self.dry_run_mode or self.db_interface is None:
+            return binary
 
-    def record_symlink_in_db(self, sym: Symlink) -> Symlink:
+        binary.id = self.db_interface.record_class(
+            binary.name, prefix=f"{binary.path.parent}/", delimiter=":"
+        )
+        if binary.id is None:
+            logging.error(f"{log_prefix}: Record of binary '{binary.name}' failed.")
+            return binary
+        for symbol in binary.iter_exported_symbols():
+            if symbol.is_func:
+                symbol.id = self.db_interface.record_method(
+                    symbol.demangled_name, parent_id=binary.id
+                )
+            else:
+                symbol.id = self.db_interface.record_field(
+                    symbol.name, parent_id=binary.id
+                )
+            if symbol.id is None:
+                logging.error(
+                    f"{log_prefix}: Record of symbol '{symbol.name}' of binary \
+'{binary.name}' failed."
+                )
+            else:
+                self.db_interface.record_public_access(symbol.id)
+        for symbol in binary.iter_functions():
+            # check if have not been already mapped
+            if not binary.exported_function_exists(symbol.name):
+                symbol.id = self.db_interface.record_method(
+                    symbol.demangled_name, parent_id=binary.id
+                )
+                if symbol.id is None:
+                    logging.error(
+                        f"{log_prefix}: Record of symbol '{symbol.name}' of binary \
+'{binary.name}' failed."
+                    )
+                else:
+                    self.db_interface.record_private_access(symbol.id)
+        return binary
+
+    def record_symlink_in_db(self, sym: Symlink, log_prefix: str = "") -> Symlink:
         """Record into DB the symlink and its link to its target.
 
         Update 'sym.id' with the id of the created object.
@@ -142,7 +183,10 @@ class FileSystemMapper(ABC):
         sym.id = self.db_interface.record_typedef_node(
             sym.name, prefix=f"{sym.path.parent}/", delimiter=":"
         )
-        self.record_import(sym.id, sym.target_id)
+        if sym.id is None:
+            logging.error(f"{log_prefix}: Record of symlink '{sym.name}' failed.")
+        else:
+            self.record_import_in_db(sym.id, sym.target_id)
         return sym
 
     @classmethod
@@ -385,10 +429,10 @@ class FileSystemMapper(ABC):
                     # For symlinks, we record a ref to the symlink but to ease symbol
                     # resolution, the final target of the symlink is considered to be
                     # imported and not the symlink itself
-                    self.record_import(binary.id, res.initial_import.id, log_prefix)
+                    self.record_import_in_db(binary.id, res.initial_import.id, log_prefix)
                     binary.add_imported_library(res.final_import)
                 case self._PartialLibImport():
-                    self.record_import(binary.id, res.initial_import.id, log_prefix)
+                    self.record_import_in_db(binary.id, res.initial_import.id, log_prefix)
                     logging.warning(
                         f"{log_prefix}: import {res.initial_import.path} symlink which \
 does not point on a recorded bin"
@@ -403,7 +447,7 @@ does not point on a recorded bin"
                         lib_id = self.db_interface.record_class(
                             lib_name, is_indexed=False
                         )
-                        self.record_import(binary.id, lib_id, log_prefix)
+                        self.record_import_in_db(binary.id, lib_id, log_prefix)
                     binary.add_non_resolved_imported_library(lib_name)
                 case _:
                     logging.error(
@@ -417,7 +461,7 @@ import, drop case"
         logging.warning(f"[symbol imports] {binary.name}: cannot resolve {symbol_name}")
         if not self.dry_run_mode and self.db_interface is not None:
             symb_id = self.db_interface.record_field(symbol_name, is_indexed=False)
-            self.record_import(binary.id, symb_id, f"[symbol imports] {binary.name}")
+            self.record_import_in_db(binary.id, symb_id, f"[symbol imports] {binary.name}")
         binary.add_non_resolved_imported_symbol(symbol_name)
 
     def map_symbol_imports(
@@ -448,7 +492,7 @@ import, drop case"
                             lib = res.final_import
                             if lib.exported_symbol_exists(symb_name):
                                 symb = lib.get_exported_symbol(symb_name)
-                                self.record_import(binary.id, symb.id)
+                                self.record_import_in_db(binary.id, symb.id)
                                 found = True
                                 break
                     if not found:
@@ -460,7 +504,7 @@ import, drop case"
                 for lib in binary.iter_imported_libraries():
                     if lib.exported_symbol_exists(func_name):
                         symbol = lib.get_exported_symbol(func_name)
-                        self.record_import(binary.id, symbol.id)
+                        self.record_import_in_db(binary.id, symbol.id)
                         binary.add_imported_symbol(symbol)
                         found = True
                         break
