@@ -1,22 +1,37 @@
+# -*- coding: utf-8 -*-
+
+#  Copyright 2023-2025 Quarkslab
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
 """InterCGMapper implementation."""
 
 import logging
 from collections import defaultdict
-from contextlib import contextmanager
 from pathlib import Path
 
 # third-party imports
 from numbat import SourcetrailDB
-from rich.progress import (
-    BarColumn,
-    MofNCompleteColumn,
-    Progress,
-    TextColumn,
-    TimeElapsedColumn,
-)
+from rich.progress import Progress
 
 # local imports
-from pyrrha_mapper.common import Binary, FileSystem, FileSystemMapper, Symbol, Symlink
+from pyrrha_mapper.common import (
+    Binary,
+    FileSystem,
+    FileSystemMapper,
+    Symbol,
+    Symlink,
+    hide_progress,
+)
 from pyrrha_mapper.intercg.loader import load_program
 from pyrrha_mapper.types import ResolveDuplicateOption
 
@@ -25,22 +40,6 @@ IGNORE_LIST = ["__gmon_start__"]
 QUOKKA_EXT = ".quokka"
 
 NUMBAT_UI_BIN = "numbat-ui"
-
-
-@contextmanager
-def hide(progress: Progress):
-    """From https://github.com/Textualize/rich/issues/1535#issuecomment-1745297594."""
-    transient = progress.live.transient  # save the old value
-    progress.live.transient = True
-    progress.stop()
-    progress.live.transient = transient  # restore the old value
-    try:
-        yield
-    finally:
-        # make space for the progress to use so it doesn't overwrite any previous lines
-        print("\n" * (len(progress.tasks) - 2))
-        progress.start()
-
 
 class InterImageCGMapper(FileSystemMapper):
     """Filesystem mapper based on Lief, which computes imports and exports."""
@@ -58,11 +57,6 @@ class InterImageCGMapper(FileSystemMapper):
         if not self.dry_run_mode and self.db_interface is not None:
             # Change some headers
             self.db_interface.set_node_type("class", "Binaries", "binary")
-
-        # Internal objects for fast lookup
-        # self.binary_mapping: dict[int, Binary] = {}  # pyrrha_id -> Binary
-        # self.pid_to_nid: dict[int, int] = {}  # pyrrha_id -> numbat_id
-        # self.symbol_ids = {}  # (binary) numbat_id -> function name -> (symbol function) numbat_id
 
         # Mapping to keep Numbat ID to the associated object
         self.node_ids: dict[int, Binary | Symbol | Symlink] = {}
@@ -131,11 +125,19 @@ class InterImageCGMapper(FileSystemMapper):
                 logging.debug(f"Store cached binaries: {cache_file}")
                 self.fs.write(cache_file)
 
-    def map(
+    def mapper_main(
         self,
         threads: int,
+        progress: Progress,
         resolution_strategy: ResolveDuplicateOption = ResolveDuplicateOption.IGNORE,
     ) -> FileSystem:
+        """Main function of the mapper, return the result stored in a FileSytsem.
+
+        :param threads: number of threads to use
+        :param progress: a progress bar ready to be filled
+        :param resolution_strategy: the chosen option for duplicate import resolution
+        :return: The FileSystem object filled
+        """  # noqa: D401
         # Step1: Load FileSystem object and enrich it if needed
         if self.dry_run_mode or self.db_interface is None:
             self.load_binaries(None)
@@ -143,76 +145,70 @@ class InterImageCGMapper(FileSystemMapper):
             cache_file = self.db_interface.path.with_suffix(".bins.json")
             self.load_binaries(cache_file)
 
-        # Then iterate all Binary objects to fill the database
-        with Progress(
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            MofNCompleteColumn(),
-            TimeElapsedColumn(),
-        ) as progress:
-            self.progress = progress  # need to be able to hide it further down in calls
-            bins_count = len(self.fs.binaries)
-            binaries_map = progress.add_task(
-                "[deep_pink2]Binaries mapping", total=bins_count
+        self.progress = progress  # need to be able to hide it further down in calls
+        bins_count = len(self.fs.binaries)
+        binaries_map = progress.add_task(
+            "[deep_pink2]Binaries mapping", total=bins_count
+        )
+
+        # ---------- Iterate all binaries and add Nodes in the database ---------
+        for i, binary in enumerate(self.fs.iter_binaries()):
+            logging.debug(f"[{i + 1}/{bins_count}] index node: {binary.name}")
+
+            # Create the node entry in numbat and create the custom command
+            self.record_binary_in_db(binary)
+            if binary.id is not None:
+                self.node_ids[binary.id] = binary
+                self._record_custom_command(binary)
+
+            progress.update(binaries_map, advance=1)
+        # ---------------------------------------------------------------
+
+        # Dict of:     exported-funs -> [binaries]
+        self.exports_to_bins = self.make_export_to_binaries_map()
+
+        # Iterate again all binaries to create call edges (all numbat_id are created)
+        cg_map = progress.add_task("[orange1]Call Graph mapping", total=bins_count)
+
+        for i, binary in enumerate(self.fs.iter_binaries()):
+            resolve_cache: set[Binary] = set()
+            logging.debug(
+                f"-------------- [{i + 1}/{bins_count}] index call graph {binary.path} \
+--------------"
             )
 
-            # ---------- Iterate all binaries and add Nodes in the database ---------
-            for i, binary in enumerate(self.fs.iter_binaries()):
-                logging.debug(f"[{i + 1}/{bins_count}] index node: {binary.name}")
+            # Filter symbols to solely the ones exposed by the imported libraries
+            filtered_symbols: dict[str, Symbol] = {}  # fun_name -> Symbol
+            for lib in binary.iter_imported_libraries():
+                # dep_num_id = pid_to_nid[dep_pyr_id]
+                # deps_symbols.update(symbol_ids[dep_num_id])
+                if lib is not None:
+                    filtered_symbols.update(
+                        lib.exported_symbols
+                    )  # NOTE: Might silently overwrite a symbol
 
-                # Create the node entry in numbat and create the custom command
-                self.record_binary_in_db(binary)
-                if binary.id is not None:
-                    self.node_ids[binary.id] = binary
-                    self._record_custom_command(binary)
+            count_res = {True: 0, False: 0}
+            if binary in self.unresolved_callgraph:
+                for f_symb, targets in self.unresolved_callgraph[binary].items():
+                    for target in targets:
+                        try:
+                            res = self._record_one_call(
+                                binary,
+                                f_symb,
+                                target,
+                                filtered_symbols,
+                                resolution_strategy,
+                                resolve_cache,
+                            )
+                            count_res[res] += 1
+                        except KeyError as e:
+                            logging.error(f"can't find symbols: {e}")
 
-                progress.update(binaries_map, advance=1)
-            # ---------------------------------------------------------------
+            # Log amount of symbols that succeeded
+            good, bad = count_res[True], count_res[False]
+            logging.debug(f"Good: {good}, Bad: {bad}")
 
-            # Dict of:     exported-funs -> [binaries]
-            self.exports_to_bins = self.make_export_to_binaries_map()
-
-            # Iterate again all binaries to create call edges (all numbat_id are created)
-            cg_map = progress.add_task("[orange1]Call Graph mapping", total=bins_count)
-
-            for i, binary in enumerate(self.fs.iter_binaries()):
-                resolve_cache: set[Binary] = set()
-                logging.debug(
-                    f"-------------- [{i + 1}/{bins_count}] index call graph {binary.path} --------------"
-                )
-
-                # Filter symbols to solely the ones exposed by the imported libraries
-                filtered_symbols: dict[str, Symbol] = {}  # fun_name -> Symbol
-                for lib in binary.iter_imported_libraries():
-                    # dep_num_id = pid_to_nid[dep_pyr_id]
-                    # deps_symbols.update(symbol_ids[dep_num_id])
-                    if lib is not None:
-                        filtered_symbols.update(
-                            lib.exported_symbols
-                        )  # NOTE: Might silently overwrite a symbol
-
-                count_res = {True: 0, False: 0}
-                if binary in self.unresolved_callgraph:
-                    for f_symb, targets in self.unresolved_callgraph[binary].items():
-                        for target in targets:
-                            try:
-                                res = self._record_one_call(
-                                    binary,
-                                    f_symb,
-                                    target,
-                                    filtered_symbols,
-                                    resolution_strategy,
-                                    resolve_cache,
-                                )
-                                count_res[res] += 1
-                            except KeyError as e:
-                                logging.error(f"can't find symbols: {e}")
-
-                # Log amount of symbols that succeeded
-                good, bad = count_res[True], count_res[False]
-                logging.debug(f"Good: {good}, Bad: {bad}")
-
-                progress.update(cg_map, advance=1)
+            progress.update(cg_map, advance=1)
 
         # return the filesystem object
         return self.fs
