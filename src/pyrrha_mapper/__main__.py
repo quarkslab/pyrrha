@@ -225,20 +225,20 @@ def fs_mapper(debug: bool,  # noqa: D103
 @click.option(
     "--ignore",
     "resolve_duplicates",
-    flag_value="IGNORE",
+    flag_value=ResolveDuplicateOption.IGNORE,
     help="When resolving duplicate imports, ignore them",
     default=True,
 )
 @click.option(
     "--arbitrary",
     "resolve_duplicates",
-    flag_value="ARBITRARY",
+    flag_value=ResolveDuplicateOption.ARBITRARY,
     help="When resolving duplicate imports, select the first one available",
 )
 @click.option(
     "--interactive",
     "resolve_duplicates",
-    flag_value="INTERACTIVE",
+    flag_value=ResolveDuplicateOption.INTERACTIVE,
     help="When resolving duplicate imports, user manually select which one to use",
 )
 @click.option(
@@ -266,7 +266,7 @@ def fs_call_graph_mapper(  # noqa: D103
     debug: bool,
     db: Path,
     jobs: int,
-    resolve_duplicates: str,
+    resolve_duplicates: ResolveDuplicateOption,
     disassembler: Disassembler,
     exporter: Exporters,
     root_directory,
@@ -285,7 +285,6 @@ def fs_call_graph_mapper(  # noqa: D103
         return 1
 
     root_directory = root_directory.absolute()
-    resolver = ResolveDuplicateOption(resolve_duplicates)
 
     # First launch FS-mapper in (dry-mode) to obtain base FS
     fs_mapper = fs.FileSystemImportsMapper(root_directory, None)
@@ -294,7 +293,7 @@ def fs_call_graph_mapper(  # noqa: D103
     # Create InterCG mapper and launch mapping
     try:
         intercg_mapper = intercg.InterImageCGMapper(root_directory, fs_object, db_instance)
-        intercg_mapper.map(jobs, resolver)
+        intercg_mapper.map(jobs, resolve_duplicates)
     except RuntimeError:
         pass
 
