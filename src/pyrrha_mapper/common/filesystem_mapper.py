@@ -135,9 +135,20 @@ class FileSystemMapper(ABC):
                 )
             else:
                 self.db_interface.record_public_access(symbol.id)
-        for symbol in binary.iter_functions():
+        for symbol in binary.iter_not_exported_functions():
             # check if have not been already mapped
-            if not binary.exported_function_exists(symbol.name):
+            if binary.exported_function_exists(symbol.name):
+                logging.warning(
+                    f"Bin {binary.name}: Cannot register function \
+{symbol.name}, already exists in this binary, same id for both symbols"
+                )
+                symbol.id = binary.get_exported_symbol(symbol.name).id
+            elif binary.exported_symbol_exists(symbol.name):
+                logging.info(
+                    f"Bin {binary.name}: Cannot register internal function \
+{symbol.name}, an exported symbol with the same name already exists"
+                )
+            else:
                 symbol.id = self.db_interface.record_method(
                     symbol.demangled_name, parent_id=binary.id
                 )
@@ -148,6 +159,7 @@ class FileSystemMapper(ABC):
                     )
                 else:
                     self.db_interface.record_private_access(symbol.id)
+
         return binary
 
     def record_symlink_in_db(self, sym: Symlink, log_prefix: str = "") -> Symlink:
