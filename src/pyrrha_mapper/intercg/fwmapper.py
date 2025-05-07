@@ -63,7 +63,7 @@ class InterImageCGMapper(FileSystemMapper):
         # Mapping to keep export_name -> list[Binary] exposing this function
         self.exports_to_bins: dict[str, list[Binary]] = {}
         self.progress: Progress | None = None
-        self.unresolved_callgraph: dict[Binary, dict[Symbol, list[str]]] = dict()
+        self.unresolved_callgraph: dict[Path, dict[Symbol, list[str]]] = dict()
 
     def load_binaries(self, cache_file: Path | None) -> None:
         """Load all the binaries located in the filesystem as Binary objects.
@@ -108,7 +108,7 @@ class InterImageCGMapper(FileSystemMapper):
             )
             logging.info(f"[{i + 1}/{tot}] process: {binary.name} [{s}]")
             try:
-                self.unresolved_callgraph[binary] = load_program(binary)
+                self.unresolved_callgraph[binary.path] = load_program(binary)
             except SyntaxError:
                 logging.error(f"cannot load Quokka files: {quokka_file}")
                 continue
@@ -181,8 +181,8 @@ class InterImageCGMapper(FileSystemMapper):
                     )  # NOTE: Might silently overwrite a symbol
 
             count_res = {True: 0, False: 0}
-            if binary in self.unresolved_callgraph:
-                for f_symb, targets in self.unresolved_callgraph[binary].items():
+            if binary.path in self.unresolved_callgraph:
+                for f_symb, targets in self.unresolved_callgraph[binary.path].items():
                     for target in targets:
                         try:
                             res = self._record_one_call(
