@@ -177,7 +177,7 @@ class Binary(FileSystemComponent):
         """Record a Symbol in the current binary and flag it as exported.
 
         If the symbol is a function, record it also in the binary's functions.
-        It overrides old symbol with the same name
+        It overrides old symbol with the same name.
         """
         if symbol.is_func:
             self._record_func_addr(symbol)
@@ -249,6 +249,10 @@ class Binary(FileSystemComponent):
     def iter_exported_functions(self) -> Iterable[Symbol]:
         """:return: an iterable over the exported functions stored in the Binary."""
         yield from self.exported_functions.values()
+
+    def iter_not_exported_functions(self) -> Iterable[Symbol]:
+        """:return: an iterable over the exported functions stored in the Binary."""
+        yield from self.internal_functions.values()
 
     def iter_imported_libraries(self) -> Iterable[Binary]:
         """:return: an iterable over the imported libraries stored in the Binary."""
