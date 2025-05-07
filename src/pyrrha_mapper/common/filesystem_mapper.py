@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import overload
 
 from numbat import SourcetrailDB
+from numbat.exceptions import DBException
 from rich.progress import (
     BarColumn,
     MofNCompleteColumn,
@@ -31,6 +32,7 @@ from rich.progress import (
 )
 
 from pyrrha_mapper.common.objects import Binary, FileSystem, Symlink
+from pyrrha_mapper.exceptions import PyrrhaError
 from pyrrha_mapper.types import ResolveDuplicateOption
 
 
@@ -134,7 +136,12 @@ class FileSystemMapper(ABC):
 '{binary.name}' failed."
                 )
             else:
-                self.db_interface.record_public_access(symbol.id)
+                try:
+                    self.db_interface.record_public_access(symbol.id)
+                except DBException as e:
+                    raise PyrrhaError(
+                        f"{log_prefix}: Cannot register access to symbol {symbol.name}: {e}"
+                    ) from e
         for symbol in binary.iter_not_exported_functions():
             # check if have not been already mapped
             if binary.exported_function_exists(symbol.name):
@@ -158,7 +165,12 @@ class FileSystemMapper(ABC):
 '{binary.name}' failed."
                     )
                 else:
-                    self.db_interface.record_private_access(symbol.id)
+                    try:
+                        self.db_interface.record_private_access(symbol.id)
+                    except DBException as e:
+                        raise PyrrhaError(
+                            f"{log_prefix}: Cannot register access to symbol {symbol.name}: {e}"
+                        ) from e
 
         return binary
 
