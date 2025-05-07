@@ -94,10 +94,11 @@ class FileSystemImportsMapper(FileSystemMapper):
                 if s.imported:
                     bin_obj.add_imported_symbol_name(str(s.name))
                 elif s.exported:
+                    is_func = s.is_function or s.type == lief.ELF.Symbol.TYPE.GNU_IFUNC
                     bin_obj.add_exported_symbol(
                         Symbol(
                             name=str(s.name),
-                            is_func=s.is_function,
+                            is_func=is_func,
                             demangled_name=s.demangled_name,
                             addr=s.value,
                         )
@@ -366,7 +367,7 @@ import, drop case"
         could simply solve the symbol import using its name (part before the `@@`) and
         the list of possible libraries it could come from.
         """
-        log_prefix = f"[lib imports] {binary.path}"
+        log_prefix = f"[symbol imports] {binary.path}"
         for func_name in binary.imported_symbol_names:
             if len(func_name.split("@@")) == 2:  # symbols with a specific version
                 symb_name, symb_version = func_name.split("@@")
