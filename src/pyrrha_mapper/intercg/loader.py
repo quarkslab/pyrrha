@@ -84,14 +84,12 @@ def compute_call_graph(binary: Binary, program: Program) -> dict[Symbol, list[st
     ] = {}  # addr: (pyrrha symbol, mangled_name, pp_name, addr, typ, calls: list[int])
     for f_addr, f in program.items():
         name = f.mangled_name  # as computed by IDA
-
         if (
             f_addr in exports or f_addr + 1 in exports
         ):  # If the function is somewhat exported (and visible in LIEF)
             all_symbs = exports.get(
                 f_addr, exports.get(f_addr + 1, [])
             )  # In THUMB mode address is address+1
-
             canonical = disambiguate_export(all_symbs)
             if name != canonical.name:
                 logging.info(f"change fun name: {name} -> {canonical.name}")
@@ -130,6 +128,7 @@ def compute_call_graph(binary: Binary, program: Program) -> dict[Symbol, list[st
     # The deal here is to fast-forward call to imported function directly on the
     # imported symbol and not on the PLT (to make the graph more straightforward)
     for f_symb, f_name, _, f_addr, f_type, calls in _inter_cg.values():
+        call_graph[f_symb] = []
         if f_type in [FunctionType.NORMAL, FunctionType.LIBRARY]:
             # Iter calls (ignore calls that are not pointing to a function!)
             for _, c_name, _, c_addr, c_type, c_calls in [
