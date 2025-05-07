@@ -231,8 +231,8 @@ class InterImageCGMapper(FileSystemMapper):
             return False
         if src.id is None or dst.id is None:
             logging.error(
-                f"Cannot record call ref between {src.name} and {dst.name}, both ids \
-are not defined"
+                f"Cannot record call ref between {src.name} and {dst.name}, missing ids\
+ ({src.name}: {src.id}, {dst.name}: {dst.id})"
             )
             return False
         self.db_interface.record_ref_call(src.id, dst.id)
