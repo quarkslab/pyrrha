@@ -162,7 +162,9 @@ class FileSystemMapper(ABC):
                 )
             else:
                 symbol.id = self.db_interface.record_method(
-                    symbol.demangled_name, parent_id=binary.id
+                    symbol.name,
+                    parent_id=binary.id,
+                    hover_display=symbol.demangled_name,
                 )
                 if symbol.id is None:
                     logging.error(
