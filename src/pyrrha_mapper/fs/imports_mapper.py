@@ -131,16 +131,15 @@ class FileSystemImportsMapper(FileSystemMapper):
                 bin_obj.add_imported_library_name(str(lib))
             for f in res.imported_functions:
                 bin_obj.add_imported_symbol_name(str(f.name))
-            if res.abstract.header.OBJECT_TYPES == lief.Header.OBJECT_TYPES.LIBRARY:
-                for f in res.exported_functions:
-                    bin_obj.add_exported_symbol(
-                        Symbol(
-                            name=str(f.name),
-                            demangled_name=str(f.name),
-                            is_func=True,
-                            addr=f.address,
-                        )
+            for f in res.exported_functions:
+                bin_obj.add_exported_symbol(
+                    Symbol(
+                        name=str(f.name),
+                        demangled_name=str(f.name),
+                        is_func=True,
+                        addr=f.address,
                     )
+                )
 
         return bin_obj
 
@@ -174,7 +173,9 @@ class FileSystemImportsMapper(FileSystemMapper):
         This function updates the filesystem representation stored as `self.fs`.
         :param bin_object: Binary object
         """
-        self.fs.add_binary(self.record_binary_in_db(bin_object))
+        self.fs.add_binary(bin_object)
+        if not self.dry_run_mode:
+            self.record_binary_in_db(bin_object)
 
     def map_symlink(self, path: Path) -> None:
         """Given a symlink, resolve it and create the associated objects if needed.

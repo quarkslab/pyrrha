@@ -121,14 +121,19 @@ class FileSystemMapper(ABC):
         if binary.id is None:
             logging.error(f"{log_prefix}: Record of binary '{binary.name}' failed.")
             return binary
+        logging.debug(f"{log_prefix}: Given id of {binary.name} is {binary.id}.")
         for symbol in binary.iter_exported_symbols():
             if symbol.is_func:
                 symbol.id = self.db_interface.record_method(
-                    symbol.demangled_name, parent_id=binary.id
+                    symbol.name,
+                    parent_id=binary.id,
+                    hover_display=symbol.demangled_name,
                 )
             else:
                 symbol.id = self.db_interface.record_field(
-                    symbol.name, parent_id=binary.id
+                    symbol.name,
+                    parent_id=binary.id,
+                    hover_display=symbol.demangled_name,
                 )
             if symbol.id is None:
                 logging.error(
