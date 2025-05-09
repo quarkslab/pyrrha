@@ -41,6 +41,7 @@ QUOKKA_EXT = ".quokka"
 
 NUMBAT_UI_BIN = "numbat-ui"
 
+
 class InterImageCGMapper(FileSystemMapper):
     """Filesystem mapper based on Lief, which computes imports and exports."""
 
@@ -77,25 +78,30 @@ class InterImageCGMapper(FileSystemMapper):
 
         :param cache_file: Cache file to load binaries from (if exists)
         """
+        log_prefix: str = "[binary loading]"
         if cache_file is not None and cache_file.exists():
-            logging.info(f"Load cached binaries: {cache_file.name}")
+            logging.info(f"{log_prefix}: Load cached binaries: {cache_file.name}")
             self.fs = FileSystem.from_json_export(cache_file)
             return
 
         # Otherwise load files from the filesystem
         tot = len(self.fs.binaries)
         for i, binary in enumerate(self.fs.iter_binaries()):
+            log_prefix = f"[binary loading] {binary.name}"
             if binary.path.suffix == ".ko":  # ignore kernel modules at the moment
-                logging.warning("do not map kernel modules at the moment (skip)")
+                logging.warning(
+                    f"{log_prefix}: do not map kernel modules at the moment (skip)"
+                )
                 continue
             if binary.real_path is None:
                 logging.error(
-                    f"Path on the filesystem of '{binary.name}' binary not set (skip)"
+                    f"{log_prefix}: Path on the filesystem the binary not \
+set (skip)"
                 )
                 continue
             if not binary.real_path.exists():
                 logging.error(
-                    f"cannot find executable file mentioned in 'fs' mapper: \
+                    f"{log_prefix}: cannot find executable mentioned in 'fs' mapper: \
 {binary.real_path.name} (skip)"
                 )
                 continue
@@ -106,16 +112,18 @@ class InterImageCGMapper(FileSystemMapper):
                 if binary.real_path is None or not binary.real_path.exists()
                 else ("LOAD" if quokka_file.exists() else "CREATE")
             )
-            logging.info(f"[{i + 1}/{tot}] process: {binary.name} [{s}]")
+            logging.info(f"{log_prefix}: [{i + 1}/{tot}] process: {binary.name} [{s}]")
             try:
-                self.unresolved_callgraph[binary.path] = load_program(binary)
+                self.unresolved_callgraph[binary.path] = load_program(
+                    binary, log_prefix
+                )
             except SyntaxError:
-                logging.error(f"cannot load Quokka files: {quokka_file}")
+                logging.error(f"{log_prefix}: cannot load Quokka files: {quokka_file}")
                 continue
 
         if cache_file is not None:
             # Once finished stores the FS object (for fast reload)
-            logging.debug(f"Store cached binaries: {cache_file}")
+            logging.debug(f"[binary loading]: Store cached binaries: {cache_file}")
             self.fs.write(cache_file)
 
     def mapper_main(
@@ -145,14 +153,13 @@ class InterImageCGMapper(FileSystemMapper):
         )
 
         # ---------- Iterate all binaries and add Nodes in the database ---------
-        for i, binary in enumerate(self.fs.iter_binaries()):
-            logging.debug(f"[{i + 1}/{bins_count}] index node: {binary.name}")
-
+        for binary in self.fs.iter_binaries():
+            log_prefix = f"[bin mapping] {binary.name}"
             # Create the node entry in numbat and create the custom command
-            self.record_binary_in_db(binary)
+            self.record_binary_in_db(binary, log_prefix)
             if binary.id is not None:
                 self.node_ids[binary.id] = binary
-                self._record_custom_command(binary)
+                self._record_custom_command(binary, log_prefix)
 
             progress.update(binaries_map, advance=1)
         # ---------------------------------------------------------------
@@ -163,12 +170,9 @@ class InterImageCGMapper(FileSystemMapper):
         # Iterate again all binaries to create call edges (all numbat_id are created)
         cg_map = progress.add_task("[orange1]Call Graph mapping", total=bins_count)
 
-        for i, binary in enumerate(self.fs.iter_binaries()):
+        for binary in self.fs.iter_binaries():
+            log_prefix = "[cg mapping] {binary.name}"
             resolve_cache: set[Binary] = set()
-            logging.debug(
-                f"-------------- [{i + 1}/{bins_count}] index call graph {binary.path} \
---------------"
-            )
 
             # Filter symbols to solely the ones exposed by the imported libraries
             filtered_symbols: dict[str, Symbol] = {}  # fun_name -> Symbol
@@ -195,18 +199,18 @@ class InterImageCGMapper(FileSystemMapper):
                             )
                             count_res[res] += 1
                         except KeyError as e:
-                            logging.error(f"can't find symbols: {e}")
+                            logging.error(f"{log_prefix}: can't find symbols: {e}")
 
             # Log amount of symbols that succeeded
             good, bad = count_res[True], count_res[False]
-            logging.debug(f"Good: {good}, Bad: {bad}")
+            logging.debug(f"{log_prefix}: Good: {good}, Bad: {bad}")
 
             progress.update(cg_map, advance=1)
 
         # return the filesystem object
         return self.fs
 
-    def _record_custom_command(self, binary: Binary) -> None:
+    def _record_custom_command(self, binary: Binary, log_prefix: str = "") -> None:
         """Add a custom command to call numbat-ui on the underlying Sourcetrail.
 
         :param binary: binary on which to apply the custom command
@@ -215,13 +219,11 @@ class InterImageCGMapper(FileSystemMapper):
             return None
         cmd = ["NumbatUi", str(binary.real_path) + ".srctrlprj"]
         if binary.id is None:
-            logging.warning(
-                f"Cannot record command on binary {binary.name} as it has no id"
-            )
+            logging.warning(f"{log_prefix}: cannot record command as binary has no id")
         else:
             self.db_interface.set_custom_command(binary.id, cmd, "Open in NumbatUI")
 
-    def _record_call_ref(self, src: Symbol, dst: Symbol) -> bool:
+    def _record_call_ref(self, src: Symbol, dst: Symbol, log_prefix: str = "") -> bool:
         """Add call reference between two symbols in DB.
 
         :param src: originator of the call
@@ -231,14 +233,16 @@ class InterImageCGMapper(FileSystemMapper):
             return False
         if src.id is None or dst.id is None:
             logging.error(
-                f"Cannot record call ref between {src.name} and {dst.name}, missing ids\
- ({src.name}: {src.id}, {dst.name}: {dst.id})"
+                f"{log_prefix}: Cannot record call ref between {src.name} and \
+{dst.name}, missing ids ({src.name}: {src.id}, {dst.name}: {dst.id})"
             )
             return False
         self.db_interface.record_ref_call(src.id, dst.id)
         return True
 
-    def _record_unindexed_call(self, src: Symbol, dst: str) -> None:
+    def _record_unindexed_call(
+        self, src: Symbol, dst: str, log_prefix: str = ""
+    ) -> None:
         """Add a call to an unindexed function.
 
         Namely add a new function node outside of any binary and add a call reference
@@ -253,8 +257,8 @@ class InterImageCGMapper(FileSystemMapper):
         tgt_id = self.db_interface.record_function(dst, is_indexed=False)
         if src.id is None or tgt_id is None:
             logging.error(
-                f"Cannot record call ref between {src.name} and {dst}, both ids \
-are not defined"
+                f" {log_prefix}: Cannot record call ref between {src.name} and {dst}, \
+both ids are not defined"
             )
             return None
         self.db_interface.record_ref_call(src.id, tgt_id)
@@ -280,6 +284,7 @@ are not defined"
         deps_symbols: dict[str, Symbol],
         resolver: ResolveDuplicateOption,
         resolve_cache: set,
+        log_prefix: str = "",
     ) -> bool:
         """Record call edge betwen caller and callee.
 
@@ -342,7 +347,8 @@ are not defined"
             # Automatically add the lib to filtered_symbols
             new_lib = served_by[0]
             logging.debug(
-                f"symbol {callee} served by {served_by[0].name} automatically add it!"
+                f"{log_prefix}: symbol {callee} served by {served_by[0].name} \
+automatically add it!"
             )
             deps_symbols.update(new_lib.exported_symbols)
             # Recursive call to try again with the newly added lib (should enter second case)
@@ -354,12 +360,12 @@ are not defined"
             exposing: list[Binary] = self.exports_to_bins.get(callee, [])
             if exposing and len(exposing) > 1:
                 logging.warning(
-                    f"{binary.path}: several matches for edge {caller} -> {callee}:"
+                    f"{log_prefix}: several matches for edge {caller} -> {callee}:"
                     f"{[x.name for x in exposing]}"
                 )
             else:
                 logging.debug(
-                    f"{binary.path}: no match found for edge {caller} -> {callee}:"
+                    f"{log_prefix}: no match found for edge {caller} -> {callee}:"
                     f"{[x.name for x in exposing]}"
                 )
                 self._record_unindexed_call(caller, callee)
