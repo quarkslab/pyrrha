@@ -119,9 +119,8 @@ class FileSystemMapper(ABC):
             binary.name, prefix=f"{binary.path.parent}/", delimiter=":"
         )
         if binary.id is None:
-            logging.error(f"{log_prefix}: Record of binary '{binary.name}' failed.")
+            logging.error(f"{log_prefix}: Record of binary failed.")
             return binary
-        logging.debug(f"{log_prefix}: Given id of {binary.name} is {binary.id}.")
         for symbol in binary.iter_exported_symbols():
             if symbol.is_func:
                 symbol.id = self.db_interface.record_method(
@@ -136,28 +135,26 @@ class FileSystemMapper(ABC):
                     hover_display=symbol.demangled_name,
                 )
             if symbol.id is None:
-                logging.error(
-                    f"{log_prefix}: Record of symbol '{symbol.name}' of binary \
-'{binary.name}' failed."
-                )
+                logging.error(f"{log_prefix}: Record of symbol '{symbol.name}' failed.")
             else:
                 try:
                     self.db_interface.record_public_access(symbol.id)
                 except DBException as e:
                     raise PyrrhaError(
-                        f"{log_prefix}: Cannot register access to symbol {symbol.name}: {e}"
+                        f"{log_prefix}: Cannot register access to symbol {symbol.name}:\
+ {e}"
                     ) from e
         for symbol in binary.iter_not_exported_functions():
             # check if have not been already mapped
             if binary.exported_function_exists(symbol.name):
                 logging.warning(
-                    f"Bin {binary.name}: Cannot register function \
-{symbol.name}, already exists in this binary, same id for both symbols"
+                    f"{log_prefix}: Cannot register function {symbol.name}, already \
+exists in this binary, same id for both symbols"
                 )
                 symbol.id = binary.get_exported_symbol(symbol.name).id
             elif binary.exported_symbol_exists(symbol.name):
                 logging.info(
-                    f"Bin {binary.name}: Cannot register internal function \
+                    f"{log_prefix}: Cannot register internal function \
 {symbol.name}, an exported symbol with the same name already exists"
                 )
             else:
@@ -168,15 +165,15 @@ class FileSystemMapper(ABC):
                 )
                 if symbol.id is None:
                     logging.error(
-                        f"{log_prefix}: Record of symbol '{symbol.name}' of binary \
-'{binary.name}' failed."
+                        f"{log_prefix}: Record of symbol '{symbol.name}' failed."
                     )
                 else:
                     try:
                         self.db_interface.record_private_access(symbol.id)
                     except DBException as e:
                         raise PyrrhaError(
-                            f"{log_prefix}: Cannot register access to symbol {symbol.name}: {e}"
+                            f"{log_prefix}: Cannot register access to symbol \
+{symbol.name}: {e}"
                         ) from e
 
         return binary
@@ -194,9 +191,9 @@ class FileSystemMapper(ABC):
             sym.name, prefix=f"{sym.path.parent}/", delimiter=":"
         )
         if sym.id is None:
-            logging.error(f"{log_prefix}: Record of symlink '{sym.name}' failed.")
+            logging.error(f"{log_prefix}: Record of symlink failed.")
         else:
-            self.record_import_in_db(sym.id, sym.target_id)
+            self.record_import_in_db(sym.id, sym.target.id)
         return sym
 
     # =============================== Utils ===============================

@@ -1,3 +1,18 @@
+# -*- coding: utf-8 -*-
+
+#  Copyright 2023-2025 Quarkslab
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
 """Load information used by InterCGMapper from the files on the disk."""
 
 import logging
@@ -23,7 +38,7 @@ QUOKKA_EXT = ".quokka"
 """
 
 
-def load_program(binary: Binary) -> dict[Symbol, list[str]]:
+def load_program(binary: Binary, log_prefix: str = "") -> dict[Symbol, list[str]]:
     """Create a Binary object from a given file using lief and quokka.
 
     It modifies the provided binary object in place.
@@ -55,10 +70,12 @@ def load_program(binary: Binary) -> dict[Symbol, list[str]]:
         raise FsMapperError()
 
     # Load the call graph
-    return compute_call_graph(binary, program)
+    return compute_call_graph(binary, program, log_prefix)
 
 
-def compute_call_graph(binary: Binary, program: Program) -> dict[Symbol, list[str]]:
+def compute_call_graph(
+    binary: Binary, program: Program, log_prefix: str = ""
+) -> dict[Symbol, list[str]]:
     """Compute the call graph of the program using Quokka/Binexport.
 
     It fill the call attribute of binary.
@@ -90,9 +107,11 @@ def compute_call_graph(binary: Binary, program: Program) -> dict[Symbol, list[st
             all_symbs = exports.get(
                 f_addr, exports.get(f_addr + 1, [])
             )  # In THUMB mode address is address+1
-            canonical = disambiguate_export(all_symbs)
+            canonical = disambiguate_export(all_symbs, log_prefix)
             if name != canonical.name:
-                logging.info(f"change fun name: {name} -> {canonical.name}")
+                logging.info(
+                    f"{log_prefix}: change fun name {name} -> {canonical.name}"
+                )
                 name = canonical.name  # In multiple names just select the canonical one
             f_symb = canonical
         else:
@@ -110,7 +129,7 @@ def compute_call_graph(binary: Binary, program: Program) -> dict[Symbol, list[st
     # Check if some exports don't have any associated function (not detected by IDA)
     for exp_addr in exports.keys() - program.keys():
         all_symbs = exports[exp_addr]
-        canon = disambiguate_export(all_symbs)
+        canon = disambiguate_export(all_symbs, log_prefix)
         if p_fun := program.get(
             exp_addr - 1
         ):  # IDA keeps ARM address while LIEF use THUMB addresses
@@ -120,7 +139,8 @@ def compute_call_graph(binary: Binary, program: Program) -> dict[Symbol, list[st
                 continue
         # else case
         logging.info(
-            f"export {canon.name}: {hex(exp_addr)} address not found in program (add)."
+            f"{log_prefix}: export {canon.name}: {hex(exp_addr)} address not found \
+in program (add)."
         )
         call_graph[canon] = []
 
@@ -162,8 +182,8 @@ def compute_call_graph(binary: Binary, program: Program) -> dict[Symbol, list[st
                         call_graph[f_symb].append(c_name)  # Add it normally
                 else:  # ignore function without name
                     logging.warning(
-                        f"[{program.name}] {f_name} calls a function without name \
-(at {c_addr:#08x})"
+                        f"{log_prefix}: [{program.name}] {f_name} calls a function \
+without name (at {c_addr:#08x})"
                     )
 
         # If thunk AND exported still keep it (for later resolution)
@@ -178,7 +198,7 @@ def compute_call_graph(binary: Binary, program: Program) -> dict[Symbol, list[st
     return call_graph
 
 
-def disambiguate_export(symbs: list[Symbol]) -> Symbol:
+def disambiguate_export(symbs: list[Symbol], log_prefix: str = "") -> Symbol:
     """Given a list of symbols associated with one address, chose one."""
     if len(symbs) == 1:
         return symbs[0]  # If only one no ambiguity
@@ -199,7 +219,8 @@ def disambiguate_export(symbs: list[Symbol]) -> Symbol:
     # all exports starts with _
     if chosen is None:
         logging.warning(
-            f"cannot disambiguate: {[s.name for s in symbs]} (select shortest name)"
+            f"{log_prefix}: cannot disambiguate: {[s.name for s in symbs]} \
+(select shortest name)"
         )
         chosen = min(symbs, key=lambda x: len(x.name))
     return chosen

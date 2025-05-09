@@ -175,7 +175,7 @@ class FileSystemImportsMapper(FileSystemMapper):
         """
         self.fs.add_binary(bin_object)
         if not self.dry_run_mode:
-            self.record_binary_in_db(bin_object)
+            self.record_binary_in_db(bin_object, f"[binary mapping] {bin_object.name}")
 
     def map_symlink(self, path: Path) -> None:
         """Given a symlink, resolve it and create the associated objects if needed.
@@ -332,7 +332,7 @@ does not point on a recorded bin"
                         f"{log_prefix}: {lib_name} import undecided, not recorded in DB"
                     )
                 case self._FailedLibImport():
-                    logging.warning(f"{log_prefix}: lib '{lib_name}' not found in DB")
+                    logging.warning(f"{log_prefix}: lib '{lib_name}' not found in FS")
                     if not self.dry_run_mode and self.db_interface is not None:
                         lib_id = self.db_interface.record_class(
                             lib_name, is_indexed=False
