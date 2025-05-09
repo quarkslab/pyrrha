@@ -206,18 +206,20 @@ class FileSystemImportsMapper(FileSystemMapper):
             return None
         if self.fs.binary_exists(target):
             target_obj = self.fs.get_binary_by_path(target)
-            if target_obj.id is None:
-                if not self.dry_run_mode:
+            symlink_obj = Symlink(
+                path=self.fs.gen_fw_path(path),
+                target=target_obj,
+            )
+            if not self.dry_run_mode:
+                if target_obj.id is None:
                     logging.warning(
                         f"{log_prefix}: '{target}' is not a recorded binary"
                     )
-                return None
-            symlink_obj = self.record_symlink_in_db(
-                Symlink(
-                    path=self.fs.gen_fw_path(path),
-                    target_path=target_obj.path,
-                    target_id=target_obj.id,
-                )
+                    return None
+                self.record_symlink_in_db(symlink_obj)
+            logging.debug(
+                f"{log_prefix}: added symlink {symlink_obj.path} -> \
+{symlink_obj.target.path}"
             )
             self.fs.add_symlink(symlink_obj)
         else:

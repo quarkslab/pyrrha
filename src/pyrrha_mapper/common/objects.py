@@ -19,9 +19,10 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable
+from enum import Enum, auto
 from functools import reduce
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 from pydantic import (
     BaseModel,
@@ -29,8 +30,10 @@ from pydantic import (
     PrivateAttr,
     SerializationInfo,
     ValidationInfo,
+    computed_field,
     field_serializer,
     field_validator,
+    model_validator,
 )
 
 
@@ -58,8 +61,8 @@ class Symbol(BaseModel):
 
     def __repr__(self):  # noqa: D105
         return f"Symbol('{self.name}')"
-    
-    def __hash__(self) -> int: # noqa: D105
+
+    def __hash__(self) -> int:  # noqa: D105
         return hash(tuple(self.model_dump().values()))
 
 
@@ -308,14 +311,37 @@ class Binary(FileSystemComponent):
             )
 
 
+class TargetType(Enum):
+    """Enum used for serialization."""
+
+    BINARY = auto()
+    SYMLINK = auto()
+
+
 class Symlink(FileSystemComponent):
     """Class that represents a Symlink and store the associated DB id."""
 
-    target_path: Path
-    target_id: int
+    target: Binary | Symlink
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def target_type(self) -> TargetType:
+        """:return: type of the target"""
+        if isinstance(self.target, Binary):
+            return TargetType.BINARY
+        elif isinstance(self.target, Symlink):
+            return TargetType.SYMLINK
+        else:
+            raise ValueError("Target is not a Binary object neither a Symlink one.")
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def target_path(self) -> Path:
+        """:return: path of the target"""
+        return self.target.path
 
     def __repr__(self):  # noqa: D105
-        return f"Symlink({self.path} -> {self.target_path})"
+        return f"Symlink({self.path} -> {self.target.path})"
 
 
 class FileSystem(BaseModel):
@@ -347,7 +373,7 @@ class FileSystem(BaseModel):
     @field_serializer(
         "binaries", mode="plain", when_used="always", return_type=dict[str | Path, dict]
     )
-    def fs_serializer(self, v: dict[Path, Binary], info: SerializationInfo) -> Any:
+    def fs_bin_serializer(self, v: dict[Path, Binary], info: SerializationInfo) -> Any:
         """Serialize the current FS instance into a json dump or a dict dump."""
         res = dict()
         mode = "json" if info.mode_is_json() else "python"
@@ -380,10 +406,26 @@ class FileSystem(BaseModel):
                     )
         return res
 
+    @field_serializer(
+        "symlinks", mode="plain", when_used="always", return_type=dict[str | Path, dict]
+    )
+    def fs_sym_serializer(self, v: dict[Path, Binary], info: SerializationInfo) -> Any:
+        """Serialize the current FS instance into a json dump or a dict dump."""
+        res = dict()
+        mode = "json" if info.mode_is_json() else "python"
+
+        for path, sym in v.items():
+            if info.mode_is_json():
+                path = str(path)  # type: ignore[assignment]
+            if sym is None:
+                raise ValueError(f"{path} has no data associated")
+            res[path] = sym.model_dump(mode=mode, exclude={"target": True})
+        return res
+
     @field_validator("binaries", mode="plain")
     @classmethod
-    def fs_validate(cls, data: Any, info: ValidationInfo) -> Any:
-        """Validate a dict dump and transform it into an FS instance."""
+    def fs_bin_validate(cls, data: Any, info: ValidationInfo) -> Any:
+        """Validate a dict dump and transform it into a correct `binaries` field."""
         if not isinstance(data, dict):
             raise ValueError("provided data is not a dict")
         if info.field_name == "binaries" and reduce(
@@ -392,16 +434,10 @@ class FileSystem(BaseModel):
             True,  # correct equivalent to `isinstance(data, dict[Path, Binary])`
         ):
             return data
-        elif info.field_name == "symlinks" and reduce(
-            lambda x, y: x and isinstance(y[0], Path) and isinstance(y[1], Symlink),
-            data.items(),
-            True,  # correct equivalent to `isinstance(data, dict[Path, Symlink])`
-        ):
-            return data
 
         # generate first version of res
         res: dict[Path, Binary] = dict()
-        imported_libs: dict[Path, dict[str, dict[str,Any]]] = dict()
+        imported_libs: dict[Path, dict[str, dict[str, Any]]] = dict()
         # first part: automatic conversion
         for path, content in data.items():
             try:
@@ -459,6 +495,106 @@ class FileSystem(BaseModel):
                     bin.add_imported_symbol(symbols_by_ids[symb.id])
 
         return res
+
+    @field_validator("symlinks", mode="plain")
+    @classmethod
+    def fs_sym_validate(cls, data: Any, info: ValidationInfo) -> Any:
+        """Validate a dict dump and transform it into a correct `symlinks` field."""
+        if not isinstance(data, dict):
+            raise ValueError("provided data is not a dict")
+        if info.field_name == "symlinks" and reduce(
+            lambda x, y: x and isinstance(y[0], Path) and isinstance(y[1], Symlink),
+            data.items(),
+            True,  # correct equivalent to `isinstance(data, dict[Path, Symlink])`
+        ):
+            return data
+
+        # generate first version of res
+        res: dict[Path, Symlink] = dict()
+        untreated_symlinks: dict[Path, dict] = dict()
+        # first part: automatic conversion
+        for path, content in data.items():
+            try:
+                validated_path = Path(path)
+            except TypeError as e:
+                raise ValueError(
+                    f"Cannot convert '{path}' into a pathlib.Path object: {e}"
+                ) from e
+            if isinstance(content, Symlink):
+                res[validated_path] = data[path]
+                continue
+            if not isinstance(content, dict):
+                raise ValueError(
+                    f"There is no content associated to {path} in the provided data"
+                )
+            if "target_path" not in content or "target_type" not in content:
+                res[validated_path] = cls.__symlink_convert(content, validated_path)
+                continue
+
+            target_type = TargetType(content.pop("target_type"))
+            try:
+                content["target_path"] = Path(content["target_path"])
+                target_path = content["target_path"]
+            except TypeError as e:
+                raise ValueError(
+                    f"Cannot convert '{content['target_path']}' into a pathlib.Path \
+object: {e}"
+                ) from e
+            if target_type is TargetType.BINARY:
+                try:
+                    content["target"] = info.data["binaries"][target_path]
+                except KeyError as e:
+                    raise ValueError(
+                        f"Targeted object {target_path} does not exist in this FS"
+                    ) from e
+                res[validated_path] = cls.__symlink_convert(content, validated_path)
+            else:
+                content["target_path"] = target_path
+                untreated_symlinks[validated_path] = content
+
+        # check if any untreated symlink points on a non existing path
+        for content in untreated_symlinks.values():
+            target_path = content["target_path"]
+            if target_path not in untreated_symlinks and target_path not in res:
+                raise ValueError(
+                    f"Targeted object {target_path} does not exist in this FS"
+                )
+
+        # then recursively resolve symlinks
+        nb_symlinks = len(res) + len(untreated_symlinks)
+        while len(res) < nb_symlinks:
+            for path, content in untreated_symlinks.items():
+                target_path = content["target_path"]
+                if target_path in res:
+                    content["target"] = res[target_path]
+                    res[path] = cls.__symlink_convert(content, path)
+                    untreated_symlinks.pop(path)
+
+        return res
+
+    @staticmethod
+    def __symlink_convert(content: dict, correct_path: Path) -> Symlink:
+        sym_obj = Symlink.model_validate(content)
+        if sym_obj.path != correct_path:
+            raise ValueError("path mismatches between sym object and its export")
+        return sym_obj
+
+    @model_validator(mode="after")
+    def finalize_sym_validation(self) -> Self:
+        """Finalize validation of symlinks target by accessing full fs."""
+        for sym in self.iter_symlinks():
+            try:
+                if sym.target_type is TargetType.BINARY:
+                    sym.target = self.get_binary_by_path(sym.target_path)
+                elif sym.target_type is TargetType.SYMLINK:
+                    sym.target = self.get_symlink_by_path(sym.target_path)
+                else:
+                    raise ValueError("Target type is not a value of the correct enum.")
+            except KeyError as e:
+                raise ValueError(
+                    f"Targeted object {sym.target_path} does not exist in this FS"
+                ) from e
+        return self
 
     def model_post_init(self, __context: Any) -> None:
         """Automatically called after class instanciation, compute internal dicts."""
@@ -570,8 +706,8 @@ class FileSystem(BaseModel):
         :return: its final target
         """
         current_symlink = symlink
-        while self.symlink_exists(current_symlink.target_path):
-            current_symlink = self.get_symlink_by_path(current_symlink.target_path)
-        if not self.binary_exists(current_symlink.target_path):
+        while self.symlink_exists(current_symlink.target.path):
+            current_symlink = self.get_symlink_by_path(current_symlink.target.path)
+        if not self.binary_exists(current_symlink.target.path):
             return None
-        return self.get_binary_by_path(current_symlink.target_path)
+        return self.get_binary_by_path(current_symlink.target.path)
