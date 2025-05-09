@@ -120,8 +120,7 @@ def example_sym(example_bin):
     return Symlink(
         id=10,
         path=Path("/bin/my_symlink"),
-        target_path=example_bin.path,
-        target_id=example_bin.id,
+        target=example_bin,
     )
 
 
@@ -479,8 +478,7 @@ class TestFileSystem:
         sym = Symlink(
             id=19,
             path=Path("/bin/my_second_symlink"),
-            target_path=example_bin.path,
-            target_id=example_bin.id,
+            target=example_bin,
         )
         expected_symlinks = list(fs.iter_symlinks()) + [sym]
         fs.add_symlink(sym)
@@ -569,8 +567,7 @@ class TestFileSystem:
         rec_sym = Symlink(
             id=29,
             path=Path("/tmp/rec_symlink"),
-            target_path=example_sym.path,
-            target_id=example_sym.id,  # type: ignore
+            target=example_sym,  # type: ignore
         )
         example_fs.add_symlink(rec_sym)
         assert example_fs.resolve_symlink(rec_sym) == example_bin
@@ -579,11 +576,11 @@ class TestFileSystem:
         self, example_fs: FileSystem, example_bin: Binary, example_sym: Symlink
     ):
         """Check symlink which point on a non existing binary resolution."""
+        non_existing_bin = Binary(path=Path("/tmp/non_existing"))
         rec_sym = Symlink(
             id=29,
             path=Path("/tmp/rec_symlink"),
-            target_path=Path("/tmp/my_non_existing_binary_wow"),
-            target_id=-1000,
+            target=non_existing_bin,
         )
         example_fs.add_symlink(rec_sym)
         assert example_fs.resolve_symlink(rec_sym) is None
