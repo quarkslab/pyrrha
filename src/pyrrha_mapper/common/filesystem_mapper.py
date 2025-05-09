@@ -91,8 +91,9 @@ class FileSystemMapper(ABC):
         self, source_id: int | None, dest_id: int | None, log_prefix: str = ""
     ) -> None:
         """Record in DB the import of dest by source."""
-        if self.dry_run_mode or self.db_interface is None:
+        if self.dry_run_mode:
             return None
+        assert(self.db_interface is not None)
         if source_id is None or dest_id is None:
             logging.error(
                 f"{log_prefix}: Cannot record import, src and/or dest are unknown"
@@ -112,9 +113,10 @@ class FileSystemMapper(ABC):
         :return: the updated object
         """
         # If dry run do not store the binary in DB
-        if self.dry_run_mode or self.db_interface is None:
+        if self.dry_run_mode:
             return binary
 
+        assert(self.db_interface is not None)
         binary.id = self.db_interface.record_class(
             binary.name, prefix=f"{binary.path.parent}/", delimiter=":"
         )

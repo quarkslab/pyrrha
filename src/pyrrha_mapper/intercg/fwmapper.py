@@ -215,8 +215,9 @@ set (skip)"
 
         :param binary: binary on which to apply the custom command
         """
-        if self.dry_run_mode or self.db_interface is None:
+        if self.dry_run_mode:
             return None
+        assert(self.db_interface is not None)
         cmd = ["NumbatUi", str(binary.real_path) + ".srctrlprj"]
         if binary.id is None:
             logging.warning(f"{log_prefix}: cannot record command as binary has no id")
@@ -229,8 +230,9 @@ set (skip)"
         :param src: originator of the call
         :param dst: destination of the call
         """
-        if self.dry_run_mode or self.db_interface is None:
-            return False
+        if self.dry_run_mode:
+            return True
+        assert(self.db_interface is not None)
         if src.id is None or dst.id is None:
             logging.error(
                 f"{log_prefix}: Cannot record call ref between {src.name} and \
@@ -251,8 +253,9 @@ set (skip)"
         :param src: source symbol
         :param dst: destination symbol
         """
-        if self.dry_run_mode or self.db_interface is None:
+        if self.dry_run_mode:
             return None
+        assert(self.db_interface is not None)
         # NOTE: Add a node here which have no existence at Binary/Symbol level
         tgt_id = self.db_interface.record_function(dst, is_indexed=False)
         if src.id is None or tgt_id is None:
