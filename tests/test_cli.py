@@ -15,6 +15,7 @@
 #  limitations under the License.
 """Functionnal test from the CLI."""
 
+from abc import ABC, abstractmethod
 from pathlib import Path
 
 import pytest
@@ -53,11 +54,17 @@ class TestCLI:
         assert res_short.output == res_long.output, "Usage different with -h/--help"
 
 
-class TestFSMapper(TestCLI):
-    """Main functional test class for the FS mapper. Tests are done from the CLI."""
+class BaseTestFsMapper(ABC):
+    """Common tests for all fs* mapper."""
 
     COMMAND = pyrrha
-    SUBCOMMAND = "fs"
+
+    @property
+    @abstractmethod
+    def SUBCOMMAND(self) -> str:
+        """To be implemented in concrete class, as class attribute."""
+        ...
+
     FW_TEST_PATH = Path(__file__).parent / "test_fw"
     FW_TEST_LD = Path("/lib/ld-linux.so.3")
     FW_TEST_BIN_PATHS = {
@@ -71,11 +78,11 @@ class TestFSMapper(TestCLI):
     }
     FW_TEST_SYMLINKS_PATHS = {Path("/lib/libssl.so")}
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def db_path(self, tmp_path_factory) -> Path:
         """Generate the path for DB file."""
         tmp = tmp_path_factory.mktemp("db", numbered=True)
-        return tmp / "test.srctrlprj"
+        return tmp / f"test-{self.SUBCOMMAND}.srctrlprj"
 
     @pytest.mark.parametrize("nb_thread", [1, 16])
     def test_numbat_project_creation(self, nb_thread, db_path):
@@ -100,21 +107,11 @@ class TestFSMapper(TestCLI):
         """Compute path for the exported JSON."""
         return db_path.with_suffix(".json")
 
+    @abstractmethod
     @pytest.fixture(params=[1, 16])
     def export_res(self, db_path: Path, request) -> Result:
         """Run Pyrrha with export activated."""
-        runner = CliRunner()
-        args = [
-            self.SUBCOMMAND,
-            "-e",
-            "--db",
-            f"{db_path}",
-            "-j",
-            request.param,
-            f"{self.FW_TEST_PATH}",
-        ]
-        res = runner.invoke(self.COMMAND, args)
-        return res
+        pass
 
     def test_export_creation(self, export_res: Result, export_path: Path) -> None:
         """Export file exist."""
@@ -195,3 +192,51 @@ class TestFSMapper(TestCLI):
         assert len(list(_bin.iter_imported_symbols())) == len(
             _bin.imported_symbol_names
         ), "Some imported symbols have not been resolved"
+
+
+class TestFSMapper(BaseTestFsMapper):
+    """Main functional test class for the FS mapper. Tests are done from the CLI."""
+
+    SUBCOMMAND = "fs"  # type: ignore
+
+    @pytest.fixture(params=[1, 16])
+    def export_res(self, db_path: Path, request) -> Result:
+        """Run Pyrrha with export activated."""
+        runner = CliRunner()
+        args = [
+            self.SUBCOMMAND,
+            "-e",
+            "--db",
+            f"{db_path}",
+            "-j",
+            request.param,
+            f"{self.FW_TEST_PATH}",
+        ]
+        res = runner.invoke(self.COMMAND, args)
+        return res
+
+
+class TestFsCgMapper(BaseTestFsMapper):
+    """Main functional test class for the fs-cg mapper. Tests are done from the CLI."""
+
+    SUBCOMMAND = "fs-cg"  # type: ignore
+
+    @pytest.fixture
+    def export_path(self, db_path: Path) -> Path:
+        """Compute path for the exported JSON."""
+        return db_path.with_suffix(".bins.json")
+
+    @pytest.fixture(params=[1, 16], scope="class")
+    def export_res(self, db_path: Path, request) -> Result:
+        """Run Pyrrha with export activated."""
+        runner = CliRunner()
+        args = [
+            self.SUBCOMMAND,
+            "--db",
+            f"{db_path}",
+            "-j",
+            request.param,
+            f"{self.FW_TEST_PATH}",
+        ]
+        res = runner.invoke(self.COMMAND, args)
+        return res
