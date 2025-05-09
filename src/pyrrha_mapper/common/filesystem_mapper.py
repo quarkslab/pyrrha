@@ -251,15 +251,19 @@ exists in this binary, same id for both symbols"
             )
             return None
         selected_index = None
+        selected_bin = None
         if len(matching_objects) > 1 and strategy is ResolveDuplicateOption.INTERACTIVE:
-            for cache_entry in cache or []:
+            for cache_entry in cache or {}:
                 if cache_entry in matching_objects:  # reuse already selected entry
                     logging.debug(
                         f"{log_prefix}: manually selected entry to disambiguate \
 {target_name}"
                     )
+                    selected_bin = cache_entry
+
             while (
-                selected_index is None
+                selected_bin is None
+                or selected_index is None
                 or selected_index < 0
                 or selected_index >= len(matching_objects)
             ):
@@ -272,7 +276,8 @@ exists in this binary, same id for both symbols"
                     print("Enter a valid number")
         else:  # "arbitrary" option
             selected_index = 0
-        selected_bin = matching_objects[selected_index]
+        if selected_bin is None:
+            selected_bin = matching_objects[selected_index]
         return selected_bin
 
     def commit(self) -> None:
