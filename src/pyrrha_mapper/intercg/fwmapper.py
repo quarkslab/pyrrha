@@ -45,6 +45,8 @@ NUMBAT_UI_BIN = "numbat-ui"
 class InterImageCGMapper(FileSystemImportsMapper):
     """Filesystem mapper based on Lief, which computes imports and exports."""
 
+    FS_EXT = ".fs.json"
+
     def __init__(
         self, root_directory: Path | str, fs_dump: FileSystem, db: SourcetrailDB | None
     ):
@@ -142,7 +144,7 @@ class InterImageCGMapper(FileSystemImportsMapper):
         if self.dry_run_mode or self.db_interface is None:
             self.load_binaries(None)
         else:
-            cache_file = self.db_interface.path.with_suffix(".bins.json")
+            cache_file = self.db_interface.path.with_suffix(self.FS_EXT)
             self.load_binaries(cache_file)
 
         self.progress = progress  # need to be able to hide it further down in calls
