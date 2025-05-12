@@ -24,6 +24,7 @@ from click.testing import CliRunner, Result
 
 from pyrrha_mapper.__main__ import pyrrha
 from pyrrha_mapper.common import FileSystem
+from pyrrha_mapper.intercg.fwmapper import InterImageCGMapper
 
 
 class TestCLI:
@@ -224,7 +225,7 @@ class TestFsCgMapper(BaseTestFsMapper):
     @pytest.fixture
     def export_path(self, db_path: Path) -> Path:
         """Compute path for the exported JSON."""
-        return db_path.with_suffix(".bins.json")
+        return db_path.with_suffix(InterImageCGMapper.FS_EXT)
 
     @pytest.fixture(params=[1, 16], scope="class")
     def export_res(self, db_path: Path, request) -> Result:
