@@ -217,6 +217,24 @@ class Binary(FileSystemComponent):
         """:return: true if an exported function exists in the current Binary."""
         return symbol_name in self.exported_functions
 
+    def imported_symbol_exists(self, symb_name: str, is_resolved: bool = True) -> bool:
+        """:return: true if an imported symbol exists in the current Binary
+
+        you can optionnaly select if the lib should be resolved or not
+        """
+        return symb_name in self.imported_symbols and (
+            (not is_resolved) or self.imported_symbols[symb_name] is not None
+        )
+
+    def imported_library_exists(self, lib_name: str, is_resolved: bool = True) -> bool:
+        """:return: true if an imported lib exists in the current Binary
+
+        you can optionnaly select if the lib should be resolved or not
+        """
+        return lib_name in self.imported_libraries and (
+            (not is_resolved) or self.imported_libraries[lib_name] is not None
+        )
+
     def function_exists(self, symbol_name: str) -> bool:
         """:return: true if an function exists in the current Binary."""
         return (
@@ -237,6 +255,13 @@ class Binary(FileSystemComponent):
         res = self.exported_functions.get(
             symbol_name, self.exported_symbols.get(symbol_name)
         )
+        if res is None:
+            raise KeyError(symbol_name)
+        return res
+
+    def get_imported_symbol(self, symbol_name: str) -> Symbol:
+        """:return: the imported symbol with the given name."""
+        res = self.imported_symbols[symbol_name]
         if res is None:
             raise KeyError(symbol_name)
         return res
