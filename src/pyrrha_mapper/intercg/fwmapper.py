@@ -27,11 +27,11 @@ from rich.progress import Progress
 from pyrrha_mapper.common import (
     Binary,
     FileSystem,
-    FileSystemMapper,
     Symbol,
     Symlink,
     hide_progress,
 )
+from pyrrha_mapper.fs import FileSystemImportsMapper
 from pyrrha_mapper.intercg.loader import load_program
 from pyrrha_mapper.types import ResolveDuplicateOption
 
@@ -42,7 +42,7 @@ QUOKKA_EXT = ".quokka"
 NUMBAT_UI_BIN = "numbat-ui"
 
 
-class InterImageCGMapper(FileSystemMapper):
+class InterImageCGMapper(FileSystemImportsMapper):
     """Filesystem mapper based on Lief, which computes imports and exports."""
 
     def __init__(
@@ -172,30 +172,19 @@ set (skip)"
 
         for binary in self.fs.iter_binaries():
             log_prefix = "[cg mapping] {binary.name}"
-            resolve_cache: set[Binary] = set()
-
-            # Filter symbols to solely the ones exposed by the imported libraries
-            filtered_symbols: dict[str, Symbol] = {}  # fun_name -> Symbol
-            for lib in binary.iter_imported_libraries():
-                # dep_num_id = pid_to_nid[dep_pyr_id]
-                # deps_symbols.update(symbol_ids[dep_num_id])
-                if lib is not None:
-                    filtered_symbols.update(
-                        lib.exported_symbols
-                    )  # NOTE: Might silently overwrite a symbol
-
             count_res = {True: 0, False: 0}
             if binary.path in self.unresolved_callgraph:
                 for f_symb, targets in self.unresolved_callgraph[binary.path].items():
+                    if not binary.function_exists(f_symb.name):
+                        logging.error(f"function {f_symb.name} not in binary: {binary.name}")
+                        continue
                     for target in targets:
                         try:
                             res = self._record_one_call(
                                 binary,
                                 f_symb,
                                 target,
-                                filtered_symbols,
                                 resolution_strategy,
-                                resolve_cache,
                             )
                             count_res[res] += 1
                         except KeyError as e:
@@ -217,7 +206,7 @@ set (skip)"
         """
         if self.dry_run_mode:
             return None
-        assert(self.db_interface is not None)
+        assert self.db_interface is not None
         cmd = ["NumbatUi", str(binary.real_path) + ".srctrlprj"]
         if binary.id is None:
             logging.warning(f"{log_prefix}: cannot record command as binary has no id")
@@ -232,7 +221,7 @@ set (skip)"
         """
         if self.dry_run_mode:
             return True
-        assert(self.db_interface is not None)
+        assert self.db_interface is not None
         if src.id is None or dst.id is None:
             logging.error(
                 f"{log_prefix}: Cannot record call ref between {src.name} and \
@@ -255,7 +244,7 @@ set (skip)"
         """
         if self.dry_run_mode:
             return None
-        assert(self.db_interface is not None)
+        assert self.db_interface is not None
         # NOTE: Add a node here which have no existence at Binary/Symbol level
         tgt_id = self.db_interface.record_function(dst, is_indexed=False)
         if src.id is None or tgt_id is None:
@@ -284,9 +273,7 @@ both ids are not defined"
         binary: Binary,
         caller: Symbol,
         callee: str,
-        deps_symbols: dict[str, Symbol],
         resolver: ResolveDuplicateOption,
-        resolve_cache: set,
         log_prefix: str = "",
     ) -> bool:
         """Record call edge betwen caller and callee.
@@ -304,7 +291,6 @@ both ids are not defined"
         :param caller: caller Symbol
         :param callee: callee function name as string
         :param resolver: resolution strategy enum
-        :param resolve_cache: cache of resolved libs
 
         :return: True if target function was found
         """
@@ -314,14 +300,24 @@ both ids are not defined"
             binary.add_call(caller, callee_symb)
             return self._record_call_ref(caller, callee_symb)
 
-        # call among libraries explicitely listed
-        elif target := deps_symbols.get(callee):
-            binary.add_call(caller, target)
-            return self._record_call_ref(caller, target)
-
-        # call not among libraries (need to find it)
-        if target in IGNORE_LIST:
+        if callee in IGNORE_LIST:
             return False
+
+        # already solved import
+        if binary.imported_symbol_exists(callee, is_resolved=True):
+            callee_symb = binary.get_imported_symbol(callee)
+            binary.add_call(caller, callee_symb)
+            return self._record_call_ref(caller, callee_symb)
+
+        # solve import from listed imported libraries
+        tmp = self.resolve_symbol_import(binary, callee, resolver, log_prefix)
+        if tmp is not None:
+            target_bin, target_symb = tmp
+            if not binary.imported_library_exists(target_bin.name):
+                binary.add_imported_library(target_bin)
+            binary.add_imported_symbol(target_symb)
+            binary.add_call(caller, target_symb)
+            return self._record_call_ref(caller, target_symb)
 
         # Get binaries exporting this symbol
         served_by: list[Binary] = self.exports_to_bins[callee]
@@ -334,42 +330,28 @@ both ids are not defined"
             ):
                 with hide_progress(self.progress):
                     choice = self._select_fs_component(
-                        resolver, served_by, "[Calls resolution]", callee, resolve_cache
+                        resolver, served_by, log_prefix, callee
                     )
             else:
                 choice = self._select_fs_component(
-                    resolver, served_by, "[Calls resolution]", callee, resolve_cache
+                    resolver, served_by, log_prefix, callee
                 )
             if choice:
                 # if a choice has been done
-                resolve_cache.add(choice)
-                served_by = [choice]
-
-        # Check again
-        if len(served_by) == 1:
-            # Automatically add the lib to filtered_symbols
-            new_lib = served_by[0]
-            logging.debug(
-                f"{log_prefix}: symbol {callee} served by {served_by[0].name} \
-automatically add it!"
-            )
-            deps_symbols.update(new_lib.exported_symbols)
-            # Recursive call to try again with the newly added lib (should enter second case)
-            return self._record_one_call(
-                binary, caller, callee, deps_symbols, resolver, resolve_cache
-            )
-
-        else:  # still not resolved
-            exposing: list[Binary] = self.exports_to_bins.get(callee, [])
-            if exposing and len(exposing) > 1:
+                served_by = [choice]  # registerded just below
+            else:
                 logging.warning(
                     f"{log_prefix}: several matches for edge {caller} -> {callee}:"
-                    f"{[x.name for x in exposing]}"
+                    f"{[x.name for x in served_by]}"
                 )
-            else:
-                logging.debug(
-                    f"{log_prefix}: no match found for edge {caller} -> {callee}:"
-                    f"{[x.name for x in exposing]}"
-                )
-                self._record_unindexed_call(caller, callee)
+                return False
+        if len(served_by) == 1:
+            binary.add_imported_library(served_by[0])
+            callee_symb = served_by[0].get_exported_symbol(callee)
+            binary.add_imported_symbol(callee_symb)
+            binary.add_call(caller, callee_symb)
+            return self._record_call_ref(caller, callee_symb)
+        else:  # still not resolved
+            logging.debug(f"{log_prefix}: no match found for edge {caller} -> {callee}")
+            self._record_unindexed_call(caller, callee)
             return False
