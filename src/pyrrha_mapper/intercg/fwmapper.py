@@ -95,14 +95,13 @@ class InterImageCGMapper(FileSystemImportsMapper):
                 continue
             if binary.real_path is None:
                 logging.error(
-                    f"{log_prefix}: Path on the filesystem the binary not \
-set (skip)"
+                    f"{log_prefix}: Path on the filesystem the binary not set (skip)"
                 )
                 continue
             if not binary.real_path.exists():
                 logging.error(
-                    f"{log_prefix}: cannot find executable mentioned in 'fs' mapper: \
-{binary.real_path.name} (skip)"
+                    f"{log_prefix}: cannot find executable mentioned in 'fs' mapper: "\
+                    f"{binary.real_path.name} (skip)"
                 )
                 continue
 
@@ -224,8 +223,8 @@ set (skip)"
         assert self.db_interface is not None
         if src.id is None or dst.id is None:
             logging.error(
-                f"{log_prefix}: Cannot record call ref between {src.name} and \
-{dst.name}, missing ids ({src.name}: {src.id}, {dst.name}: {dst.id})"
+                f"{log_prefix}: Cannot record call ref between {src.name} and "\
+                f"{dst.name}, missing ids ({src.name}: {src.id}, {dst.name}: {dst.id})"
             )
             return False
         self.db_interface.record_ref_call(src.id, dst.id)
@@ -249,8 +248,8 @@ set (skip)"
         tgt_id = self.db_interface.record_function(dst, is_indexed=False)
         if src.id is None or tgt_id is None:
             logging.error(
-                f" {log_prefix}: Cannot record call ref between {src.name} and {dst}, \
-both ids are not defined"
+                f" {log_prefix}: Cannot record call ref between {src.name} and {dst}, "\
+                "both ids are not defined"
             )
             return None
         self.db_interface.record_ref_call(src.id, tgt_id)

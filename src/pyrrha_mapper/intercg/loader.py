@@ -147,8 +147,7 @@ def compute_call_graph(
                 continue
         # else case
         logging.info(
-            f"{log_prefix}: export {canon.name}: {hex(exp_addr)} address not found \
-in program (add)."
+            f"{log_prefix}: export {canon.name}: {hex(exp_addr)} address not found in program (add)."
         )
         call_graph[canon] = []
 
@@ -185,8 +184,8 @@ in program (add)."
                         call_graph[f.symbol].append(c.name)  # Add it normally
                 else:  # ignore function without name
                     logging.warning(
-                        f"{log_prefix}: [{program.name}] {f.symbol} calls a function \
-without name (at {c.addr:#08x})"
+                        f"{log_prefix}: [{program.name}] {f.symbol} calls a function without"\
+                        " name (at {c.addr:#08x})"
                     )
 
         # If thunk AND exported still keep it (for later resolution)
@@ -226,8 +225,7 @@ def disambiguate_export(symbs: list[Symbol], log_prefix: str = "") -> Symbol:
     # all exports starts with _
     if chosen is None:
         logging.warning(
-            f"{log_prefix}: cannot disambiguate: {[s.name for s in symbs]} \
-(select shortest name)"
+            f"{log_prefix}: cannot disambiguate: {[s.name for s in symbs]} (select shortest name)"
         )
         chosen = min(symbs, key=lambda x: len(x.name))
     return chosen
