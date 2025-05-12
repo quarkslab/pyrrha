@@ -356,6 +356,40 @@ import, drop case"
             )
         binary.add_non_resolved_imported_symbol(symbol_name)
 
+    def resolve_symbol_import(
+        self,
+        binary: Binary,
+        func_name: str,
+        resolution_strategy: ResolveDuplicateOption,
+        log_prefix: str,
+    ) -> tuple[Binary, Symbol] | None:
+        """Given an already mapped binary and a symbol, resolve this symbol import.
+
+        It is able to treat versionned symbolfs from ELF binaries (e.g. SYMBOL@@GLIBC.1)
+        First the version part of the symbol should be resolved, using symbol version
+        auxiliary symbols (here GLIBC.1 could be associated to several libs), then we
+        could simply solve the symbol import using its name (part before the `@@`) and
+        the list of possible libraries it could come from.
+
+        :return: a tuple (imported bin, imported symbol) or None if nothing found
+        """
+        if len(func_name.split("@@")) == 2:  # symbols with a specific version
+            symb_name, symb_version = func_name.split("@@")
+            if symb_version in binary.version_requirement:
+                for lib_name in binary.version_requirement[symb_version]:
+                    res = self._resolve_lib_import(
+                        lib_name, resolution_strategy, log_prefix
+                    )
+                    if isinstance(res, self._SolvedLibImport):
+                        lib = res.final_import
+                        if lib.exported_symbol_exists(symb_name):
+                            return lib, lib.get_exported_symbol(symb_name)
+        else:
+            for lib in binary.iter_imported_libraries():
+                if lib.exported_symbol_exists(func_name):
+                    return lib, lib.get_exported_symbol(func_name)
+        return None
+
     def map_symbol_imports(
         self,
         binary: Binary,
@@ -363,45 +397,25 @@ import, drop case"
     ) -> None:
         """Given an already mapped binary, resolve its symbols.
 
-        This function update the DB with the import links found.
+        This function update the DB and the current FS with the import links found.
         It is able to treat versionned symbolfs from ELF binaries (e.g. SYMBOL@@GLIBC.1)
-        First the version part of the symbol should be resolved, using symbol version
-        auxiliary symbols (here GLIBC.1 could be associated to several libs), then we
-        could simply solve the symbol import using its name (part before the `@@`) and
-        the list of possible libraries it could come from.
         """
         log_prefix = f"[symbol imports] {binary.path}"
         for func_name in binary.imported_symbol_names:
-            if len(func_name.split("@@")) == 2:  # symbols with a specific version
-                symb_name, symb_version = func_name.split("@@")
-                if symb_version in binary.version_requirement:
-                    found = False
-                    for lib_name in binary.version_requirement[symb_version]:
-                        res = self._resolve_lib_import(
-                            lib_name, resolution_strategy, log_prefix
-                        )
-                        if isinstance(res, self._SolvedLibImport):
-                            lib = res.final_import
-                            if lib.exported_symbol_exists(symb_name):
-                                symb = lib.get_exported_symbol(symb_name)
-                                self.record_import_in_db(binary.id, symb.id)
-                                found = True
-                                break
-                    if not found:
-                        self._record_non_resolved_symbol_import(binary, func_name)
-                else:
-                    self._record_non_resolved_symbol_import(binary, func_name)
+            res = self.resolve_symbol_import(
+                binary, func_name, resolution_strategy, log_prefix
+            )
+            if res is None:
+                self._record_non_resolved_symbol_import(binary, func_name)
             else:
-                found = False
-                for lib in binary.iter_imported_libraries():
-                    if lib.exported_symbol_exists(func_name):
-                        symbol = lib.get_exported_symbol(func_name)
-                        self.record_import_in_db(binary.id, symbol.id)
-                        binary.add_imported_symbol(symbol)
-                        found = True
-                        break
-                if found is False:
-                    self._record_non_resolved_symbol_import(binary, func_name)
+                callee_bin, callee_symb = res
+                binary.add_imported_symbol(callee_symb)
+                if not binary.imported_library_exists(
+                    callee_bin.name, is_resolved=True
+                ):
+                    binary.add_imported_library(callee_bin)
+                    self.record_import_in_db(binary.id, callee_bin.id)
+                self.record_import_in_db(binary.id, callee_symb.id)
 
     # ================================ Main function ==================================
     def mapper_main(
