@@ -130,6 +130,9 @@ class FileSystemMapper(ABC):
                     parent_id=binary.id,
                     hover_display=symbol.demangled_name,
                 )
+                self.db_interface.change_node_color(
+                        symbol.id, fill_color="#bee0af", border_color="#395f33"
+                    )
             else:
                 symbol.id = self.db_interface.record_field(
                     symbol.name,
@@ -143,21 +146,20 @@ class FileSystemMapper(ABC):
                     self.db_interface.record_public_access(symbol.id)
                 except DBException as e:
                     raise PyrrhaError(
-                        f"{log_prefix}: Cannot register access to symbol {symbol.name}:\
- {e}"
+                        f"{log_prefix}: Cannot register access to symbol {symbol.name}:{e}"
                     ) from e
         for symbol in binary.iter_not_exported_functions():
             # check if have not been already mapped
             if binary.exported_function_exists(symbol.name):
                 logging.warning(
-                    f"{log_prefix}: Cannot register function {symbol.name}, already \
-exists in this binary, same id for both symbols"
+                    f"{log_prefix}: Cannot register function {symbol.name}, already"\
+                    "exists in this binary, same id for both symbols"
                 )
                 symbol.id = binary.get_exported_symbol(symbol.name).id
             elif binary.exported_symbol_exists(symbol.name):
                 logging.info(
-                    f"{log_prefix}: Cannot register internal function \
-{symbol.name}, an exported symbol with the same name already exists"
+                    f"{log_prefix}: Cannot register internal function {symbol.name},"\
+                    " an exported symbol with the same name already exists"
                 )
             else:
                 symbol.id = self.db_interface.record_method(
@@ -174,8 +176,7 @@ exists in this binary, same id for both symbols"
                         self.db_interface.record_private_access(symbol.id)
                     except DBException as e:
                         raise PyrrhaError(
-                            f"{log_prefix}: Cannot register access to symbol \
-{symbol.name}: {e}"
+                            f"{log_prefix}: Cannot register access to symbol {symbol.name}: {e}"
                         ) from e
 
         return binary
@@ -246,8 +247,8 @@ exists in this binary, same id for both symbols"
         """
         if len(matching_objects) > 1 and strategy is ResolveDuplicateOption.IGNORE:
             logging.debug(
-                f"{log_prefix}: several matches for {target_name} but strategy is \
-{ResolveDuplicateOption.IGNORE.name} so nothing selected"
+                f"{log_prefix}: several matches for {target_name} but strategy is "
+                f"{ResolveDuplicateOption.IGNORE.name} so nothing selected"
             )
             return None
         selected_index = None
@@ -256,8 +257,7 @@ exists in this binary, same id for both symbols"
             for cache_entry in cache or {}:
                 if cache_entry in matching_objects:  # reuse already selected entry
                     logging.debug(
-                        f"{log_prefix}: manually selected entry to disambiguate \
-{target_name}"
+                        f"{log_prefix}: manually selected entry to disambiguate {target_name}"
                     )
                     selected_bin = cache_entry
 
