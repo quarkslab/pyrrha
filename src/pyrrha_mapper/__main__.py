@@ -293,7 +293,12 @@ def fs_call_graph_mapper(  # noqa: D103
     # Create InterCG mapper and launch mapping
     try:
         intercg_mapper = intercg.InterImageCGMapper(root_directory, fs_object, db_instance)
-        intercg_mapper.map(jobs, resolve_duplicates)
+        fs_object: FileSystem = intercg_mapper.map(jobs, resolve_duplicates)
+
+        # systematically save the FileSystem object (shall be enriched with calls)
+        output_file = db_instance.path.with_suffix(intercg_mapper.FS_EXT)
+        fs_object.write(output_file)
+
     except RuntimeError:
         pass
 

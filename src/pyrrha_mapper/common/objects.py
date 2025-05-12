@@ -572,8 +572,7 @@ class FileSystem(BaseModel):
                 target_path = content["target_path"]
             except TypeError as e:
                 raise ValueError(
-                    f"Cannot convert '{content['target_path']}' into a pathlib.Path \
-object: {e}"
+                    f"Cannot convert '{content['target_path']}' into a pathlib.Path object: {e}"
                 ) from e
             if target_type is TargetType.BINARY:
                 try:
@@ -649,8 +648,9 @@ object: {e}"
         export_path.write_text(self.model_dump_json())
 
     @classmethod
-    def from_json_export(cls, export_path: Path):
+    def from_json_export(cls, export_path: Path | str):
         """Create an populate an FS instance from a json file content."""
+        export_path = Path(export_path)
         return cls.model_validate_json(export_path.read_text())
 
     # -------------------------- Firmware manipulation helpers -------------------------
