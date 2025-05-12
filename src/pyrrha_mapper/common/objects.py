@@ -196,6 +196,16 @@ class Binary(FileSystemComponent):
         self.internal_functions[func.name] = func
         self._record_func_addr(func)
 
+    def remove_function(self, func_name) -> None:
+        """Remove a Function in the current binary."""
+        res = self.exported_functions.pop(
+            func_name, self.internal_functions.pop(func_name, None)
+        )
+        if res is None:
+            raise KeyError(func_name)
+        if func_name in self.calls:
+            self.calls.pop(func_name)
+
     def exported_symbol_exists(self, symbol_name: str) -> bool:
         """:return: true if an exported symbol exists in the current Binary."""
         return (
