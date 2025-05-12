@@ -16,6 +16,7 @@
 """Load information used by InterCGMapper from the files on the disk."""
 
 import logging
+from typing import NamedTuple
 
 # third-party imports
 from quokka import Program
@@ -73,6 +74,15 @@ def load_program(binary: Binary, log_prefix: str = "") -> dict[Symbol, list[str]
     return compute_call_graph(binary, program, log_prefix)
 
 
+class _FuncData(NamedTuple):
+    symbol: Symbol
+    name: str
+    demangled_name: str
+    addr: int
+    type: FunctionType
+    calls: list[int]
+
+
 def compute_call_graph(
     binary: Binary, program: Program, log_prefix: str = ""
 ) -> dict[Symbol, list[str]]:
@@ -96,9 +106,7 @@ def compute_call_graph(
             exports[s.addr].append(s)
 
     # Fill temporary dict
-    _inter_cg: dict[
-        int, tuple[Symbol, str, str, int, FunctionType, list[int]]
-    ] = {}  # addr: (pyrrha symbol, mangled_name, pp_name, addr, typ, calls: list[int])
+    _inter_cg: dict[int, _FuncData] = {}
     for f_addr, f in program.items():
         name = f.mangled_name  # as computed by IDA
         if (
@@ -116,14 +124,14 @@ def compute_call_graph(
             f_symb = canonical
         else:
             f_symb = Symbol(name=name, demangled_name=f.name, is_func=True, addr=f_addr)
-            binary.add_function(f_symb)  # FIXME : c'est bien une fonction interne ???
-        _inter_cg[f_addr] = (
-            f_symb,
-            name,
-            f.name,
-            f_addr,
-            f.type,
-            list(set(x.start for x in f.calls)),
+            binary.add_function(f_symb)
+        _inter_cg[f_addr] = _FuncData(
+            symbol=f_symb,
+            name=name,
+            demangled_name=f.name,
+            addr=f_addr,
+            type=f.type,
+            calls=list(set(x.start for x in f.calls)),
         )
 
     # Check if some exports don't have any associated function (not detected by IDA)
@@ -147,52 +155,51 @@ in program (add)."
     # Iterate back the temporary dict to fill the real call graph
     # The deal here is to fast-forward call to imported function directly on the
     # imported symbol and not on the PLT (to make the graph more straightforward)
-    for f_symb, f_name, _, f_addr, f_type, calls in _inter_cg.values():
-        call_graph[f_symb] = []
-        if f_type in [FunctionType.NORMAL, FunctionType.LIBRARY]:
+    for f in _inter_cg.values():
+        call_graph[f.symbol] = []
+        if f.type in [FunctionType.NORMAL, FunctionType.LIBRARY]:
             # Iter calls (ignore calls that are not pointing to a function!)
-            for _, c_name, _, c_addr, c_type, c_calls in [
-                _inter_cg[x] for x in calls if x in _inter_cg
-            ]:
-                if c_name:  # Has a true name
-                    if c_type == FunctionType.THUNK and c_addr not in exports:
+            for c in [_inter_cg[x] for x in f.calls if x in _inter_cg]:
+                if c.name:  # Has a true name
+                    if c.type == FunctionType.THUNK and c.addr not in exports:
                         if (
-                            len(c_calls) == 1
+                            len(c.calls) == 1
                         ):  # The callee calls something else (and only one)
-                            sub_callee = (
-                                _inter_cg[c_calls[0]]
-                                if c_calls[0] in _inter_cg
-                                else None
-                            )
-                            if sub_callee is None:
-                                continue  # Do not do anything if not pointing to a func
-                            if sub_callee[3] in [
+                            if c.calls[0] in _inter_cg:
+                                sub_callee = _inter_cg[c.calls[0]]
+                            else:  # Do not do anything if not pointing to a func
+                                continue
+                            if sub_callee.type in [
                                 FunctionType.IMPORTED,
                                 FunctionType.EXTERN,
                             ]:
-                                call_graph[f_symb].append(
-                                    c_name
+                                call_graph[f.symbol].append(
+                                    c.name
                                 )  # Keep the name of the thunk "strcpy, sprintf"
                             else:  # Forward the call to the underlying function name
-                                call_graph[f_symb].append(sub_callee[0].name)
+                                call_graph[f.symbol].append(sub_callee[0].name)
                         else:
-                            call_graph[f_symb].append(c_name)  # Add it normally
+                            call_graph[f.symbol].append(c.name)  # Add it normally
                     # Add it normally
                     else:  # In all other cases
-                        call_graph[f_symb].append(c_name)  # Add it normally
+                        call_graph[f.symbol].append(c.name)  # Add it normally
                 else:  # ignore function without name
                     logging.warning(
-                        f"{log_prefix}: [{program.name}] {f_name} calls a function \
-without name (at {c_addr:#08x})"
+                        f"{log_prefix}: [{program.name}] {f.symbol} calls a function \
+without name (at {c.addr:#08x})"
                     )
 
         # If thunk AND exported still keep it (for later resolution)
-        elif f_type == FunctionType.THUNK and (
-            (f_addr in exports) or (f_addr + 1 in exports)
+        elif f.type == FunctionType.THUNK and (
+            (f.addr in exports) or (f.addr + 1 in exports)
         ):
-            call_graph[f_symb] = [_inter_cg[x][1] for x in calls if x in _inter_cg]
+            call_graph[f.symbol] = [
+                _inter_cg[x].name for x in f.calls if x in _inter_cg
+            ]
 
         else:  # THUNK, IMPORTED, EXTERN (not included in call graph)
+            binary.remove_function(f.name)
+            call_graph.pop(f.symbol)
             pass
 
     return call_graph

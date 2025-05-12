@@ -149,12 +149,12 @@ set (skip)"
         self.progress = progress  # need to be able to hide it further down in calls
         bins_count = len(self.fs.binaries)
         binaries_map = progress.add_task(
-            "[deep_pink2]Binaries mapping", total=bins_count
+            "[deep_pink2]Binaries recording", total=bins_count
         )
 
         # ---------- Iterate all binaries and add Nodes in the database ---------
         for binary in self.fs.iter_binaries():
-            log_prefix = f"[bin mapping] {binary.name}"
+            log_prefix = f"[bin recording] {binary.name}"
             # Create the node entry in numbat and create the custom command
             self.record_binary_in_db(binary, log_prefix)
             if binary.id is not None:
