@@ -282,13 +282,9 @@ def fs_call_graph_mapper(  # noqa: D103
 
     root_directory = root_directory.absolute()
 
-    # First launch FS-mapper in (dry-mode) to obtain base FS
-    fs_mapper = fs.FileSystemImportsMapper(root_directory, None)
-    fs_object: FileSystem = fs_mapper.map(jobs)
-
     # Create InterCG mapper and launch mapping
     try:
-        intercg_mapper = intercg.InterImageCGMapper(root_directory, fs_object, db_instance)
+        intercg_mapper = intercg.InterImageCGMapper(root_directory, db_instance)
         fs_object: FileSystem = intercg_mapper.map(jobs, resolve_duplicates)
 
         # systematically save the FileSystem object (shall be enriched with calls)

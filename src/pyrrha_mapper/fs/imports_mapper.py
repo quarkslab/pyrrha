@@ -21,13 +21,13 @@ from abc import ABC
 from dataclasses import dataclass
 from multiprocessing import Manager, Pool, Queue
 from pathlib import Path
+from typing import Any
 
 import lief
 from numbat import SourcetrailDB
 from rich.progress import Progress
 
 from pyrrha_mapper.common import Binary, FileSystem, FileSystemMapper, Symbol, Symlink
-from pyrrha_mapper.exceptions import FsMapperError
 from pyrrha_mapper.types import ResolveDuplicateOption
 
 lief.logging.disable()
@@ -57,10 +57,11 @@ class FileSystemImportsMapper(FileSystemMapper):
         return p.is_file() and not p.is_symlink() and (lief.is_elf(str(p)) or lief.is_pe(str(p)))
 
     @staticmethod
-    def load_binary(root_directory: Path, file_path: Path) -> Binary:
+    def load_binary(root_directory: Path, file_path: Path) -> tuple[Binary, Any] | str:
         """Create a Binary object from a given file using lief.
 
         raise: FsMapperError if cannot load it
+        :return: bin object and additionnal info if needed or a string in case of error
         """
         # compute absolute path but from root_directory base
         base = Path(root_directory.anchor)
@@ -72,11 +73,10 @@ class FileSystemImportsMapper(FileSystemMapper):
             parser_config = lief.ELF.ParserConfig()
             if bin_obj.name.startswith("libcrypto"):
                 parser_config.count_mtd = lief.ELF.ParserConfig.DYNSYM_COUNT.HASH
-            parsing_res: lief.ELF.Binary | None = lief.ELF.parse(
-                str(file_path), parser_config
-            )
+                logging.debug("lief parser config set to hash for dynsym count")
+            parsing_res: lief.ELF.Binary | None = lief.ELF.parse(str(file_path), parser_config)
             if parsing_res is None:
-                raise FsMapperError(f"Lief cannot parse {file_path}")
+                return f"Lief cannot parse {file_path}"
 
             # parse imported libs
             for lib in parsing_res.libraries:
@@ -121,7 +121,7 @@ class FileSystemImportsMapper(FileSystemMapper):
             # PE parsing
             res: lief.Binary | None = lief.parse(str(file_path))
             if res is None:
-                raise FsMapperError(f"Lief cannot parse {file_path}")
+                return f"ERROR: Lief cannot parse {file_path}"
             # parse imported libs
             for lib in res.libraries:
                 bin_obj.add_imported_library_name(str(lib))
@@ -137,7 +137,7 @@ class FileSystemImportsMapper(FileSystemMapper):
                     )
                 )
 
-        return bin_obj
+        return (bin_obj, None)
 
     @classmethod
     def parse_binary_job(cls, ingress: Queue, egress: Queue, root_directory: Path) -> None:
@@ -161,7 +161,7 @@ class FileSystemImportsMapper(FileSystemMapper):
             except KeyboardInterrupt:
                 break
 
-    def map_binary(self, bin_object: Binary) -> None:
+    def map_binary(self, bin_object: Binary, additional_res: Any = None) -> None:
         """Given a Binary object add it to the DB.
 
         This function updates the filesystem representation stored as `self.fs`.
@@ -381,13 +381,131 @@ import, drop case"
                 self._record_non_resolved_symbol_import(binary, func_name)
             else:
                 callee_bin, callee_symb = res
+                if callee_symb.name != func_name:
+                    try:
+                        binary.remove_imported_symbol(func_name)
+                    except KeyError:
+                        pass
                 binary.add_imported_symbol(callee_symb)
                 if not binary.imported_library_exists(callee_bin.name, is_resolved=True):
                     binary.add_imported_library(callee_bin)
                     self.record_import_in_db(binary.id, callee_bin.id)
                 self.record_import_in_db(binary.id, callee_symb.id)
 
-    # ================================ Main function ==================================
+    # ================================ Main functions ==================================
+
+    @staticmethod
+    def _is_list_str(x: list) -> bool:
+        """:return: True if isinstance(x, list[str])"""
+        return isinstance(x, list) and all(map(lambda i: isinstance(i, str), x))
+
+    def _correct_map_result(self, res: Any) -> bool:
+        """:return: True if res is a tuple[Binary, Any, list[str]]"""
+        return isinstance(res, tuple) and len(res) == 2 and isinstance(res[0], Binary)
+
+    def _treat_bin_parsing_result(self, path: Path, res: Any):
+        """Handle load_binary res, map it or display error."""
+        log_prefix = f"[binary mapping] {path.name}"
+        if isinstance(res, str):
+            logging.error(f"{log_prefix}: {res}")
+        elif self._correct_map_result(res):
+            bin_obj, additional_info = res
+            self.map_binary(bin_obj, additional_info)
+        else:
+            logging.warning(f"{log_prefix}: {res}")
+
+    def map_binaries_main(self, threads: int, progress: Progress) -> None:
+        """Parse and map binaries of a given directory.
+
+        Record them in self.fs and self.db (except if self.is_dry_run == True).
+        :param threads: number of threads to use
+        :param progress: a rich.progress bar object for cli rendering
+        """
+        binary_paths = set(
+            filter(lambda p: self.is_binary_supported(p), self.root_directory.rglob("*"))
+        )
+
+        logging.debug(f"[main] Start Binaries parsing: {len(binary_paths)} binaries to parse")
+        binaries_map = progress.add_task("[deep_pink2]Binaries mapping", total=len(binary_paths))
+        if threads > 1:  # multiprocessed case
+            manager = Manager()
+            ingress = manager.Queue()
+            egress = manager.Queue()
+            pool = Pool(threads)
+
+            # Launch all workers and fill input queue
+            for _ in range(threads - 1):
+                pool.apply_async(self.parse_binary_job, (ingress, egress, self.root_directory))
+            for path in binary_paths:
+                ingress.put(path)
+            logging.debug(f"[main] {threads - 1} threads created")
+
+            i = 0
+            while True:
+                path, res = egress.get()
+                i += 1
+                self._treat_bin_parsing_result(path, res)
+                progress.update(binaries_map, advance=1)
+                if i == len(binary_paths):
+                    break
+            pool.terminate()
+        else:
+            logging.debug("[main] One thread mode")
+            for path in binary_paths:
+                res = self.load_binary(self.root_directory, path)
+                self._treat_bin_parsing_result(path, res)
+                progress.update(binaries_map, advance=1)
+        self.commit()
+
+    def map_symlinks_main(self, progress: Progress):
+        """Parse and resolve symlinks. Record them in self.fs and self.db.
+
+        :param progress: a rich.progress bar object for cli rendering
+        """
+        symlink_paths = set(filter(lambda p: p.is_symlink(), self.root_directory.rglob("*")))
+        logging.debug(f"[main] Start Symlinks parsing: {len(symlink_paths)} symlinks to parse")
+        symlinks_map = progress.add_task("[deep_pink2]Symlinks mapping", total=len(symlink_paths))
+        for path in symlink_paths:
+            self.map_symlink(path)
+            progress.update(symlinks_map, advance=1)
+        self.commit()
+
+    def map_lib_imports_main(
+        self, progress: Progress, resolution_strategy: ResolveDuplicateOption
+    ) -> None:
+        """Resolve all the lib imports.
+
+        Record them in self.fs and self.db (except if self.is_dry_run == True).
+        :param progress: a rich.progress bar object for cli rendering
+        :param resolution_strategy: the chosen option for duplicate import resolution
+        """
+        logging.debug("[main] Start Libraries imports resolution")
+        lib_imports = progress.add_task(
+            "[orange_red1]Library imports mapping", total=len(list(self.fs.iter_binaries()))
+        )
+        for binary in self.fs.iter_binaries():
+            self.map_lib_imports(binary, resolution_strategy)
+            progress.update(lib_imports, advance=1)
+        self.commit()
+
+    def map_symbol_imports_main(
+        self, progress: Progress, resolution_strategy: ResolveDuplicateOption
+    ) -> None:
+        """Resolve all the symbols imports.
+
+        Record them in self.fs and self.db (except if self.is_dry_run == True).
+        :param progress: a rich.progress bar object for cli rendering
+        :param resolution_strategy: the chosen option for duplicate import resolution
+        """
+        logging.debug("[main] Start Symbols imports resolution")
+        symbol_imports = progress.add_task(
+            "[orange1]Symbol imports mapping", total=len(list(self.fs.iter_binaries()))
+        )
+        for binary in self.fs.iter_binaries():
+            self.map_symbol_imports(binary, resolution_strategy)
+            progress.update(symbol_imports, advance=1)
+        self.commit()
+
     def mapper_main(
         self,
         threads: int,
@@ -407,87 +525,14 @@ import, drop case"
         :param resolution_strategy: the chosen option for duplicate import resolution
         :return: The FileSystem object filled
         """
-        binary_paths = set(
-            filter(
-                lambda p: self.is_binary_supported(p), self.root_directory.rglob("*")
-            )
-        )
-        symlink_paths = set(
-            filter(lambda p: p.is_symlink(), self.root_directory.rglob("*"))
-        )
-
-        logging.debug(
-            f"[main] Start Binaries parsing: {len(binary_paths)} binaries to parse"
-        )
-        binaries_map = progress.add_task(
-            "[deep_pink2]Binaries mapping", total=len(binary_paths)
-        )
-        if threads > 1:  # multiprocessed case
-            manager = Manager()
-            ingress = manager.Queue()
-            egress = manager.Queue()
-            pool = Pool(threads)
-
-            # Launch all workers and fill input queue
-            for _ in range(threads - 1):
-                pool.apply_async(
-                    self.parse_binary_job, (ingress, egress, self.root_directory)
-                )
-            for path in binary_paths:
-                ingress.put(path)
-            logging.debug(f"[main] {threads - 1} threads created")
-
-            i = 0
-            while True:
-                path, res = egress.get()
-                i += 1
-                if isinstance(res, Binary):
-                    self.map_binary(res)
-                else:
-                    logging.warning(f"Error while parsing {path}: {res}")
-                progress.update(binaries_map, advance=1)
-                if i == len(binary_paths):
-                    break
-            pool.terminate()
-        else:
-            logging.debug("[main] One thread mode")
-            for path in binary_paths:
-                binary = self.load_binary(self.root_directory, path)
-                self.map_binary(binary)
-                progress.update(binaries_map, advance=1)
-        self.commit()
+        self.map_binaries_main(threads, progress)
 
         # Parse and resolve symlinks
-        logging.debug(
-            f"[main] Start Symlinks parsing: {len(symlink_paths)} symlinks to parse"
-        )
-        symlinks_map = progress.add_task(
-            "[orange_red1]Symlinks mapping", total=len(symlink_paths)
-        )
-        for path in symlink_paths:
-            self.map_symlink(path)
-            progress.update(symlinks_map, advance=1)
-        self.commit()
+        self.map_symlinks_main(progress)
 
         # Handle imports
-        logging.debug("[main] Start Libraries imports resolution")
-        lib_imports = progress.add_task(
-            "[orange1]Library imports mapping", total=len(binary_paths)
-        )
-        for binary in self.fs.iter_binaries():
-            self.map_lib_imports(binary, resolution_strategy)
-            progress.update(lib_imports, advance=1)
-        self.commit()
-
-        logging.debug("[main] Start Symbols imports resolution")
-        symbol_imports = progress.add_task(
-            "[gold1]Symbol imports mapping", total=len(binary_paths)
-        )
-        for binary in self.fs.iter_binaries():
-            self.map_symbol_imports(binary, resolution_strategy)
-            progress.update(symbol_imports, advance=1)
-        self.commit()
-
+        self.map_lib_imports_main(progress, resolution_strategy)
+        self.map_symbol_imports_main(progress, resolution_strategy)
         # Return the internal object. The caller can do whathever
         # we wants with it, like saving it to a file etc.
         return self.fs
