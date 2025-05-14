@@ -130,7 +130,7 @@ class Binary(FileSystemComponent):
         """
         if isinstance(caller, Symbol):
             caller = caller.name
-        assert self.function_exists(caller)
+        assert self.function_exists(caller), f"Function {caller} does not exists in {self.name}"
         if caller not in self.calls:
             self.calls[caller] = [callee]
         elif callee not in self.calls[caller]:
@@ -191,9 +191,7 @@ class Binary(FileSystemComponent):
 
     def remove_function(self, func_name) -> None:
         """Remove a Function in the current binary."""
-        res = self.exported_functions.pop(
-            func_name, self.internal_functions.pop(func_name, None)
-        )
+        res = self.exported_functions.pop(func_name, self.internal_functions.pop(func_name, None))
         if res is None:
             raise KeyError(func_name)
         if func_name in self.calls:
@@ -201,10 +199,7 @@ class Binary(FileSystemComponent):
 
     def exported_symbol_exists(self, symbol_name: str) -> bool:
         """:return: true if an exported symbol exists in the current Binary."""
-        return (
-            symbol_name in self.exported_symbols
-            or symbol_name in self.exported_functions
-        )
+        return symbol_name in self.exported_symbols or symbol_name in self.exported_functions
 
     def exported_function_exists(self, symbol_name: str) -> bool:
         """:return: true if an exported function exists in the current Binary."""
@@ -230,10 +225,7 @@ class Binary(FileSystemComponent):
 
     def function_exists(self, symbol_name: str) -> bool:
         """:return: true if an function exists in the current Binary."""
-        return (
-            symbol_name in self.exported_functions
-            or symbol_name in self.internal_functions
-        )
+        return symbol_name in self.exported_functions or symbol_name in self.internal_functions
 
     def get_calls_from(self, caller: Symbol | str) -> list[Symbol]:
         """:return: list of functions called by the given function"""
@@ -245,9 +237,7 @@ class Binary(FileSystemComponent):
 
     def get_exported_symbol(self, symbol_name: str) -> Symbol:
         """:return: the exported symbol with the given name."""
-        res = self.exported_functions.get(
-            symbol_name, self.exported_symbols.get(symbol_name)
-        )
+        res = self.exported_functions.get(symbol_name, self.exported_symbols.get(symbol_name))
         if res is None:
             raise KeyError(symbol_name)
         return res
@@ -261,9 +251,7 @@ class Binary(FileSystemComponent):
 
     def get_function_by_name(self, func_name: str) -> Symbol:
         """:return: the function with the given name."""
-        res = self.exported_functions.get(
-            func_name, self.internal_functions.get(func_name)
-        )
+        res = self.exported_functions.get(func_name, self.internal_functions.get(func_name))
         if res is None:
             raise KeyError(func_name)
         return res
@@ -330,9 +318,7 @@ class Binary(FileSystemComponent):
         elif append:
             return Path(str(self.real_path) + append)
         else:
-            raise NameError(
-                "auxiliary file requires either extension or append argument"
-            )
+            raise NameError("auxiliary file requires either extension or append argument")
 
 
 class TargetType(Enum):
@@ -379,12 +365,8 @@ class FileSystem(BaseModel):
     root_dir: Path
     binaries: dict[Path, Binary] = Field(default_factory=dict)
     symlinks: dict[Path, Symlink] = Field(default_factory=dict)
-    _binary_names: dict[str, list[Binary]] = PrivateAttr(
-        default_factory=dict, init=False
-    )
-    _symlink_names: dict[str, list[Symlink]] = PrivateAttr(
-        default_factory=dict, init=False
-    )
+    _binary_names: dict[str, list[Binary]] = PrivateAttr(default_factory=dict, init=False)
+    _symlink_names: dict[str, list[Symlink]] = PrivateAttr(default_factory=dict, init=False)
 
     def __repr__(self):  # noqa: D105
         return (
@@ -467,18 +449,12 @@ class FileSystem(BaseModel):
             try:
                 path = Path(path)
             except TypeError as e:
-                raise ValueError(
-                    f"Cannot convert '{path}' into a pathlib.Path object: {e}"
-                ) from e
+                raise ValueError(f"Cannot convert '{path}' into a pathlib.Path object: {e}") from e
             if not isinstance(content, dict):
-                raise ValueError(
-                    f"There is no content associated to {path} in the provided data"
-                )
+                raise ValueError(f"There is no content associated to {path} in the provided data")
             # save imported libs separetely as it should be treated manually
             imported_libs[path] = (
-                content.pop("imported_libraries")
-                if "imported_libraries" in content
-                else dict()
+                content.pop("imported_libraries") if "imported_libraries" in content else dict()
             )
             # convert the content into a Binary object
             bin_obj = Binary.model_validate(content)
@@ -498,23 +474,18 @@ class FileSystem(BaseModel):
                             f"Cannot convert '{lib_path['path']}' into Path object: {e}"
                         ) from e
                     if lib_path_obj not in res:
-                        raise ValueError(
-                            f"Imported lib '{lib_path}' not listed in binaries"
-                        )
+                        raise ValueError(f"Imported lib '{lib_path}' not listed in binaries")
                     res[bin_path].add_imported_library(res[lib_path_obj])
 
         # optmimize version by replacing every iteration of the same symbol (same id)
         # by one object
         # 1. generate dict of symbols by ids
         symbols_by_ids: dict[int, Symbol] = {
-            s.id: s
-            for bin in res.values()
-            for s in bin.iter_exported_symbols()
-            if s.id is not None
+            s.id: s for bin in res.values() for s in bin.iter_exported_symbols() if s.id is not None
         }
         # 2. Replace same symbols objects by one object
         for bin in res.values():
-            for symb in bin.iter_imported_symbols():
+            for symb in list(bin.iter_imported_symbols()):
                 if symb.id is not None and symb.id in symbols_by_ids:
                     bin.add_imported_symbol(symbols_by_ids[symb.id])
 
@@ -541,16 +512,12 @@ class FileSystem(BaseModel):
             try:
                 validated_path = Path(path)
             except TypeError as e:
-                raise ValueError(
-                    f"Cannot convert '{path}' into a pathlib.Path object: {e}"
-                ) from e
+                raise ValueError(f"Cannot convert '{path}' into a pathlib.Path object: {e}") from e
             if isinstance(content, Symlink):
                 res[validated_path] = data[path]
                 continue
             if not isinstance(content, dict):
-                raise ValueError(
-                    f"There is no content associated to {path} in the provided data"
-                )
+                raise ValueError(f"There is no content associated to {path} in the provided data")
             if "target_path" not in content or "target_type" not in content:
                 res[validated_path] = cls.__symlink_convert(content, validated_path)
                 continue
@@ -579,9 +546,7 @@ class FileSystem(BaseModel):
         for content in untreated_symlinks.values():
             target_path = content["target_path"]
             if target_path not in untreated_symlinks and target_path not in res:
-                raise ValueError(
-                    f"Targeted object {target_path} does not exist in this FS"
-                )
+                raise ValueError(f"Targeted object {target_path} does not exist in this FS")
 
         # then recursively resolve symlinks
         nb_symlinks = len(res) + len(untreated_symlinks)
