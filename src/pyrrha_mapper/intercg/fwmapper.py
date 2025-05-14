@@ -18,6 +18,7 @@
 import logging
 from collections import defaultdict
 from pathlib import Path
+from typing import Any
 
 # third-party imports
 from numbat import SourcetrailDB
@@ -53,7 +54,6 @@ class InterImageCGMapper(FileSystemImportsMapper):
 
         # override fs with the one provided by the fs_mapper (in dry-mode)
         # it should not contains any id
-        self.fs = fs_dump
 
         if not self.dry_run_mode and self.db_interface is not None:
             # Change some headers
@@ -66,7 +66,23 @@ class InterImageCGMapper(FileSystemImportsMapper):
         self.progress: Progress | None = None
         self.unresolved_callgraph: dict[Path, dict[Symbol, list[str]]] = dict()
 
-    def load_binaries(self, cache_file: Path | None) -> None:
+    def _correct_map_result(self, res: Any) -> bool:
+        return (
+            super()._correct_map_result(res)
+            and len(res) == 2
+            and isinstance(res[1], dict)
+            and all(
+                map(  # correct equivalent to `isinstance(data, dict[Symbol, list[str]])`
+                    lambda x: isinstance(x[0], Symbol) and self._is_list_str(x[1]),
+                    res[1].items(),
+                )
+            )
+        )
+
+    @staticmethod
+    def load_binary(
+        root_directory: Path, file_path: Path
+    ) -> tuple[Binary, dict[Symbol, list[str]]] | str:
         """Load all the binaries located in the filesystem as Binary objects.
 
         First check if a cache file exists, if yes, it will load all the binaries and
@@ -78,51 +94,77 @@ class InterImageCGMapper(FileSystemImportsMapper):
 
         :param cache_file: Cache file to load binaries from (if exists)
         """
-        log_prefix: str = "[binary loading]"
-        if cache_file is not None and cache_file.exists():
-            logging.info(f"{log_prefix}: Load cached binaries: {cache_file.name}")
-            self.fs = FileSystem.from_json_export(cache_file)
-            return
-
-        # Otherwise load files from the filesystem
-        tot = len(self.fs.binaries)
-        for i, binary in enumerate(self.fs.iter_binaries()):
-            log_prefix = f"[binary loading] {binary.name}"
-            if binary.path.suffix == ".ko":  # ignore kernel modules at the moment
-                logging.warning(
-                    f"{log_prefix}: do not map kernel modules at the moment (skip)"
-                )
-                continue
-            if binary.real_path is None:
-                logging.error(
-                    f"{log_prefix}: Path on the filesystem the binary not set (skip)"
-                )
-                continue
-            if not binary.real_path.exists():
-                logging.error(
-                    f"{log_prefix}: cannot find executable mentioned in 'fs' mapper: "\
-                    f"{binary.real_path.name} (skip)"
-                )
-                continue
-
-            quokka_file = binary.auxiliary_file(append=QUOKKA_EXT)
-            s = (
-                "SKIP"
-                if binary.real_path is None or not binary.real_path.exists()
-                else ("LOAD" if quokka_file.exists() else "CREATE")
+        res = FileSystemImportsMapper.load_binary(root_directory, file_path)
+        if isinstance(res, str):  # error message
+            return res
+        else:
+            binary, _ = res
+        if binary.real_path is None:
+            return f"ERROR: Path on the filesystem of {binary.name} not set (skip)"
+        if not binary.real_path.exists():
+            return (
+                f"ERROR cannot find executable mentioned in 'fs' mapper: "
+                f"{binary.real_path.name} (skip)"
             )
-            logging.info(f"{log_prefix}: [{i + 1}/{tot}] process: {binary.name} [{s}]")
-            try:
-                self.unresolved_callgraph[binary.path] = load_program(
-                    binary, log_prefix
-                )
-            except SyntaxError:
-                logging.error(f"{log_prefix}: cannot load Quokka files: {quokka_file}")
-                continue
+
+        quokka_file = binary.auxiliary_file(append=QUOKKA_EXT)
+        try:
+            unresolved_cg = load_program(binary, f"[binary mapping] {binary.name}")
+        except SyntaxError:
+            return f"ERROR: cannot load Quokka files: {quokka_file}"
+        return (binary, unresolved_cg)
+
+    def map_binary(
+        self,
+        bin_object: Binary,
+        additional_res: dict[Symbol, list[str]] | None = None,
+    ) -> None:
+        """Given a Binary object add it to the DB.
+
+        This function updates the filesystem representation stored as `self.fs`.
+        :param bin_object: Binary object
+        """
+        super().map_binary(bin_object)
+        if additional_res is not None:
+            self.unresolved_callgraph[bin_object.path] = additional_res
+        if bin_object.id is not None:
+            self.node_ids[bin_object.id] = bin_object
+            self._record_custom_command(bin_object, f"[bin mapping] {bin_object.name}")
+
+    def map_binaries_main(self, threads: int, progress: Progress) -> None:
+        """Parse and map binaries of a given directory.
+
+        Record them in self.fs and self.db (except if self.is_dry_run == True).
+        :param threads: number of threads to use
+        :param progress: a rich.progress bar object for cli rendering
+        """
+        if self.dry_run_mode or self.db_interface is None:
+            cache_file = None
+        else:
+            cache_file = self.db_interface.path.with_suffix(self.FS_EXT)
+
+        # if cache exists, load binaries from it and record them in DB
+        if cache_file is not None and cache_file.exists():
+            logging.info(f"[binary mapping]: Load cached binaries: {cache_file.name}")
+            self.fs = FileSystem.from_json_export(cache_file)
+            binaries_map = progress.add_task(
+                "[red]Binaries recording", total=len(list(self.fs.iter_binaries()))
+            )
+            for binary in self.fs.iter_binaries():
+                log_prefix = f"[bin mapping] {binary.name}"
+                # Create the node entry in numbat and create the custom command
+                self.record_binary_in_db(binary, log_prefix)
+                if binary.id is not None:
+                    self.node_ids[binary.id] = binary
+                    self._record_custom_command(binary, log_prefix)
+
+                progress.update(binaries_map, advance=1)
+        else:
+            super().map_binaries_main(threads, progress)
 
         if cache_file is not None:
             # Once finished stores the FS object (for fast reload)
-            logging.debug(f"[binary loading]: Store cached binaries: {cache_file}")
+            logging.info(f"[binary mapping]: Store cached binaries: {cache_file}")
             self.fs.write(cache_file)
 
     def mapper_main(
@@ -139,38 +181,23 @@ class InterImageCGMapper(FileSystemImportsMapper):
         :return: The FileSystem object filled
         """  # noqa: D401
         # Step1: Load FileSystem object and enrich it if needed
-        if self.dry_run_mode or self.db_interface is None:
-            self.load_binaries(None)
-        else:
-            cache_file = self.db_interface.path.with_suffix(self.FS_EXT)
-            self.load_binaries(cache_file)
+        self.map_binaries_main(threads, progress)
+        self.map_symlinks_main(progress)
+        self.map_lib_imports_main(progress, resolution_strategy)
+        self.map_symbol_imports_main(progress, resolution_strategy)
 
-        self.progress = progress  # need to be able to hide it further down in calls
-        bins_count = len(self.fs.binaries)
-        binaries_map = progress.add_task(
-            "[deep_pink2]Binaries recording", total=bins_count
-        )
-
-        # ---------- Iterate all binaries and add Nodes in the database ---------
-        for binary in self.fs.iter_binaries():
-            log_prefix = f"[bin recording] {binary.name}"
-            # Create the node entry in numbat and create the custom command
-            self.record_binary_in_db(binary, log_prefix)
-            if binary.id is not None:
-                self.node_ids[binary.id] = binary
-                self._record_custom_command(binary, log_prefix)
-
-            progress.update(binaries_map, advance=1)
-        # ---------------------------------------------------------------
+        self.progress = progress  # need to be able to hide it further down in calls+
 
         # Dict of:     exported-funs -> [binaries]
         self.exports_to_bins = self.make_export_to_binaries_map()
 
         # Iterate again all binaries to create call edges (all numbat_id are created)
-        cg_map = progress.add_task("[orange1]Call Graph mapping", total=bins_count)
+        cg_map = progress.add_task(
+            "[gold1]Call Graph mapping", total=len(list(self.fs.iter_binaries()))
+        )
 
         for binary in self.fs.iter_binaries():
-            log_prefix = "[cg mapping] {binary.name}"
+            log_prefix = f"[cg mapping] {binary.name}"
             count_res = {True: 0, False: 0}
             if binary.path in self.unresolved_callgraph:
                 for f_symb, targets in self.unresolved_callgraph[binary.path].items():
@@ -257,12 +284,10 @@ class InterImageCGMapper(FileSystemImportsMapper):
 
         Indeed multiple binaries can export the same symbol !
         """
-        table = defaultdict(
-            list
-        )  # list there can be multiple symbols on the same address
+        table = defaultdict(list)  # list there can be multiple symbols on the same address
         for binary in self.fs.iter_binaries():
-            for export in binary.iter_exported_functions():
-                table[export.name].append(binary)
+            for export in binary.iter_exported_function_names():
+                table[export].append(binary)
         return table
 
     def _record_one_call(
