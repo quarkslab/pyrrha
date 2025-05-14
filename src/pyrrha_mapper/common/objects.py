@@ -160,25 +160,34 @@ class Binary(FileSystemComponent):
         """Add a symbol which is not resolved."""
         self.imported_symbols[symbol_name] = None
 
-    def add_exported_symbol(self, symbol: Symbol) -> None:
+    def add_exported_symbol(self, symbol: Symbol, symbol_name: str = "") -> None:
         """Record a Symbol in the current binary and flag it as exported.
 
         If the symbol is a function, record it also in the binary's functions.
         It overrides old symbol with the same name.
+        It is possible to record a symbol under another name by specifying symbol_name
+        parameter.
         """
+        if not symbol_name:
+            symbol_name = symbol.name
         if symbol.is_func:
-            self._record_func_addr(symbol)
-            self.exported_functions[symbol.name] = symbol
-            self.exported_symbols.pop(symbol.name, None)
+            self.exported_functions[symbol_name] = symbol
+            self.exported_symbols.pop(symbol_name, None)
         else:
-            self.exported_symbols[symbol.name] = symbol
-            self.exported_functions.pop(symbol.name, None)
+            self.exported_symbols[symbol_name] = symbol
+            self.exported_functions.pop(symbol_name, None)
 
-    def add_function(self, func: Symbol) -> None:
-        """Record a Function in the current binary."""
+    def add_function(self, func: Symbol, func_name: str = "") -> None:
+        """Record a Function in the current binary.
+
+        It overrides old function with the same name.
+        It is possible to record a function under another name by specifying its name in
+        parameter.
+        """
         assert func.is_func
-        self.internal_functions[func.name] = func
-        self._record_func_addr(func)
+        if not func_name:
+            func_name = func.name
+        self.internal_functions[func_name] = func
 
     def remove_function(self, func_name) -> None:
         """Remove a Function in the current binary."""
