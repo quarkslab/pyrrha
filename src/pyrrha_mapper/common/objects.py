@@ -197,6 +197,10 @@ class Binary(FileSystemComponent):
         if func_name in self.calls:
             self.calls.pop(func_name)
 
+    def remove_imported_symbol(self, name) -> None:
+        """Remove an imported symbol in the current binary."""
+        self.imported_symbols.pop(name)
+
     def exported_symbol_exists(self, symbol_name: str) -> bool:
         """:return: true if an exported symbol exists in the current Binary."""
         return symbol_name in self.exported_symbols or symbol_name in self.exported_functions
@@ -264,6 +268,14 @@ class Binary(FileSystemComponent):
     def iter_exported_functions(self) -> Iterable[Symbol]:
         """:return: an iterable over the exported functions stored in the Binary."""
         yield from self.exported_functions.values()
+
+    def iter_exported_function_names(self) -> Iterable[str]:
+        """:return: an iterable over the exported function names stored in the Binary.
+
+        It can useful to use this function if functions are stored under a name
+        different from their symbol
+        """
+        yield from self.exported_functions.keys()
 
     def iter_not_exported_functions(self) -> Iterable[Symbol]:
         """:return: an iterable over the exported functions stored in the Binary."""
