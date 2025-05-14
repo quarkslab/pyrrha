@@ -107,8 +107,6 @@ class Binary(FileSystemComponent):
     internal_functions: dict[str, Symbol] = Field(default_factory=dict)
     calls: dict[str, list[Symbol]] = Field(default_factory=dict)
 
-    _func_addr: dict[int, list[Symbol]] = PrivateAttr(default_factory=dict, init=False)
-
     # ELF specific fields
     version_requirement: dict[str, list[str]] = Field(
         default_factory=dict
@@ -124,20 +122,6 @@ class Binary(FileSystemComponent):
                     f"symbol '{symb}' cannot be a function as 'is_func' is set to False"
                 )
         return value
-
-    def model_post_init(self, __context: Any) -> None:
-        """Automatically called after class instanciation, compute internal dicts."""
-        super().model_post_init(__context)
-        for func in self.iter_functions():
-            self._record_func_addr(func)
-
-    def _record_func_addr(self, func: Symbol) -> None:
-        assert func.is_func
-        if func.addr is not None:
-            if func.addr in self._func_addr:
-                self._func_addr[func.addr].append(func)
-            else:
-                self._func_addr[func.addr] = [func]
 
     def add_call(self, caller: Symbol | str, callee: Symbol) -> None:
         """Add a call to the callee from the caller function.
@@ -274,10 +258,6 @@ class Binary(FileSystemComponent):
         if res is None:
             raise KeyError(func_name)
         return res
-
-    def get_functions_by_addr(self, addr: int) -> list[Symbol]:
-        """:return: the functions at the given address"""
-        return self._func_addr[addr]
 
     def iter_exported_symbols(self) -> Iterable[Symbol]:
         """:return: an iterable over the exported symbols stored in the Binary."""
