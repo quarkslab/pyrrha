@@ -95,9 +95,7 @@ class FileSystemMapper(ABC):
             return None
         assert self.db_interface is not None
         if source_id is None or dest_id is None:
-            logging.error(
-                f"{log_prefix}: Cannot record import, src and/or dest are unknown"
-            )
+            logging.error(f"{log_prefix}: Cannot record import, src and/or dest are unknown")
         else:
             self.db_interface.record_ref_import(source_id, dest_id)
 
@@ -123,61 +121,49 @@ class FileSystemMapper(ABC):
         if binary.id is None:
             logging.error(f"{log_prefix}: Record of binary failed.")
             return binary
-        for symbol in binary.iter_exported_symbols():
+        for symbol in set(binary.iter_exported_symbols()):
             if symbol.is_func:
                 symbol.id = self.db_interface.record_method(
-                    symbol.name,
+                    symbol.demangled_name,
                     parent_id=binary.id,
-                    hover_display=symbol.demangled_name,
+                    prefix=hex(symbol.addr) if symbol.addr is not None else "None",
                 )
-                self.db_interface.change_node_color(
+                if symbol.id is not None:
+                    self.db_interface.change_node_color(
                         symbol.id, fill_color="#bee0af", border_color="#395f33"
                     )
             else:
                 symbol.id = self.db_interface.record_field(
-                    symbol.name,
+                    symbol.demangled_name,
                     parent_id=binary.id,
-                    hover_display=symbol.demangled_name,
+                    prefix=hex(symbol.addr) if symbol.addr is not None else "None",
                 )
             if symbol.id is None:
-                logging.error(f"{log_prefix}: Record of symbol '{symbol.name}' failed.")
+                logging.error(f"{log_prefix}: Record of symbol '{symbol.demangled_name}' failed.")
             else:
                 try:
                     self.db_interface.record_public_access(symbol.id)
                 except DBException as e:
                     raise PyrrhaError(
-                        f"{log_prefix}: Cannot register access to symbol {symbol.name}:{e}"
+                        f"{log_prefix}: Cannot register access to symbol {symbol.demangled_name}: "
+                        "{e}"
                     ) from e
-        for symbol in binary.iter_not_exported_functions():
-            # check if have not been already mapped
-            if binary.exported_function_exists(symbol.name):
-                logging.warning(
-                    f"{log_prefix}: Cannot register function {symbol.name}, already"\
-                    "exists in this binary, same id for both symbols"
-                )
-                symbol.id = binary.get_exported_symbol(symbol.name).id
-            elif binary.exported_symbol_exists(symbol.name):
-                logging.info(
-                    f"{log_prefix}: Cannot register internal function {symbol.name},"\
-                    " an exported symbol with the same name already exists"
-                )
+        for symbol in set(binary.iter_not_exported_functions()):
+            symbol.id = self.db_interface.record_method(
+                symbol.demangled_name,
+                parent_id=binary.id,
+                prefix=hex(symbol.addr) if symbol.addr is not None else "None",
+            )
+            if symbol.id is None:
+                logging.error(f"{log_prefix}: Record of symbol '{symbol.demangled_name}' failed.")
             else:
-                symbol.id = self.db_interface.record_method(
-                    symbol.name,
-                    parent_id=binary.id,
-                    hover_display=symbol.demangled_name,
-                )
-                if symbol.id is None:
-                    logging.error(
-                        f"{log_prefix}: Record of symbol '{symbol.name}' failed."
-                    )
-                else:
-                    try:
-                        self.db_interface.record_private_access(symbol.id)
-                    except DBException as e:
-                        raise PyrrhaError(
-                            f"{log_prefix}: Cannot register access to symbol {symbol.name}: {e}"
-                        ) from e
+                try:
+                    self.db_interface.record_private_access(symbol.id)
+                except DBException as e:
+                    raise PyrrhaError(
+                        f"{log_prefix}: Cannot register access to symbol"
+                        f" {symbol.demangled_name}: {e}"
+                    ) from e
 
         return binary
 
