@@ -54,6 +54,8 @@ def load_program(binary: Binary, log_prefix: str = "") -> dict[Symbol, list[str]
     raise: FsMapperError if cannot load it
 
     :param binary: a Binary object that will be completed
+
+    :return: a dict of called done by each symbol of the binary
     """
     file_path = binary.real_path
     if file_path is None:
@@ -108,7 +110,6 @@ def compute_call_graph(
     # Fill temporary dict
     _inter_cg: dict[int, _FuncData] = {}
     for f_addr, f in program.items():
-        name = f.mangled_name  # as computed by IDA
         if (
             f_addr in exports or f_addr + 1 in exports
         ):  # If the function is somewhat exported (and visible in LIEF)
@@ -116,19 +117,24 @@ def compute_call_graph(
                 f_addr, exports.get(f_addr + 1, [])
             )  # In THUMB mode address is address+1
             canonical = disambiguate_export(all_symbs, log_prefix)
-            if name != canonical.name:
-                logging.info(
-                    f"{log_prefix}: change fun name {name} -> {canonical.name}"
+            if f.name != canonical.demangled_name:
+                logging.debug(
+                    f"{log_prefix}: change fun name {f.name} -> {canonical.demangled_name}"
                 )
-                name = canonical.name  # In multiple names just select the canonical one
+            if len(all_symbs) > 1:
+                for s in all_symbs:  # all the symbols will point on the chosen one
+                    if binary.exported_function_exists(s.name):
+                        binary.add_exported_symbol(canonical, symbol_name=s.name)
+                    else:
+                        binary.add_function(canonical, func_name=s.name)
             f_symb = canonical
         else:
-            f_symb = Symbol(name=name, demangled_name=f.name, is_func=True, addr=f_addr)
+            f_symb = Symbol(name=f.mangled_name, demangled_name=f.name, is_func=True, addr=f_addr)
             binary.add_function(f_symb)
         _inter_cg[f_addr] = _FuncData(
             symbol=f_symb,
-            name=name,
-            demangled_name=f.name,
+            name=f_symb.name,
+            demangled_name=f_symb.demangled_name,
             addr=f_addr,
             type=f.type,
             calls=list(set(x.start for x in f.calls)),
@@ -146,10 +152,16 @@ def compute_call_graph(
             ]:  # Check that we have a match on names
                 continue
         # else case
-        logging.info(
-            f"{log_prefix}: export {canon.name}: {hex(exp_addr)} address not found in program (add)."
+        logging.debug(
+            f"{log_prefix}: export {canon.name}: {hex(exp_addr)} address not found in program(add)."
         )
         call_graph[canon] = []
+        if len(all_symbs) > 1:
+            for s in all_symbs:  # all the symbols will point on the chosen one
+                if binary.exported_function_exists(s.name):
+                    binary.add_exported_symbol(canon, symbol_name=s.name)
+                else:
+                    binary.add_function(canon, func_name=s.name)
 
     # Iterate back the temporary dict to fill the real call graph
     # The deal here is to fast-forward call to imported function directly on the
@@ -205,7 +217,7 @@ def disambiguate_export(symbs: list[Symbol], log_prefix: str = "") -> Symbol:
 
     chosen = None
     for symb in symbs:
-        if symb.name.startswith("_"):
+        if symb.demangled_name.startswith("_"):
             continue
         if chosen is None:
             chosen = symb
@@ -213,13 +225,12 @@ def disambiguate_export(symbs: list[Symbol], log_prefix: str = "") -> Symbol:
             continue
         else:
             # print(f"multiple options for name: {chosen}, {name}")
-            if len(symb.name) < len(chosen.name):
+            if len(symb.demangled_name) < len(chosen.demangled_name):
                 chosen = symb
 
     # all exports starts with _
     if chosen is None:
-        logging.warning(
-            f"{log_prefix}: cannot disambiguate: {[s.name for s in symbs]} (select shortest name)"
-        )
-        chosen = min(symbs, key=lambda x: len(x.name))
+        options = [s.demangled_name for s in symbs]
+        logging.debug(f"{log_prefix}: cannot disambiguate, select shortest name: {options}")
+        chosen = min(symbs, key=lambda x: len(x.demangled_name))
     return chosen
