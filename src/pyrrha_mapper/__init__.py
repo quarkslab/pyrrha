@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-#  Copyright 2023-2024 Quarkslab
+#  Copyright 2023-2025 Quarkslab
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -14,4 +14,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from .__main__ import pyrrha
+"""Pyrrha is a mapper collection for firmware analysis."""
+
+from pyrrha_mapper.common import Binary, FileSystem, FileSystemMapper, Symbol, Symlink
+
+__version__ = "0.4.3"
+
+__all__ = ["Binary", "FileSystem", "FileSystemMapper", "Symbol", "Symlink"]
