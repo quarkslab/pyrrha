@@ -161,9 +161,7 @@ def compute_call_graph(
             for c in [_inter_cg[x] for x in f.calls if x in _inter_cg]:
                 if c.name:  # Has a true name
                     if c.type == FunctionType.THUNK and c.addr not in exports:
-                        if (
-                            len(c.calls) == 1
-                        ):  # The callee calls something else (and only one)
+                        if len(c.calls) == 1:  # The callee calls something else (and only one)
                             if c.calls[0] in _inter_cg:
                                 sub_callee = _inter_cg[c.calls[0]]
                             else:  # Do not do anything if not pointing to a func
@@ -184,17 +182,13 @@ def compute_call_graph(
                         call_graph[f.symbol].append(c.name)  # Add it normally
                 else:  # ignore function without name
                     logging.warning(
-                        f"{log_prefix}: [{program.name}] {f.symbol} calls a function without"\
+                        f"{log_prefix}: [{program.name}] {f.symbol} calls a function without"
                         " name (at {c.addr:#08x})"
                     )
 
         # If thunk AND exported still keep it (for later resolution)
-        elif f.type == FunctionType.THUNK and (
-            (f.addr in exports) or (f.addr + 1 in exports)
-        ):
-            call_graph[f.symbol] = [
-                _inter_cg[x].name for x in f.calls if x in _inter_cg
-            ]
+        elif f.type == FunctionType.THUNK and ((f.addr in exports) or (f.addr + 1 in exports)):
+            call_graph[f.symbol] = [_inter_cg[x].name for x in f.calls if x in _inter_cg]
 
         else:  # THUNK, IMPORTED, EXTERN (not included in call graph)
             binary.remove_function(f.name)

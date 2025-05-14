@@ -47,9 +47,7 @@ class InterImageCGMapper(FileSystemImportsMapper):
 
     FS_EXT = ".fs.json"
 
-    def __init__(
-        self, root_directory: Path | str, fs_dump: FileSystem, db: SourcetrailDB | None
-    ):
+    def __init__(self, root_directory: Path | str, db: SourcetrailDB | None):
         super(InterImageCGMapper, self).__init__(root_directory, db)
         # super initialize root_directory, db_interface, fs and _dry_run variables
 
@@ -225,16 +223,14 @@ class InterImageCGMapper(FileSystemImportsMapper):
         assert self.db_interface is not None
         if src.id is None or dst.id is None:
             logging.error(
-                f"{log_prefix}: Cannot record call ref between {src.name} and "\
+                f"{log_prefix}: Cannot record call ref between {src.name} and "
                 f"{dst.name}, missing ids ({src.name}: {src.id}, {dst.name}: {dst.id})"
             )
             return False
         self.db_interface.record_ref_call(src.id, dst.id)
         return True
 
-    def _record_unindexed_call(
-        self, src: Symbol, dst: str, log_prefix: str = ""
-    ) -> None:
+    def _record_unindexed_call(self, src: Symbol, dst: str, log_prefix: str = "") -> None:
         """Add a call to an unindexed function.
 
         Namely add a new function node outside of any binary and add a call reference
@@ -250,7 +246,7 @@ class InterImageCGMapper(FileSystemImportsMapper):
         tgt_id = self.db_interface.record_function(dst, is_indexed=False)
         if src.id is None or tgt_id is None:
             logging.error(
-                f" {log_prefix}: Cannot record call ref between {src.name} and {dst}, "\
+                f" {log_prefix}: Cannot record call ref between {src.name} and {dst}, "
                 "both ids are not defined"
             )
             return None
@@ -325,18 +321,11 @@ class InterImageCGMapper(FileSystemImportsMapper):
 
         # if multiple binaries are exposing the symbol try discriminating the symbol
         if len(served_by) > 1:
-            if (
-                resolver == ResolveDuplicateOption.INTERACTIVE
-                and self.progress is not None
-            ):
+            if resolver == ResolveDuplicateOption.INTERACTIVE and self.progress is not None:
                 with hide_progress(self.progress):
-                    choice = self._select_fs_component(
-                        resolver, served_by, log_prefix, callee
-                    )
+                    choice = self._select_fs_component(resolver, served_by, log_prefix, callee)
             else:
-                choice = self._select_fs_component(
-                    resolver, served_by, log_prefix, callee
-                )
+                choice = self._select_fs_component(resolver, served_by, log_prefix, callee)
             if choice:
                 # if a choice has been done
                 served_by = [choice]  # registerded just below

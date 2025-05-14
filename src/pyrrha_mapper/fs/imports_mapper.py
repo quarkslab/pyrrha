@@ -54,11 +54,7 @@ class FileSystemImportsMapper(FileSystemMapper):
         :param p: the path of the file to analyzed
         :return: True is the path point on a file
         """
-        return (
-            p.is_file()
-            and not p.is_symlink()
-            and (lief.is_elf(str(p)) or lief.is_pe(str(p)))
-        )
+        return p.is_file() and not p.is_symlink() and (lief.is_elf(str(p)) or lief.is_pe(str(p)))
 
     @staticmethod
     def load_binary(root_directory: Path, file_path: Path) -> Binary:
@@ -144,9 +140,7 @@ class FileSystemImportsMapper(FileSystemMapper):
         return bin_obj
 
     @classmethod
-    def parse_binary_job(
-        cls, ingress: Queue, egress: Queue, root_directory: Path
-    ) -> None:
+    def parse_binary_job(cls, ingress: Queue, egress: Queue, root_directory: Path) -> None:
         """Parse an executable file and create the associated Binary object.
 
         It is used for multiprocessing.
@@ -191,9 +185,7 @@ class FileSystemImportsMapper(FileSystemMapper):
         if not target.is_absolute():
             target = path.resolve()
             if not target.is_relative_to(self.root_directory):
-                logging.warning(
-                    f"{log_prefix}: points outside of root directory '{target}'"
-                )
+                logging.warning(f"{log_prefix}: points outside of root directory '{target}'")
                 return
             if not target.exists() or not self.is_binary_supported(target):
                 return None
@@ -212,9 +204,7 @@ class FileSystemImportsMapper(FileSystemMapper):
             )
             if not self.dry_run_mode:
                 if target_obj.id is None:
-                    logging.warning(
-                        f"{log_prefix}: '{target}' is not a recorded binary"
-                    )
+                    logging.warning(f"{log_prefix}: '{target}' is not a recorded binary")
                     return None
                 self.record_symlink_in_db(symlink_obj)
             logging.debug(
@@ -223,9 +213,7 @@ class FileSystemImportsMapper(FileSystemMapper):
             )
             self.fs.add_symlink(symlink_obj)
         else:
-            logging.warning(
-                f"{log_prefix}: '{target}' does not correspond to a recorded binary"
-            )
+            logging.warning(f"{log_prefix}: '{target}' does not correspond to a recorded binary")
 
     @dataclass(frozen=True)
     class _LibImport(ABC):
@@ -236,9 +224,7 @@ class FileSystemImportsMapper(FileSystemMapper):
         initial_import: Symlink | Binary
         final_import: Binary
 
-        def __init__(
-            self, initial_import: Symlink | Binary, final_import: Binary
-        ) -> None:
+        def __init__(self, initial_import: Symlink | Binary, final_import: Binary) -> None:
             super().__init__(initial_import=initial_import, final_import=final_import)
 
     class _PartialLibImport(_LibImport):
@@ -315,14 +301,10 @@ class FileSystemImportsMapper(FileSystemMapper):
                     # For symlinks, we record a ref to the symlink but to ease symbol
                     # resolution, the final target of the symlink is considered to be
                     # imported and not the symlink itself
-                    self.record_import_in_db(
-                        binary.id, res.initial_import.id, log_prefix
-                    )
+                    self.record_import_in_db(binary.id, res.initial_import.id, log_prefix)
                     binary.add_imported_library(res.final_import)
                 case self._PartialLibImport():
-                    self.record_import_in_db(
-                        binary.id, res.initial_import.id, log_prefix
-                    )
+                    self.record_import_in_db(binary.id, res.initial_import.id, log_prefix)
                     logging.warning(
                         f"{log_prefix}: import {res.initial_import.path} symlink which \
 does not point on a recorded bin"
@@ -334,9 +316,7 @@ does not point on a recorded bin"
                 case self._FailedLibImport():
                     logging.warning(f"{log_prefix}: lib '{lib_name}' not found in FS")
                     if not self.dry_run_mode and self.db_interface is not None:
-                        lib_id = self.db_interface.record_class(
-                            lib_name, is_indexed=False
-                        )
+                        lib_id = self.db_interface.record_class(lib_name, is_indexed=False)
                         self.record_import_in_db(binary.id, lib_id, log_prefix)
                     binary.add_non_resolved_imported_library(lib_name)
                 case _:
@@ -345,15 +325,11 @@ does not point on a recorded bin"
 import, drop case"
                     )
 
-    def _record_non_resolved_symbol_import(
-        self, binary: Binary, symbol_name: str
-    ) -> None:
+    def _record_non_resolved_symbol_import(self, binary: Binary, symbol_name: str) -> None:
         logging.warning(f"[symbol imports] {binary.name}: cannot resolve {symbol_name}")
         if not self.dry_run_mode and self.db_interface is not None:
             symb_id = self.db_interface.record_field(symbol_name, is_indexed=False)
-            self.record_import_in_db(
-                binary.id, symb_id, f"[symbol imports] {binary.name}"
-            )
+            self.record_import_in_db(binary.id, symb_id, f"[symbol imports] {binary.name}")
         binary.add_non_resolved_imported_symbol(symbol_name)
 
     def resolve_symbol_import(
@@ -377,9 +353,7 @@ import, drop case"
             symb_name, symb_version = func_name.split("@@")
             if symb_version in binary.version_requirement:
                 for lib_name in binary.version_requirement[symb_version]:
-                    res = self._resolve_lib_import(
-                        lib_name, resolution_strategy, log_prefix
-                    )
+                    res = self._resolve_lib_import(lib_name, resolution_strategy, log_prefix)
                     if isinstance(res, self._SolvedLibImport):
                         lib = res.final_import
                         if lib.exported_symbol_exists(symb_name):
@@ -402,17 +376,13 @@ import, drop case"
         """
         log_prefix = f"[symbol imports] {binary.path}"
         for func_name in binary.imported_symbol_names:
-            res = self.resolve_symbol_import(
-                binary, func_name, resolution_strategy, log_prefix
-            )
+            res = self.resolve_symbol_import(binary, func_name, resolution_strategy, log_prefix)
             if res is None:
                 self._record_non_resolved_symbol_import(binary, func_name)
             else:
                 callee_bin, callee_symb = res
                 binary.add_imported_symbol(callee_symb)
-                if not binary.imported_library_exists(
-                    callee_bin.name, is_resolved=True
-                ):
+                if not binary.imported_library_exists(callee_bin.name, is_resolved=True):
                     binary.add_imported_library(callee_bin)
                     self.record_import_in_db(binary.id, callee_bin.id)
                 self.record_import_in_db(binary.id, callee_symb.id)

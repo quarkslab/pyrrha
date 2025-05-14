@@ -86,7 +86,7 @@ norecursedirs = ["tests/pyrrha_files", "tests/test_fw", "data"]
 
 [tool.ruff]
 # Same as Black.
-line-length = 88
+line-length = 100
 indent-width = 4
 
 
