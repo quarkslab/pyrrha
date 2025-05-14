@@ -52,9 +52,7 @@ class MapperCommand(click.Command):
         )
         self.params.insert(
             0,
-            click.core.Option(
-                ("-d", "--debug"), is_flag=True, help="Set log level to DEBUG"
-            ),
+            click.core.Option(("-d", "--debug"), is_flag=True, help="Set log level to DEBUG"),
         )
         self.no_args_is_help = True
 
@@ -87,9 +85,7 @@ def setup_logs(is_debug_level: bool, db_path: Path | None = None) -> None:
         # add file handler
         file_handler = logging.FileHandler(log_file, mode="w")
         file_handler.setLevel(level)
-        file_handler.setFormatter(
-            logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-        )
+        file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
         logging.root.addHandler(file_handler)
 
 
@@ -180,12 +176,14 @@ their imports/exports plus the symlinks that points on these executable files.",
     # help='Path of the directory containing the filesystem to map.',
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
 )
-def fs_mapper(debug: bool,  # noqa: D103
-              db: Path,
-              export: bool,
-              jobs: int,
-              resolve_duplicates: ResolveDuplicateOption,
-              root_directory: Path):  # noqa: D103
+def fs_mapper(# noqa: D103
+    debug: bool,  
+    db: Path,
+    export: bool,
+    jobs: int,
+    resolve_duplicates: ResolveDuplicateOption,
+    root_directory: Path,
+):  # noqa: D103
     setup_logs(debug)
     db_instance = setup_db(db)
 
@@ -215,9 +213,7 @@ def fs_mapper(debug: bool,  # noqa: D103
     "-j",
     "--jobs",
     help="Number of parallel jobs created (threads).",
-    type=click.IntRange(
-        1, int(multiprocessing.cpu_count() * 0.7), clamp=True
-    ),  # 70% of threads
+    type=click.IntRange(1, int(multiprocessing.cpu_count() * 0.7), clamp=True),  # 70% of threads
     metavar="INT",
     default=1,
     show_default=True,
