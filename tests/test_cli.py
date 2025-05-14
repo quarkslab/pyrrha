@@ -79,7 +79,7 @@ class BaseTestFsMapper(ABC):
     }
     FW_TEST_SYMLINKS_PATHS = {Path("/lib/libssl.so")}
 
-    @pytest.fixture(scope="class")
+    @pytest.fixture()
     def db_path(self, tmp_path_factory) -> Path:
         """Generate the path for DB file."""
         tmp = tmp_path_factory.mktemp("db", numbered=True)
@@ -227,7 +227,7 @@ class TestFsCgMapper(BaseTestFsMapper):
         """Compute path for the exported JSON."""
         return db_path.with_suffix(InterImageCGMapper.FS_EXT)
 
-    @pytest.fixture(params=[1, 16], scope="class")
+    @pytest.fixture(params=[1, 16])
     def export_res(self, db_path: Path, request) -> Result:
         """Run Pyrrha with export activated."""
         runner = CliRunner()
@@ -241,3 +241,17 @@ class TestFsCgMapper(BaseTestFsMapper):
         ]
         res = runner.invoke(self.COMMAND, args)
         return res
+
+    @pytest.mark.parametrize(
+        "bin_path", BaseTestFsMapper.FW_TEST_BIN_PATHS, ids=BaseTestFsMapper._path_id
+    )
+    def test_plt_erasing(self, bin_path: Path, export_dump: FileSystem) -> None:
+        """Imported symbols are directly used (not through __imp_* functions)."""
+        _bin = export_dump.get_binary_by_path(bin_path)
+        trampoline = [
+            f.name
+            for f in filter(
+                lambda f: f.name.startswith("__imp_"), _bin.iter_functions()
+            )
+        ]
+        assert not trampoline, f"__imp_* functions: {trampoline}"
