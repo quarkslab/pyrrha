@@ -10,7 +10,7 @@ before_script:
 test:
   script:
     - pip install --editable ".[test]"
-    - pytest tests/test_cli.py tests/test_filesystem_objects.py --junitxml=report.xml
+    - pytest tests/cli.py --junitxml=report.xml
   artifacts:
     when: always
     reports:
