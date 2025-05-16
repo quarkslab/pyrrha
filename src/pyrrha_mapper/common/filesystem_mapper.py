@@ -121,7 +121,16 @@ class FileSystemMapper(ABC):
         if binary.id is None:
             logging.error(f"{log_prefix}: Record of binary failed.")
             return binary
+        # dict demangled_name -> id to check if a demangled name has already been recorded
+        recorded_symb: dict[str, int] = dict()
         for symbol in set(binary.iter_exported_symbols()):
+            if symbol.demangled_name in recorded_symb:
+                logging.debug(
+                    f"{log_prefix}: demangled name {symbol.demangled_name} already in db "
+                    "common node for these symbols"
+                )
+                symbol.id = recorded_symb[symbol.demangled_name]
+                continue
             if symbol.is_func:
                 symbol.id = self.db_interface.record_method(
                     symbol.demangled_name,
@@ -143,10 +152,11 @@ class FileSystemMapper(ABC):
             else:
                 try:
                     self.db_interface.record_public_access(symbol.id)
+                    recorded_symb[symbol.demangled_name] = symbol.id
                 except DBException as e:
                     raise PyrrhaError(
                         f"{log_prefix}: Cannot register access to symbol {symbol.demangled_name}: "
-                        "{e}"
+                        f"{e}"
                     ) from e
         for symbol in set(binary.iter_not_exported_functions()):
             symbol.id = self.db_interface.record_method(
