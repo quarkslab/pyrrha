@@ -207,10 +207,7 @@ class InterImageCGMapper(FileSystemImportsMapper):
                     for target in targets:
                         try:
                             res = self._record_one_call(
-                                binary,
-                                f_symb,
-                                target,
-                                resolution_strategy,
+                                binary, f_symb, target, resolution_strategy, log_prefix
                             )
                             count_res[res] += 1
                         except KeyError as e:

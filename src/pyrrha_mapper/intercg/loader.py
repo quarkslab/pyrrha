@@ -29,6 +29,9 @@ from pyrrha_mapper.exceptions import FsMapperError
 
 QUOKKA_EXT = ".quokka"
 
+logger = logging.getLogger("quokka")
+logger.setLevel(logging.WARNING)
+
 """
 [<FunctionType.NORMAL: 1>,
  <FunctionType.IMPORTED: 2>,
