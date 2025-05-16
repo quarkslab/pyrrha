@@ -195,6 +195,7 @@ class InterImageCGMapper(FileSystemImportsMapper):
             "[gold1]Call Graph mapping", total=len(list(self.fs.iter_binaries()))
         )
 
+        unindex_symbols: set[str] = set()
         for binary in self.fs.iter_binaries():
             log_prefix = f"[cg mapping] {binary.name}"
             count_res = {True: 0, False: 0}
@@ -206,7 +207,12 @@ class InterImageCGMapper(FileSystemImportsMapper):
                     for target in targets:
                         try:
                             res = self._record_one_call(
-                                binary, f_symb, target, resolution_strategy, log_prefix
+                                binary,
+                                f_symb,
+                                target,
+                                resolution_strategy,
+                                unindex_symbols,
+                                log_prefix,
                             )
                             count_res[res] += 1
                         except KeyError as e:
@@ -217,6 +223,11 @@ class InterImageCGMapper(FileSystemImportsMapper):
             logging.debug(f"{log_prefix}: Good: {good}, Bad: {bad}")
 
             progress.update(cg_map, advance=1)
+
+        logging.warning(
+            f"[cg mapping]: {len(unindex_symbols)} unindex symbols in userland binaries "
+            f"(details in debug logs): {', '.join(sorted(list(unindex_symbols)))}"
+        )
 
         # return the filesystem object
         return self.fs
@@ -292,6 +303,7 @@ class InterImageCGMapper(FileSystemImportsMapper):
         caller: Symbol,
         callee: str,
         resolver: ResolveDuplicateOption,
+        unindex_symbols: set[str],
         log_prefix: str = "",
     ) -> bool:
         """Record call edge betwen caller and callee.
@@ -365,9 +377,6 @@ class InterImageCGMapper(FileSystemImportsMapper):
         else:  # still not resolved
             self._record_unindexed_call(caller, callee)
             if binary.path.suffix != ".ko":
-                logging.warning(f"{log_prefix}: no match found for edge {caller.name} -> {callee}")
-            else:
-                logging.debug(
-                    f"{log_prefix}: no match found for edge {caller.name} -> {callee}, should be in Kernel API"
-                )
+                unindex_symbols.add(callee)
+            logging.debug(f"{log_prefix}: no match found for edge {caller.name} -> {callee}")
             return False
