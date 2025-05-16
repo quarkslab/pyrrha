@@ -184,7 +184,6 @@ class InterImageCGMapper(FileSystemImportsMapper):
         self.map_binaries_main(threads, progress)
         self.map_symlinks_main(progress)
         self.map_lib_imports_main(progress, resolution_strategy)
-        self.map_symbol_imports_main(progress, resolution_strategy)
 
         self.progress = progress  # need to be able to hide it further down in calls+
 
