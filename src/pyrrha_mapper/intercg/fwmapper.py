@@ -367,6 +367,11 @@ class InterImageCGMapper(FileSystemImportsMapper):
             binary.add_call(caller, callee_symb)
             return self._record_call_ref(caller, callee_symb)
         else:  # still not resolved
-            logging.debug(f"{log_prefix}: no match found for edge {caller} -> {callee}")
             self._record_unindexed_call(caller, callee)
+            if binary.path.suffix != ".ko":
+                logging.warning(f"{log_prefix}: no match found for edge {caller.name} -> {callee}")
+            else:
+                logging.debug(
+                    f"{log_prefix}: no match found for edge {caller.name} -> {callee}, should be in Kernel API"
+                )
             return False

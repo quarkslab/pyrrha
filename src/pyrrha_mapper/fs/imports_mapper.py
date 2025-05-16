@@ -86,11 +86,14 @@ class FileSystemImportsMapper(FileSystemMapper):
             # store name of imported ones and internal functions
             # store exported symbols
             s: lief.ELF.Symbol
+            is_kernel_module = (bin_obj.path.suffix == ".ko")
             for s in parsing_res.symbols:
                 if s.imported:
                     bin_obj.add_imported_symbol_name(str(s.name))
-                elif s.exported:
+                elif s.exported or is_kernel_module and s.name: 
                     is_func = s.is_function or s.type == lief.ELF.Symbol.TYPE.GNU_IFUNC
+                    if not is_func and is_kernel_module:
+                        continue
                     bin_obj.add_exported_symbol(
                         Symbol(
                             name=str(s.name),
