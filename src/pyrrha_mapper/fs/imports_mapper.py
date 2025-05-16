@@ -415,7 +415,7 @@ import, drop case"
             bin_obj, additional_info = res
             self.map_binary(bin_obj, additional_info)
         else:
-            logging.warning(f"{log_prefix}: {res}")
+            logging.warning(f"{log_prefix}: impossible to parse the following result {res}")
 
     def map_binaries_main(self, threads: int, progress: Progress) -> None:
         """Parse and map binaries of a given directory.
