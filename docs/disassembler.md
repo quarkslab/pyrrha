@@ -72,6 +72,11 @@ the disassembler path and paths where to look for binaries. Thus configure caref
 }
 ```
 
+!!! note
+    The IDA location binary provided should be a non-blocking IDA or bash script, as `heimdallr-client`
+    will run it with `subprocess.run` and wait for it before sending the request.
+
+
 **4-Creating protocol handler**: The `.desktop` file is used to register the `disas://` protocol handler.
 On Linux, it is usually located in `~/.local/share/applications/`. Creates a file in this directory with
 the following content:
