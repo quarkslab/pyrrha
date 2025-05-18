@@ -41,7 +41,7 @@ IGNORE_LIST = ["__gmon_start__"]
 
 QUOKKA_EXT = ".quokka"
 
-NUMBAT_UI_BIN = "numbat-ui"
+NUMBAT_UI_BIN = "NumbatUi"
 
 
 class InterImageCGMapper(FileSystemImportsMapper):
@@ -269,11 +269,11 @@ class InterImageCGMapper(FileSystemImportsMapper):
         if self.dry_run_mode:
             return None
         assert self.db_interface is not None
-        cmd = ["NumbatUi", str(binary.real_path) + ".srctrlprj"]
+        cmd = [NUMBAT_UI_BIN, str(binary.real_path) + ".srctrlprj"]
         if binary.id is None:
             logging.warning(f"{log_prefix}: cannot record command as binary has no id")
         else:
-            self.db_interface.set_custom_command(binary.id, cmd, "Open in NumbatUI")
+            self.db_interface.set_custom_command(binary.id, cmd, f"Open in {NUMBAT_UI_BIN}")
 
     def _record_call_ref(self, src: Symbol, dst: Symbol, log_prefix: str = "") -> bool:
         """Add call reference between two symbols in DB.
