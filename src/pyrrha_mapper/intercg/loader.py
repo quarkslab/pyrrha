@@ -19,31 +19,17 @@ import logging
 from typing import NamedTuple
 
 # third-party imports
-from quokka import Program
-from quokka.exc import ChunkMissingError
-from quokka.types import FunctionType
+from qbinary import Program
+from qbinary.types import FunctionType, Disassembler, ExportFormat
 
 # local imports
 from pyrrha_mapper.common import Binary, Symbol
 from pyrrha_mapper.exceptions import FsMapperError
 
-QUOKKA_EXT = ".quokka"
-
-logger = logging.getLogger("quokka")
-logger.setLevel(logging.WARNING)
-
-"""
-[<FunctionType.NORMAL: 1>,
- <FunctionType.IMPORTED: 2>,
- <FunctionType.LIBRARY: 3>,
- <FunctionType.THUNK: 4>,
- <FunctionType.EXTERN: 5>,
- <FunctionType.INVALID: 6>]
-"""
 
 
-def load_program(binary: Binary, log_prefix: str = "") -> dict[Symbol, list[str]]:
-    """Create a Binary object from a given file using lief and quokka.
+def load_program(binary: Binary, disass: Disassembler, export: ExportFormat, log_prefix: str = "") -> dict[Symbol, list[str]]:
+    """Create a Binary object from a given file using lief and qbinary.
 
     It modifies the provided binary object in place.
 
@@ -57,6 +43,8 @@ def load_program(binary: Binary, log_prefix: str = "") -> dict[Symbol, list[str]
     raise: FsMapperError if cannot load it
 
     :param binary: a Binary object that will be completed
+    :param disass: Disassembler enum to use for program loading
+    :param export: Export format to use for program loading
 
     :return: a dict of called done by each symbol of the binary
     """
@@ -64,19 +52,37 @@ def load_program(binary: Binary, log_prefix: str = "") -> dict[Symbol, list[str]
     if file_path is None:
         raise FileNotFoundError(file_path)
 
-    quokka_file = binary.auxiliary_file(append=QUOKKA_EXT)
-    try:
-        if quokka_file.exists():
-            program: Program | None = Program(quokka_file, file_path)
-        else:
-            program = Program.from_binary(file_path, quokka_file, timeout=3600)
-    except ChunkMissingError as e:
-        raise FsMapperError(e) from e
-    if program is None:
-        raise FsMapperError("Quokka does not produce a Program object")
+    # First try to identify if the binary has already been exported
+    if export == ExportFormat.AUTO:
+        exports = [ExportFormat.QUOKKA, ExportFormat.BINEXPORT]
+    else:
+        exports = [export]
 
+    export_file = None
+    for exp_typ in exports:
+        aux_file = binary.auxiliary_file(append=exp_typ.extension)
+        if aux_file.exists():
+            export_file = aux_file
+            break
+
+    
+    if export_file is None:  # Need to export it
+        try:
+            program: Program | None = Program.from_binary(binary.real_path, disass, export)
+        except Exception as e:
+            raise FsMapperError(f"Cannot export {binary.name} with {disass.name} | {export.name}") from e
+    else:
+        try:
+            program: Program = Program.open(export_file, binary.real_path)  # type will be infered with export_file
+        except Exception as e:
+            raise FsMapperError(f"Cannot open export {export_file}") from e
+    
+    if program is None:
+        raise FsMapperError(f"program still None")
+
+    assert program is not None, "Program should not be None"
     # Load the call graph
-    return compute_call_graph(binary, program, log_prefix)
+    return compute_call_graph(binary, program, log_prefix) # type: ignore
 
 
 class _FuncData(NamedTuple):
@@ -184,9 +190,7 @@ def compute_call_graph(
                 # Check that we have a match on names
                 continue
         # else case
-        logging.debug(
-            f"{log_prefix}: export {canon.name}: {hex(exp_addr)} address not found in program(add)."
-        )
+        logging.debug(f"{log_prefix}: export {canon.name}: {hex(exp_addr)} address not found in program.")
         call_graph[canon] = []
         if len(all_symbs) > 1:  # all the symbols will point on the chosen one
             map(lambda x: binary.replace_function(canon, x, True), all_symbs)

@@ -25,7 +25,9 @@ from numbat import SourcetrailDB
 
 from pyrrha_mapper import exedecomp, fs, intercg
 from pyrrha_mapper.common import FileSystem
-from pyrrha_mapper.types import Disassembler, Exporters, ResolveDuplicateOption
+from pyrrha_mapper.types import ResolveDuplicateOption
+
+from qbinary.types import ExportFormat, Disassembler
 
 # -------------------------------------------------------------------------------
 #                           Common stuff for mappers
@@ -248,10 +250,10 @@ def fs_mapper(# noqa: D103
 @click.option(
     "--exporter",
     required=False,
-    type=Exporters,
-    default=Exporters.AUTO,
+    type=ExportFormat,
+    default=ExportFormat.AUTO,
     show_default=True,
-    help="Binary exporter to use for binary analysis.",
+    help="Binary export format to use for binary analysis.",
 )
 @click.argument(
     "root_directory",
@@ -264,8 +266,8 @@ def fs_call_graph_mapper(  # noqa: D103
     jobs: int,
     resolve_duplicates: ResolveDuplicateOption,
     disassembler: Disassembler,
-    exporter: Exporters,
-    root_directory,
+    exporter: ExportFormat,
+    root_directory: Path,
 ):
     setup_logs(debug, db)
     db_instance = setup_db(db)
@@ -274,11 +276,13 @@ def fs_call_graph_mapper(  # noqa: D103
         click.echo("disassembler not yet supported")
         # TODO: add support for other disassembler
         return 1
+    intercg.InterImageCGMapper.DISASS = disassembler # type: ignore
 
-    if exporter not in [Exporters.AUTO, Exporters.QUOKKA]:
+    if exporter not in [ExportFormat.AUTO, ExportFormat.QUOKKA]:
         click.echo(f"binary exporter: {exporter.name} not yet supported")
         # TODO: add support for other disassembler
         return 1
+    intercg.InterImageCGMapper.EXPORT = exporter # type: ignore
 
     root_directory = root_directory.absolute()
 

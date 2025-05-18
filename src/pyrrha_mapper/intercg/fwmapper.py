@@ -36,6 +36,7 @@ from pyrrha_mapper.exceptions import FsMapperError
 from pyrrha_mapper.fs import FileSystemImportsMapper
 from pyrrha_mapper.intercg.loader import load_program
 from pyrrha_mapper.types import ResolveDuplicateOption
+from qbinary.types import Disassembler, ExportFormat
 
 IGNORE_LIST = ["__gmon_start__"]
 
@@ -48,6 +49,9 @@ class InterImageCGMapper(FileSystemImportsMapper):
     """Filesystem mapper based on Lief, which computes imports and exports."""
 
     FS_EXT = ".fs.json"
+
+    DISASS = Disassembler.AUTO
+    EXPORT = ExportFormat.AUTO
 
     def __init__(self, root_directory: Path | str, db: SourcetrailDB | None):
         super(InterImageCGMapper, self).__init__(root_directory, db)
@@ -111,16 +115,16 @@ class InterImageCGMapper(FileSystemImportsMapper):
 
         quokka_file = binary.auxiliary_file(append=QUOKKA_EXT)
         try:
-            unresolved_cg = load_program(binary, f"[binary mapping] {binary.name}")
-        except SyntaxError as e:
-            logging.error(
-                f"[binary mapping] {binary.name}: cannot load Quokka files {quokka_file}: {e}"
-            )
-            return (binary, None)
-        except (FileNotFoundError, FsMapperError) as e:
-            logging.error(f"[binary mapping] {binary.name}: error during file analysis: {e}")
-            return (binary, None)
-        return (binary, unresolved_cg)
+            prefix = f"[binary mapping] {binary.name}"
+            unresolved_cg = load_program(binary,
+                                         InterImageCGMapper.DISASS,
+                                         InterImageCGMapper.EXPORT,
+                                         prefix)
+            return binary, unresolved_cg
+        except (FileNotFoundError, FsMapperError, SyntaxError) as e:
+            logging.error(f"ERROR: cannot load Quokka files: {quokka_file}: {e}")
+            return binary, None
+
 
     def map_binary(
         self,
