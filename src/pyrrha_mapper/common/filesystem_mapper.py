@@ -85,6 +85,11 @@ class FileSystemMapper(ABC):
         """
         return self._dry_run
 
+    @dry_run_mode.setter
+    def dry_run_mode(self, value: bool) -> None:
+        """If True does not record in db."""
+        self._dry_run = value
+
     # ===================== Records in DB (NumbatUI DB) ===============================
 
     def record_import_in_db(
