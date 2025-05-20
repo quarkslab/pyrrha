@@ -9,11 +9,16 @@ before_script:
 
 test:
   script:
-    - pip install --editable ".[test]"
-    - pytest tests/test_cli.py tests/test_filesystem_objects.py --junitxml=report.xml
+    - pip install ".[test]"
+    - pytest  --junitxml=report.xml  --cov="pyrrha_mapper" --cov-report xml tests/
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:
     when: always
     reports:
       junit: report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+
 
 
