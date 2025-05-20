@@ -68,7 +68,7 @@ doc = [
     'mkdocs-section-index',
 ]
 linting = ['ruff']
-test = ['pytest']
+test = ['pytest', 'pytest-cov']
 typechecking = ['mypy']
 
 [tool.setuptools.dynamic]
