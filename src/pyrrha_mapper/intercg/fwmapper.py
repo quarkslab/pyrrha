@@ -32,6 +32,7 @@ from pyrrha_mapper.common import (
     Symlink,
     hide_progress,
 )
+from pyrrha_mapper.exceptions import FsMapperError
 from pyrrha_mapper.fs import FileSystemImportsMapper
 from pyrrha_mapper.intercg.loader import load_program
 from pyrrha_mapper.types import ResolveDuplicateOption
@@ -81,8 +82,9 @@ class InterImageCGMapper(FileSystemImportsMapper):
 
     @staticmethod
     def load_binary(
-        root_directory: Path, file_path: Path
-    ) -> tuple[Binary, dict[Symbol, list[str]]] | str:
+        root_directory: Path,
+        file_path: Path,
+    ) -> tuple[Binary, dict[Symbol, list[str]] | None] | str:
         """Load all the binaries located in the filesystem as Binary objects.
 
         First check if a cache file exists, if yes, it will load all the binaries and
@@ -110,8 +112,14 @@ class InterImageCGMapper(FileSystemImportsMapper):
         quokka_file = binary.auxiliary_file(append=QUOKKA_EXT)
         try:
             unresolved_cg = load_program(binary, f"[binary mapping] {binary.name}")
-        except SyntaxError:
-            return f"ERROR: cannot load Quokka files: {quokka_file}"
+        except SyntaxError as e:
+            logging.error(
+                f"[binary mapping] {binary.name}: cannot load Quokka files {quokka_file}: {e}"
+            )
+            return (binary, None)
+        except (FileNotFoundError, FsMapperError) as e:
+            logging.error(f"[binary mapping] {binary.name}: error during file analysis: {e}")
+            return (binary, None)
         return (binary, unresolved_cg)
 
     def map_binary(
@@ -129,7 +137,22 @@ class InterImageCGMapper(FileSystemImportsMapper):
             self.unresolved_callgraph[bin_object.path] = additional_res
         if bin_object.id is not None:
             self.node_ids[bin_object.id] = bin_object
-            self._record_custom_command(bin_object, f"[bin mapping] {bin_object.name}")
+            if additional_res is not None:
+                self._record_custom_command(bin_object, f"[bin mapping] {bin_object.name}")
+
+    def _treat_bin_parsing_result(self, path: Path, res: Any):
+        """Handle load_binary res, map it or display error."""
+        log_prefix = f"[binary mapping] {path.name}"
+        if isinstance(res, str):
+            logging.error(f"{log_prefix}: {res}")
+        elif self._correct_map_result(res):
+            bin_obj, additional_info = res
+            self.map_binary(bin_obj, additional_info)
+        elif super()._correct_map_result(res):
+            self.map_binary(res[0], None)
+            logging.info(f"{log_prefix}: fallback to lief results, internal analysis failed")
+        else:
+            logging.warning(f"{log_prefix}: impossible to parse the following result {res}")
 
     def map_binaries_main(self, threads: int, progress: Progress) -> None:
         """Parse and map binaries of a given directory.
@@ -183,7 +206,10 @@ class InterImageCGMapper(FileSystemImportsMapper):
         # Step1: Load FileSystem object and enrich it if needed
         self.map_binaries_main(threads, progress)
         self.map_symlinks_main(progress)
+        self.dry_run_mode = True  # (do not record lib imports in numbat db)
         self.map_lib_imports_main(progress, resolution_strategy)
+        if self.db_interface is not None:
+            self.dry_run_mode = False
 
         self.progress = progress  # need to be able to hide it further down in calls+
 
