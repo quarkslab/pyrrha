@@ -62,7 +62,7 @@ def load_program(binary: Binary, log_prefix: str = "") -> dict[Symbol, list[str]
     """
     file_path = binary.real_path
     if file_path is None:
-        raise FsMapperError()
+        raise FileNotFoundError(file_path)
 
     quokka_file = binary.auxiliary_file(append=QUOKKA_EXT)
     try:
@@ -71,9 +71,9 @@ def load_program(binary: Binary, log_prefix: str = "") -> dict[Symbol, list[str]
         else:
             program = Program.from_binary(file_path, quokka_file, timeout=3600)
     except ChunkMissingError as e:
-        raise FsMapperError() from e
+        raise FsMapperError(e) from e
     if program is None:
-        raise FsMapperError()
+        raise FsMapperError("Quokka does not produce a Program object")
 
     # Load the call graph
     return compute_call_graph(binary, program, log_prefix)
@@ -169,6 +169,7 @@ def compute_call_graph(
     # Iterate back the temporary dict to fill the real call graph
     # The deal here is to fast-forward call to imported function directly on the
     # imported symbol and not on the PLT (to make the graph more straightforward)
+    removed_trampoline: dict[str, str] = dict()
     for f in _inter_cg.values():
         call_graph[f.symbol] = []
         if f.type in [FunctionType.NORMAL, FunctionType.LIBRARY]:
@@ -188,8 +189,10 @@ def compute_call_graph(
                                 call_graph[f.symbol].append(
                                     c.name
                                 )  # Keep the name of the thunk "strcpy, sprintf"
+                                removed_trampoline[sub_callee.name] = c.name
                             else:  # Forward the call to the underlying function name
                                 call_graph[f.symbol].append(sub_callee[0].name)
+                                removed_trampoline[c.name] = sub_callee[0].name
                         else:
                             call_graph[f.symbol].append(c.name)  # Add it normally
                     # Add it normally
@@ -210,7 +213,10 @@ def compute_call_graph(
             call_graph.pop(f.symbol)
             pass
 
-    return call_graph
+    return {
+        symb: [removed_trampoline[c] if c in removed_trampoline else c for c in calls]
+        for symb, calls in call_graph.items()
+    }
 
 
 def disambiguate_export(symbs: list[Symbol], log_prefix: str = "") -> Symbol:

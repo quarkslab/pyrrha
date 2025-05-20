@@ -19,7 +19,7 @@ import logging
 import queue
 from abc import ABC
 from dataclasses import dataclass
-from multiprocessing import Manager, Pool, Queue, get_context, set_start_method
+from multiprocessing import Queue, get_context
 from pathlib import Path
 from typing import Any
 
