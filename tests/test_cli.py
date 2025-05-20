@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 import pytest
-from click import BaseCommand
+from click import Command
 from click.testing import CliRunner, Result
 
 from pyrrha_mapper.__main__ import pyrrha
@@ -31,7 +31,7 @@ from pyrrha_mapper.intercg.fwmapper import InterImageCGMapper
 class TestCLI:
     """Tests to check that the CLI works and display correct messages."""
 
-    COMMAND: BaseCommand = pyrrha
+    COMMAND: Command = pyrrha
     SUBCOMMANDS = pyrrha.commands
 
     def test_usage(self):
