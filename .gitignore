@@ -8,3 +8,11 @@ data/
 *.srctrl*
 .mypy_cache
 .pytest_cache
+*.json
+*.id0
+*.id1
+*.id2
+*.til
+*.nam
+.coverage
+*.log
