@@ -23,7 +23,7 @@ from click import BaseCommand
 from click.testing import CliRunner, Result
 
 from pyrrha_mapper.__main__ import pyrrha
-from pyrrha_mapper.common import FileSystem
+from pyrrha_mapper.common import FileSystem, Symbol
 from pyrrha_mapper.intercg.fwmapper import InterImageCGMapper
 
 
@@ -130,15 +130,15 @@ class BaseTestFsMapper(ABC):
 
     def test_binary_list(self, export_dump: FileSystem) -> None:
         """Firmware binaries are present in results."""
-        assert {
-            _bin.path for _bin in export_dump.iter_binaries()
-        } == self.FW_TEST_BIN_PATHS, "Missing binaries"
+        assert {_bin.path for _bin in export_dump.iter_binaries()} == self.FW_TEST_BIN_PATHS, (
+            "Missing binaries"
+        )
 
     def test_symlink_list(self, export_dump: FileSystem) -> None:
         """Firmware symlinks are present in results."""
-        assert {
-            sym.path for sym in export_dump.iter_symlinks()
-        } == self.FW_TEST_SYMLINKS_PATHS, "Missing symlinks"
+        assert {sym.path for sym in export_dump.iter_symlinks()} == self.FW_TEST_SYMLINKS_PATHS, (
+            "Missing symlinks"
+        )
 
     @staticmethod
     def _path_id(val):
@@ -157,23 +157,17 @@ class BaseTestFsMapper(ABC):
         """Imported libraries exist for each binary of the firware except ldd."""
         _bin = export_dump.get_binary_by_path(bin_path)
         if bin_path == self.FW_TEST_LD:
-            assert len(list(_bin.iter_imported_libraries())) == 0, (
-                "Create false imported libraries"
-            )
+            assert len(list(_bin.iter_imported_libraries())) == 0, "Create false imported libraries"
         else:
-            assert len(list(_bin.iter_imported_libraries())) > 0, (
-                "Missing imported libraries"
-            )
+            assert len(list(_bin.iter_imported_libraries())) > 0, "Missing imported libraries"
 
     @pytest.mark.parametrize("bin_path", FW_TEST_BIN_PATHS, ids=_path_id)
-    def test_resolved_dependencies(
-        self, bin_path: Path, export_dump: FileSystem
-    ) -> None:
+    def test_resolved_dependencies(self, bin_path: Path, export_dump: FileSystem) -> None:
         """Imported libraries correspond to a binary object."""
         _bin = export_dump.get_binary_by_path(bin_path)
-        assert len(list(_bin.iter_imported_libraries())) == len(
-            _bin.imported_library_names
-        ), "Some imported libraries have not been resolved"
+        assert len(list(_bin.iter_imported_libraries())) == len(_bin.imported_library_names), (
+            "Some imported libraries have not been resolved"
+        )
 
     @pytest.mark.parametrize("bin_path", FW_TEST_BIN_PATHS, ids=_path_id)
     def test_imported_symbols(self, bin_path: Path, export_dump: FileSystem) -> None:
@@ -184,15 +178,11 @@ class BaseTestFsMapper(ABC):
         else:
             assert len(_bin.imported_symbol_names) > 0, "Missing imported symbols"
 
+    @abstractmethod
     @pytest.mark.parametrize("bin_path", FW_TEST_BIN_PATHS, ids=_path_id)
-    def test_resolved_imported_symbols(
-        self, bin_path: Path, export_dump: FileSystem
-    ) -> None:
+    def test_resolved_imported_symbols(self, bin_path: Path, export_dump: FileSystem) -> None:
         """Imported symbols correspond to a symbol object."""
-        _bin = export_dump.get_binary_by_path(bin_path)
-        assert len(list(_bin.iter_imported_symbols())) == len(
-            _bin.imported_symbol_names
-        ), "Some imported symbols have not been resolved"
+        pass
 
 
 class TestFSMapper(BaseTestFsMapper):
@@ -215,6 +205,17 @@ class TestFSMapper(BaseTestFsMapper):
         ]
         res = runner.invoke(self.COMMAND, args)
         return res
+
+    @pytest.mark.parametrize(
+        "bin_path", BaseTestFsMapper.FW_TEST_BIN_PATHS, ids=BaseTestFsMapper._path_id
+    )
+    def test_resolved_imported_symbols(self, bin_path: Path, export_dump: FileSystem) -> None:
+        """Imported symbols correspond to a symbol object."""
+        _bin = export_dump.get_binary_by_path(bin_path)
+        for name in _bin.imported_symbol_names:
+            assert isinstance(_bin.get_imported_symbol(name), Symbol), (
+                "Some imported symbols have not been resolved"
+            )
 
 
 class TestFsCgMapper(BaseTestFsMapper):
@@ -249,9 +250,19 @@ class TestFsCgMapper(BaseTestFsMapper):
         """Imported symbols are directly used (not through __imp_* functions)."""
         _bin = export_dump.get_binary_by_path(bin_path)
         trampoline = [
-            f.name
-            for f in filter(
-                lambda f: f.name.startswith("__imp_"), _bin.iter_functions()
-            )
+            f.name for f in filter(lambda f: f.name.startswith("__imp_"), _bin.iter_functions())
         ]
         assert not trampoline, f"__imp_* functions: {trampoline}"
+
+    @pytest.mark.parametrize(
+        "bin_path", BaseTestFsMapper.FW_TEST_BIN_PATHS, ids=BaseTestFsMapper._path_id
+    )
+    def test_resolved_imported_symbols(self, bin_path: Path, export_dump: FileSystem) -> None:
+        """Imported symbols correspond to a symbol object."""
+        _bin = export_dump.get_binary_by_path(bin_path)
+        for func in _bin.iter_functions():
+            for target in _bin.get_calls_from(func):
+                if not _bin.function_exists(target.name):
+                    assert target.name in _bin.imported_symbol_names
+                    assert _bin.imported_symbol_exists(target.name)
+                    assert isinstance(_bin.get_imported_symbol(target.name), Symbol)
