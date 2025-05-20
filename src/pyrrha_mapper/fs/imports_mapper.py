@@ -19,7 +19,7 @@ import logging
 import queue
 from abc import ABC
 from dataclasses import dataclass
-from multiprocessing import Manager, Pool, Queue
+from multiprocessing import Manager, Pool, Queue, set_start_method
 from pathlib import Path
 from typing import Any
 
@@ -431,6 +431,7 @@ import, drop case"
         logging.debug(f"[main] Start Binaries parsing: {len(binary_paths)} binaries to parse")
         binaries_map = progress.add_task("[deep_pink2]Binaries mapping", total=len(binary_paths))
         if threads > 1:  # multiprocessed case
+            set_start_method("spawn")  # fork usage deprecated starting 3.12
             manager = Manager()
             ingress = manager.Queue()
             egress = manager.Queue()
