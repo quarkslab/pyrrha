@@ -19,7 +19,7 @@ import logging
 import queue
 from abc import ABC
 from dataclasses import dataclass
-from multiprocessing import Manager, Pool, Queue, set_start_method
+from multiprocessing import Manager, Pool, Queue, get_context, set_start_method
 from pathlib import Path
 from typing import Any
 
@@ -86,11 +86,11 @@ class FileSystemImportsMapper(FileSystemMapper):
             # store name of imported ones and internal functions
             # store exported symbols
             s: lief.ELF.Symbol
-            is_kernel_module = (bin_obj.path.suffix == ".ko")
+            is_kernel_module = bin_obj.path.suffix == ".ko"
             for s in parsing_res.symbols:
                 if s.imported:
                     bin_obj.add_imported_symbol_name(str(s.name))
-                elif s.exported or is_kernel_module and s.name: 
+                elif s.exported or is_kernel_module and s.name:
                     is_func = s.is_function or s.type == lief.ELF.Symbol.TYPE.GNU_IFUNC
                     if not is_func and is_kernel_module:
                         continue
@@ -403,7 +403,7 @@ import, drop case"
         return isinstance(x, list) and all(map(lambda i: isinstance(i, str), x))
 
     def _correct_map_result(self, res: Any) -> bool:
-        """:return: True if res is a tuple[Binary, Any, list[str]]"""
+        """:return: True if res is a tuple[Binary, Any]"""
         return isinstance(res, tuple) and len(res) == 2 and isinstance(res[0], Binary)
 
     def _treat_bin_parsing_result(self, path: Path, res: Any):
@@ -431,11 +431,11 @@ import, drop case"
         logging.debug(f"[main] Start Binaries parsing: {len(binary_paths)} binaries to parse")
         binaries_map = progress.add_task("[deep_pink2]Binaries mapping", total=len(binary_paths))
         if threads > 1:  # multiprocessed case
-            set_start_method("spawn")  # fork usage deprecated starting 3.12
-            manager = Manager()
+            ctx = get_context("spawn")  # fork usage deprecated starting 3.12
+            manager = ctx.Manager()
             ingress = manager.Queue()
             egress = manager.Queue()
-            pool = Pool(threads)
+            pool = ctx.Pool(threads)
 
             # Launch all workers and fill input queue
             for _ in range(threads - 1):
