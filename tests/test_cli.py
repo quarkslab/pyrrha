@@ -59,14 +59,6 @@ class TestCLI:
 class BaseTestFsMapper(ABC):
     """Common tests for all fs* mapper."""
 
-    class ExecResults(NamedTuple):
-        res: Result
-        db_path: Path
-
-        @property
-        def export_path(self) -> Path:
-            return self.db_path.with_suffix(".json")
-
     COMMAND = pyrrha
 
     @property
@@ -88,11 +80,24 @@ class BaseTestFsMapper(ABC):
     }
     FW_TEST_SYMLINKS_PATHS = {Path("/lib/libssl.so")}
 
-    # @pytest.fixture(scope="class")
-    # def db_path(self, tmp_path_factory, request) -> Path:
-    #     """Generate the path for DB file."""
-    #     tmp = tmp_path_factory.mktemp("db", numbered=True)
-    #     return tmp / f"test-{self.SUBCOMMAND}-{request.param}.srctrlprj"
+
+    # =============================== INTERNAL STUFFS ==================================
+
+    class ExecResults(NamedTuple):  # noqa: D106
+        res: Result
+        db_path: Path
+
+        @property
+        def export_path(self) -> Path:  # noqa: D102
+            return self.db_path.with_suffix(".json")
+
+    @staticmethod
+    def _path_id(val):
+        if isinstance(val, Path):
+            return str(val)
+        return val
+
+    # =============================== FIXTURES ========================================
 
     @pytest.fixture(scope="class")
     def pyrrha_exec(self, request, tmp_path_factory) -> ExecResults:
@@ -112,6 +117,19 @@ class BaseTestFsMapper(ABC):
         ]
         return self.ExecResults(res=runner.invoke(self.COMMAND, args), db_path=tmp_path)
 
+    @abstractmethod
+    @pytest.fixture(scope="class")
+    def export_res(self, tmp_path_factory, request) -> ExecResults:
+        """Run Pyrrha with export activated."""
+        ...
+
+    @pytest.fixture(scope="class")
+    def export_dump(self, export_res: ExecResults) -> FileSystem:
+        """Load JSON export into a FileSystem object."""
+        return FileSystem.from_json_export(export_res.export_path)
+
+    # =================================== TESTS ========================================
+
     @pytest.mark.parametrize("pyrrha_exec", [1, 16], indirect=True)
     def test_numbat_project_creation(self, pyrrha_exec: ExecResults):
         """Two files are generated with correct extensions."""
@@ -120,22 +138,11 @@ class BaseTestFsMapper(ABC):
         assert pyrrha_exec.db_path.with_suffix(".srctrldb").exists(), "Missing DB file"
         assert pyrrha_exec.db_path.with_suffix(".srctrlprj").exists(), "Missing project file"
 
-    @abstractmethod
-    @pytest.fixture(scope="class")
-    def export_res(self, tmp_path_factory, request) -> ExecResults:
-        """Run Pyrrha with export activated."""
-        pass
-
     @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
     def test_export_creation(self, export_res: ExecResults) -> None:
         """Export file exist."""
         assert export_res.res.exit_code == 0
         assert export_res.export_path.exists(), "Export file does not exist"
-
-    @pytest.fixture(scope="class")
-    def export_dump(self, export_res: ExecResults) -> FileSystem:
-        """Load JSON export into a FileSystem object."""
-        return FileSystem.from_json_export(export_res.export_path)
 
     @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
     def test_export_format(self, export_dump: FileSystem) -> None:
@@ -155,12 +162,6 @@ class BaseTestFsMapper(ABC):
         assert {sym.path for sym in export_dump.iter_symlinks()} == self.FW_TEST_SYMLINKS_PATHS, (
             "Missing symlinks"
         )
-
-    @staticmethod
-    def _path_id(val):
-        if isinstance(val, Path):
-            return str(val)
-        return val
 
     @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
     @pytest.mark.parametrize("bin_path", FW_TEST_BIN_PATHS, ids=_path_id)
@@ -203,13 +204,15 @@ class BaseTestFsMapper(ABC):
     @pytest.mark.parametrize("bin_path", FW_TEST_BIN_PATHS, ids=_path_id)
     def test_resolved_imported_symbols(self, bin_path: Path, export_dump: FileSystem) -> None:
         """Imported symbols correspond to a symbol object."""
-        pass
+        ...
 
 
 class TestFSMapper(BaseTestFsMapper):
     """Main functional test class for the FS mapper. Tests are done from the CLI."""
 
     SUBCOMMAND = "fs"  # type: ignore
+
+    # =============================== FIXTURES ========================================
 
     @pytest.fixture(scope="class")
     def export_res(self, tmp_path_factory, request) -> BaseTestFsMapper.ExecResults:
@@ -229,6 +232,8 @@ class TestFSMapper(BaseTestFsMapper):
             f"{self.FW_TEST_PATH}",
         ]
         return self.ExecResults(res=runner.invoke(self.COMMAND, args), db_path=tmp_path)
+    
+    # =================================== TESTS ========================================
 
     @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
     @pytest.mark.parametrize(
@@ -248,15 +253,14 @@ class TestFsCgMapper(BaseTestFsMapper):
 
     SUBCOMMAND = "fs-cg"  # type: ignore
 
-    class ExecResults(BaseTestFsMapper.ExecResults):
+    # =============================== INTERNAL STUFFS ==================================
+
+    class ExecResults(BaseTestFsMapper.ExecResults):  # noqa: D106
         @property
-        def export_path(self) -> Path:
+        def export_path(self) -> Path:  # noqa: D102
             return self.db_path.with_suffix(InterImageCGMapper.FS_EXT)
 
-    @pytest.fixture
-    def export_path(self, db_path: Path) -> Path:
-        """Compute path for the exported JSON."""
-        return db_path.with_suffix(InterImageCGMapper.FS_EXT)
+    # =============================== FIXTURES =========================================
 
     @pytest.fixture(scope="class")
     def export_res(self, tmp_path_factory, request) -> BaseTestFsMapper.ExecResults:
@@ -275,6 +279,8 @@ class TestFsCgMapper(BaseTestFsMapper):
             f"{self.FW_TEST_PATH}",
         ]
         return self.ExecResults(res=runner.invoke(self.COMMAND, args), db_path=tmp_path)
+    
+    # =================================== TESTS ========================================
 
     @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
     @pytest.mark.parametrize(
