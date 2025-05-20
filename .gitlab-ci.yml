@@ -10,7 +10,7 @@ before_script:
 test:
   script:
     - pip install ".[test]"
-    - pytest  --junitxml=report.xml  --cov="pyrrha_mapper" --cov-report xml tests/
+    - pytest  --junitxml=report.xml  --cov="pyrrha_mapper" --cov-report xml -v tests/
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:
     when: always
