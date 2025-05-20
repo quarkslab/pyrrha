@@ -17,6 +17,7 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import NamedTuple
 
 import pytest
 from click import BaseCommand
@@ -58,6 +59,14 @@ class TestCLI:
 class BaseTestFsMapper(ABC):
     """Common tests for all fs* mapper."""
 
+    class ExecResults(NamedTuple):
+        res: Result
+        db_path: Path
+
+        @property
+        def export_path(self) -> Path:
+            return self.db_path.with_suffix(".json")
+
     COMMAND = pyrrha
 
     @property
@@ -79,61 +88,68 @@ class BaseTestFsMapper(ABC):
     }
     FW_TEST_SYMLINKS_PATHS = {Path("/lib/libssl.so")}
 
-    @pytest.fixture()
-    def db_path(self, tmp_path_factory) -> Path:
-        """Generate the path for DB file."""
-        tmp = tmp_path_factory.mktemp("db", numbered=True)
-        return tmp / f"test-{self.SUBCOMMAND}.srctrlprj"
+    # @pytest.fixture(scope="class")
+    # def db_path(self, tmp_path_factory, request) -> Path:
+    #     """Generate the path for DB file."""
+    #     tmp = tmp_path_factory.mktemp("db", numbered=True)
+    #     return tmp / f"test-{self.SUBCOMMAND}-{request.param}.srctrlprj"
 
-    @pytest.mark.parametrize("nb_thread", [1, 16])
-    def test_numbat_project_creation(self, nb_thread, db_path):
-        """Two files are generated with correct extensions."""
+    @pytest.fixture(scope="class")
+    def pyrrha_exec(self, request, tmp_path_factory) -> ExecResults:
+        """Run pyrrha whith the given thread number and the given db path."""
         runner = CliRunner()
+        tmp_path = (
+            tmp_path_factory.mktemp("db", numbered=True)
+            / f"{self.SUBCOMMAND}-{request.param}.srctrlprj"
+        )
         args = [
             self.SUBCOMMAND,
             "--db",
-            f"{db_path}",
+            f"{tmp_path}",
             "-j",
-            nb_thread,
+            request.param,
             f"{self.FW_TEST_PATH}",
         ]
-        res = runner.invoke(self.COMMAND, args)
-        assert res.exit_code == 0
-        assert db_path.exists()
-        assert db_path.with_suffix(".srctrldb").exists(), "Missing DB file"
-        assert db_path.with_suffix(".srctrlprj").exists(), "Missing project file"
+        return self.ExecResults(res=runner.invoke(self.COMMAND, args), db_path=tmp_path)
 
-    @pytest.fixture
-    def export_path(self, db_path: Path) -> Path:
-        """Compute path for the exported JSON."""
-        return db_path.with_suffix(".json")
+    @pytest.mark.parametrize("pyrrha_exec", [1, 16], indirect=True)
+    def test_numbat_project_creation(self, pyrrha_exec: ExecResults):
+        """Two files are generated with correct extensions."""
+        assert pyrrha_exec.res.exit_code == 0
+        assert pyrrha_exec.db_path.exists()
+        assert pyrrha_exec.db_path.with_suffix(".srctrldb").exists(), "Missing DB file"
+        assert pyrrha_exec.db_path.with_suffix(".srctrlprj").exists(), "Missing project file"
 
     @abstractmethod
-    @pytest.fixture(params=[1, 16])
-    def export_res(self, db_path: Path, request) -> Result:
+    @pytest.fixture(scope="class")
+    def export_res(self, tmp_path_factory, request) -> ExecResults:
         """Run Pyrrha with export activated."""
         pass
 
-    def test_export_creation(self, export_res: Result, export_path: Path) -> None:
+    @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
+    def test_export_creation(self, export_res: ExecResults) -> None:
         """Export file exist."""
-        assert export_res.exit_code == 0
-        assert export_path.exists(), "Export file does not exist"
+        assert export_res.res.exit_code == 0
+        assert export_res.export_path.exists(), "Export file does not exist"
 
-    @pytest.fixture
-    def export_dump(self, export_res, export_path: Path) -> FileSystem:
+    @pytest.fixture(scope="class")
+    def export_dump(self, export_res: ExecResults) -> FileSystem:
         """Load JSON export into a FileSystem object."""
-        return FileSystem.from_json_export(export_path)
+        return FileSystem.from_json_export(export_res.export_path)
 
+    @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
     def test_export_format(self, export_dump: FileSystem) -> None:
         """JSON export is loaded as a Filesystem object."""
         assert isinstance(export_dump, FileSystem), "Export cannot be loaded correctly"
 
+    @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
     def test_binary_list(self, export_dump: FileSystem) -> None:
         """Firmware binaries are present in results."""
         assert {_bin.path for _bin in export_dump.iter_binaries()} == self.FW_TEST_BIN_PATHS, (
             "Missing binaries"
         )
 
+    @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
     def test_symlink_list(self, export_dump: FileSystem) -> None:
         """Firmware symlinks are present in results."""
         assert {sym.path for sym in export_dump.iter_symlinks()} == self.FW_TEST_SYMLINKS_PATHS, (
@@ -146,12 +162,14 @@ class BaseTestFsMapper(ABC):
             return str(val)
         return val
 
+    @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
     @pytest.mark.parametrize("bin_path", FW_TEST_BIN_PATHS, ids=_path_id)
     def test_exported_symbols(self, bin_path: Path, export_dump: FileSystem) -> None:
         """Exported symbols exist for each binary of the firware."""
         _bin = export_dump.get_binary_by_path(bin_path)
         assert len(list(_bin.iter_exported_symbols())) > 0, "Missing exported symbols"
 
+    @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
     @pytest.mark.parametrize("bin_path", FW_TEST_BIN_PATHS, ids=_path_id)
     def test_dependencies(self, bin_path: Path, export_dump: FileSystem) -> None:
         """Imported libraries exist for each binary of the firware except ldd."""
@@ -161,6 +179,7 @@ class BaseTestFsMapper(ABC):
         else:
             assert len(list(_bin.iter_imported_libraries())) > 0, "Missing imported libraries"
 
+    @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
     @pytest.mark.parametrize("bin_path", FW_TEST_BIN_PATHS, ids=_path_id)
     def test_resolved_dependencies(self, bin_path: Path, export_dump: FileSystem) -> None:
         """Imported libraries correspond to a binary object."""
@@ -169,6 +188,7 @@ class BaseTestFsMapper(ABC):
             "Some imported libraries have not been resolved"
         )
 
+    @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
     @pytest.mark.parametrize("bin_path", FW_TEST_BIN_PATHS, ids=_path_id)
     def test_imported_symbols(self, bin_path: Path, export_dump: FileSystem) -> None:
         """Imported symbols exist for each binary of the firware except ldd."""
@@ -179,6 +199,7 @@ class BaseTestFsMapper(ABC):
             assert len(_bin.imported_symbol_names) > 0, "Missing imported symbols"
 
     @abstractmethod
+    @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
     @pytest.mark.parametrize("bin_path", FW_TEST_BIN_PATHS, ids=_path_id)
     def test_resolved_imported_symbols(self, bin_path: Path, export_dump: FileSystem) -> None:
         """Imported symbols correspond to a symbol object."""
@@ -190,22 +211,26 @@ class TestFSMapper(BaseTestFsMapper):
 
     SUBCOMMAND = "fs"  # type: ignore
 
-    @pytest.fixture(params=[1, 16])
-    def export_res(self, db_path: Path, request) -> Result:
+    @pytest.fixture(scope="class")
+    def export_res(self, tmp_path_factory, request) -> BaseTestFsMapper.ExecResults:
         """Run Pyrrha with export activated."""
         runner = CliRunner()
+        tmp_path = (
+            tmp_path_factory.mktemp("db", numbered=True)
+            / f"{self.SUBCOMMAND}-{request.param}-export.srctrlprj"
+        )
         args = [
             self.SUBCOMMAND,
             "-e",
             "--db",
-            f"{db_path}",
+            f"{tmp_path}",
             "-j",
             request.param,
             f"{self.FW_TEST_PATH}",
         ]
-        res = runner.invoke(self.COMMAND, args)
-        return res
+        return self.ExecResults(res=runner.invoke(self.COMMAND, args), db_path=tmp_path)
 
+    @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
     @pytest.mark.parametrize(
         "bin_path", BaseTestFsMapper.FW_TEST_BIN_PATHS, ids=BaseTestFsMapper._path_id
     )
@@ -223,26 +248,35 @@ class TestFsCgMapper(BaseTestFsMapper):
 
     SUBCOMMAND = "fs-cg"  # type: ignore
 
+    class ExecResults(BaseTestFsMapper.ExecResults):
+        @property
+        def export_path(self) -> Path:
+            return self.db_path.with_suffix(InterImageCGMapper.FS_EXT)
+
     @pytest.fixture
     def export_path(self, db_path: Path) -> Path:
         """Compute path for the exported JSON."""
         return db_path.with_suffix(InterImageCGMapper.FS_EXT)
 
-    @pytest.fixture(params=[1, 16])
-    def export_res(self, db_path: Path, request) -> Result:
+    @pytest.fixture(scope="class")
+    def export_res(self, tmp_path_factory, request) -> BaseTestFsMapper.ExecResults:
         """Run Pyrrha with export activated."""
         runner = CliRunner()
+        tmp_path = (
+            tmp_path_factory.mktemp("db", numbered=True)
+            / f"{self.SUBCOMMAND}-{request.param}-export.srctrlprj"
+        )
         args = [
             self.SUBCOMMAND,
             "--db",
-            f"{db_path}",
+            f"{tmp_path}",
             "-j",
             request.param,
             f"{self.FW_TEST_PATH}",
         ]
-        res = runner.invoke(self.COMMAND, args)
-        return res
+        return self.ExecResults(res=runner.invoke(self.COMMAND, args), db_path=tmp_path)
 
+    @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
     @pytest.mark.parametrize(
         "bin_path", BaseTestFsMapper.FW_TEST_BIN_PATHS, ids=BaseTestFsMapper._path_id
     )
@@ -254,6 +288,7 @@ class TestFsCgMapper(BaseTestFsMapper):
         ]
         assert not trampoline, f"__imp_* functions: {trampoline}"
 
+    @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
     @pytest.mark.parametrize(
         "bin_path", BaseTestFsMapper.FW_TEST_BIN_PATHS, ids=BaseTestFsMapper._path_id
     )
