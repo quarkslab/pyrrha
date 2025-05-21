@@ -308,6 +308,36 @@ class Binary(FileSystemComponent):
         """:return: the list of the imported symbols names."""
         return list(self.imported_symbols.keys())
 
+    @property
+    def exported_funcs_by_addr(self) -> dict[int, list[Symbol]]:
+        """:return: a dict [addr, list of exported symbols at this addr] for a given binary"""
+        exports: dict[int, list[Symbol]] = dict()
+        for s in self.iter_exported_functions():
+            if s.addr is None:
+                continue
+            elif s.addr not in exports:
+                exports[s.addr] = [s]
+            else:
+                exports[s.addr].append(s)
+        return exports
+
+    def replace_function(self, new_func: Symbol, old_func: Symbol, keep_old_name: bool) -> None:
+        """Replace a function by a new one.
+
+        If keep_old_name, will be registered with the same name as the previous one.
+        """
+        assert new_func.is_func and old_func.is_func
+        if new_func == old_func:
+            return
+        if keep_old_name:
+            name = old_func.name
+        else:
+            name = new_func.name
+        if self.exported_function_exists(old_func.name):
+            self.add_exported_symbol(new_func, symbol_name=name)
+        else:
+            self.add_function(new_func, func_name=name)
+
     def __repr__(self):  # noqa: D105
         return f"Binary('{self.path}')"
 
