@@ -349,12 +349,14 @@ class Binary(FileSystemComponent):
         utility function enables accessing quickly files stored
         along a binary.
 
-        :param extension: file extension that shall be returned
+        :param extension: file extension that shall be returned (replace current one)
         :param append: suffix that will be added to the current file name
         :return: new Path object (as on the host)
         """
         if self.real_path is None:
             raise AttributeError("real path should be set to compute auxiliary file")
+        if extension and append:
+            raise NameError("cannot combine extention and append")
         if extension:
             return self.real_path.with_suffix(extension)
         elif append:
