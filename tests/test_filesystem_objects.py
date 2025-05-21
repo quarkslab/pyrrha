@@ -570,6 +570,29 @@ class TestBinary:
         expected = [request.getfixturevalue(x) for x in expected]  # type: ignore
         assert sorted(_bin.iter_functions()) == sorted(expected)
 
+    @pytest.mark.parametrize("bin_", ["empty_bin", "example_bin"], ids=["Empty bin", "Example bin"])
+    def test_auxiliary_file(self, bin_: Binary, request: pytest.FixtureRequest):
+        """Check auxiliary file return values and that exception are raised correctly."""
+        bin_ = request.getfixturevalue(bin_)  # type: ignore
+        old_real_path = bin_.real_path
+        real_path = Path("/tmp/real_path") if old_real_path is None else old_real_path
+        bin_.real_path = None
+        with pytest.raises(AttributeError) as excinfo_no_real_path:
+            _ = bin_.auxiliary_file(extension="json")
+        assert issubclass(excinfo_no_real_path.type, AttributeError)
+        bin_.real_path = real_path
+        with pytest.raises(NameError) as excinfo_no_param:
+            _ = bin_.auxiliary_file()
+        assert issubclass(excinfo_no_param.type, NameError)
+        with pytest.raises(NameError) as excinfo_both_param:
+            _ = bin_.auxiliary_file(extension=".json", append=".json")
+        assert issubclass(excinfo_both_param.type, NameError)
+        assert bin_.auxiliary_file(extension=".json") == real_path.with_suffix(".json")
+        assert bin_.auxiliary_file(append=".json") == real_path.with_suffix(
+            bin_.real_path.suffix + ".json"
+        )
+        bin_.real_path = old_real_path
+
 
 class TestFileSystem:
     """Unit tests for FileSystem class."""
