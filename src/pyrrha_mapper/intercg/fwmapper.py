@@ -227,8 +227,10 @@ class InterImageCGMapper(FileSystemImportsMapper):
             count_res = {True: 0, False: 0}
             if binary.path in self.unresolved_callgraph:
                 for f_symb, targets in self.unresolved_callgraph[binary.path].items():
-                    if not binary.function_exists(f_symb.name):
-                        logging.error(f"function {f_symb.name} not in binary: {binary.name}")
+                    if targets and not binary.function_exists(f_symb.name):
+                        logging.error(
+                            f"function {f_symb.name} ({hex(f_symb.addr) if f_symb.addr is not None else None}) not in binary: {binary.name}"
+                        )
                         continue
                     for target in targets:
                         try:
@@ -250,10 +252,11 @@ class InterImageCGMapper(FileSystemImportsMapper):
 
             progress.update(cg_map, advance=1)
 
-        logging.warning(
-            f"[cg mapping]: {len(unindex_symbols)} unindex symbols in userland binaries "
-            f"(details in debug logs): {', '.join(sorted(list(unindex_symbols)))}"
-        )
+        if len(unindex_symbols) > 0:
+            logging.warning(
+                f"[cg mapping]: {len(unindex_symbols)}  symbols not resolved in userland binaries "
+                f"(added as unindex symbols): {', '.join(sorted(list(unindex_symbols)))}"
+            )
 
         # return the filesystem object
         return self.fs
