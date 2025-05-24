@@ -3,14 +3,14 @@ import json
 from pathlib import Path
 from collections import namedtuple, defaultdict
 from dataclasses import dataclass
-from typing import Generator
 
 
 # third-party imports
-from quokka import Program, Function
-from quokka.types import FunctionType
+from qbinary import Program, Function, FunctionType
+from qbinary.types import Disassembler, ExportFormat
+
+
 from numbat import SourcetrailDB
-import magic
 from idascript import IDA
 
 DECOMPILE_SCRIPT = Path(__file__).parent / "decompile.py"
@@ -48,13 +48,13 @@ def normalize_name(name: str) -> str:
     return name.strip("_").strip(".")
 
 
-def find_all_call_references(f: Function, source: str) -> tuple[Location, dict[int, list[Location]]]:
+def find_all_call_references(p: Program, f: Function, source: str) -> tuple[Location, dict[int, list[Location]]]:
     decl_loc = None
     refs = defaultdict(list)  # dict: call_addr -> list[Location]
     #ppname = lambda name: name.strip("_").strip(".")
 
-    call_name_to_addr = {normalize_name(c.name): c.start for c in f.calls if c.name}  # NOTE: we exclude by design calls that
-    call_addr_to_name = {c.start: normalize_name(c.name) for c in f.calls if c.name}  # don't have a name, usually these are calls
+    call_name_to_addr = {normalize_name(p[c].name): c for c in f.children if p[c].name}  # NOTE: we exclude by design calls that
+    call_addr_to_name = {c: normalize_name(p[c].name) for c in f.children if p[c].name}  # don't have a name, usually these are calls
                                                                       # to unrecognized function e.g: loc_185CC
     for idx, line in enumerate(source.split("\n")):
 
@@ -113,7 +113,8 @@ def decompile_program(program: Program) -> Path:
     :param program: Program object of the file to decompiled
     :return: path of the created decompiled file
     """
-    bin_path = program.executable.exec_file
+    bin_path: str = program.exec_path
+    assert bin_path, "program.exec_path is not set, can't decompile"
     ida = IDA(bin_path,
               str(DECOMPILE_SCRIPT),
               [],
@@ -126,16 +127,16 @@ def decompile_program(program: Program) -> Path:
 
 
 def load_decompiled(program: Program) -> dict[int, DecompiledFunction]:
-    decompile_file = Path(str(program.executable.exec_file)+".decompiled")
+    decompile_file = Path(str(program.exec_path)+".decompiled")
     if decompile_file.exists():
         logging.info(f"load decompilation file: {decompile_file}")
         data = {int(k): v for k, v in json.loads(decompile_file.read_text()).items()}
-        final_data = {}
+        final_data: dict[int, DecompiledFunction] = {}
         # Iterate the decompiled data to try make references inside
         for f_addr, source_text in data.items():
-            f = program[f_addr]
+            f: Function = program[f_addr]
 
-            decl, refs = find_all_call_references(f, source_text)
+            decl, refs = find_all_call_references(program, f, source_text)
 
             final_data[f_addr] = DecompiledFunction(
                 address=f_addr,
@@ -152,17 +153,27 @@ def load_decompiled(program: Program) -> dict[int, DecompiledFunction]:
         if decompile_file.exists():
             return load_decompiled(program)  # call ourselves again
         else:
-            logging.warning("can't find decompilation file and idascript failed")
+            logging.error("can't find decompilation file (idascript failed)")
             return {}
 
 
-def load_program(bin_path: Path) -> Program:
-    quokka_file = Path(f"{bin_path}.quokka")
-    if quokka_file.exists():
-        logging.info("loading existing Quokka file")
-        return Program(quokka_file, bin_path)
-    else:  # Quokka file does not exists
-        return Program.from_binary(bin_path, quokka_file)
+def load_program(bin_path: Path, disass: Disassembler, format: ExportFormat) -> Program | None:
+    # First try to find pre-existing exported files if format is AUTO
+    export_file = None
+    if format == ExportFormat.AUTO:
+        for fmt in [ExportFormat.QUOKKA, ExportFormat.BINEXPORT]:
+            export_file = Path(f"{bin_path}{fmt.extension}")
+            if export_file.exists():
+                break
+    else:
+        export_file = Path(f"{bin_path}{format.extension}")
+    
+    if export_file is not None:
+        if export_file.exists():
+            logging.info(f"loading existing export file: {export_file}")
+            return Program.open(export_file, bin_path)
+    # Try to generate the export
+    return Program.from_binary(bin_path, disass, format)
 
 
 
@@ -171,7 +182,7 @@ def set_function_color(db: SourcetrailDB, p: Program, fun: Function, f_id: int) 
         # Change node color based on its type
         if is_thunk_to_import(p, fun):
             db.change_node_color(f_id, fill_color="#bee0af", border_color="#395f33")
-        elif fun.type == FunctionType.THUNK:
+        elif fun.type == FunctionType.thunk:
             db.change_node_color(f_id, fill_color="gray")
         # elif fun.type == FunctionType.EXTERN:
         #     db.change_node_color(f_id, fill_color="magenta")
@@ -208,21 +219,21 @@ def add_source_file(db: SourcetrailDB, mangled_name: str, symbol_id: int, info: 
     return True
 
 def is_thunk_to_import(p: Program, f: Function) -> bool:
-    if f.type == FunctionType.THUNK:
-        if len(f.calls) == 1:
-            c = f.calls[0]
-            callee = p.get_function_by_chunk(c)[0]
-            if callee.type in [FunctionType.EXTERN, FunctionType.IMPORTED]:
+    if f.type == FunctionType.thunk:
+        if len(f.children) == 1:
+            c = list(f.children)[0]
+            callee: Function = p[c]
+            if callee.type == FunctionType.imported:
                 return True
         return False
     else:
         return False
 
 
-def map_binary(db: SourcetrailDB, program_path: Path) -> bool:
+def map_binary(db: SourcetrailDB, program_path: Path, disass: Disassembler, format: ExportFormat) -> bool:
 
     # Load the Quokka file
-    program = load_program(program_path)
+    program = load_program(program_path, disass, format)
     if program is None:
         logging.error(f"can't generate exported binary")
         return False
@@ -237,7 +248,7 @@ def map_binary(db: SourcetrailDB, program_path: Path) -> bool:
     f_mapping = {}  # f_addr -> numbat_id
     for f_addr, f in program.items():
         logging.info(f"============= process: {f.name} {f.type} =============")
-        if f.type in [FunctionType.EXTERN, FunctionType.IMPORTED]:
+        if f.type == FunctionType.imported:
             logging.info(f"skip {f.name} extern function")
             continue  # do not add EXTERN functions
         is_imp = is_thunk_to_import(program, f)
@@ -248,7 +259,7 @@ def map_binary(db: SourcetrailDB, program_path: Path) -> bool:
         set_function_color(db, program, f, f_id)
 
         # Add custom command to open that function in IDA
-        abs_path = program.executable.exec_file.absolute()
+        abs_path = Path(program.exec_path).absolute()
         cmd = ["ida64", f"-ONumbatJump:{f_addr:#08x}", str(abs_path)]
         db.set_custom_command(f_id, cmd, "Open in IDA Pro")
 
@@ -258,7 +269,7 @@ def map_binary(db: SourcetrailDB, program_path: Path) -> bool:
             if not add_source_file(db, f.mangled_name, f_id, info):
                 logging.warning(f"failed to add decompiled code for: {f.name}")
         else:
-            if f.type not in [FunctionType.EXTERN, FunctionType.IMPORTED]:
+            if f.type != FunctionType.imported:
                 logging.warning(f"function {f.name} not in decompiled dict")
 
     # Index the call graph
@@ -266,17 +277,18 @@ def map_binary(db: SourcetrailDB, program_path: Path) -> bool:
     for f_addr, f in program.items():
         decomp_fun = decompiled.get(f_addr, None)
 
-        for callee in f.calls:
+        for callee in f.children:
             try:
-                callee_id = f_mapping[callee.start]
+                callee_id = f_mapping[callee]
                 db.record_ref_call(f_mapping[f_addr], callee_id)  # record the call
 
                 if decomp_fun:  # if we have info about the decompiled function
-                    if refs := decomp_fun.references.get(callee.start):  # get the refs associated with callee
+                    if refs := decomp_fun.references.get(callee):  # get the refs associated with callee
                         for li, coli, le, cole in refs:  # iterate them and add them
                             db.record_reference_location(callee_id, decomp_fun.numbat_id, li, coli, le, cole)
                     else:
-                        logging.warning(f"{f.name} calls {callee.name} but not references in DecompiledFunction")
+                        logging.warning(f"{f.name} calls {program[callee].name} "
+                                        "but not references in DecompiledFunction")
 
             except KeyError:
                 pass  # ignore call to non recognized functions

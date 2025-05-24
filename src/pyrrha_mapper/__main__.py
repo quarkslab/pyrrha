@@ -315,24 +315,32 @@ def fs_call_graph_mapper(  # noqa: D103
     type=Disassembler,
     default=Disassembler.AUTO,
     show_default=True,
-    help="Disassembler to use for disassembly.",
+    help="Disassembler to use for disassembly and decompilation.",
+)
+@click.option(
+    "--exporter",
+    required=False,
+    type=ExportFormat,
+    default=ExportFormat.AUTO,
+    show_default=True,
+    help="Binary export format to use for binary analysis.",
 )
 @click.argument(
     "executable",
     type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
 )
 def fs_exe_decompiled_mapper(  # noqa: D103
-    debug: bool, db: Path, disassembler: Disassembler, executable: Path
+    debug: bool, db: Path, disassembler: Disassembler, exporter: ExportFormat, executable: Path
 ):
     setup_logs(debug, db)
     db_instance = setup_db(db)
 
     if disassembler not in [Disassembler.AUTO, Disassembler.IDA]:
-        click.echo("disassembler not yet supported")
+        click.echo(f"disassembler {disassembler.name} not yet supported")
         # TODO: add support for other disassembler (forward parameter to mapper)
         return 1
 
-    if exedecomp.map_binary(db_instance, executable):
+    if exedecomp.map_binary(db_instance, executable, disassembler, exporter):
         logging.info("success.")
     else:
         logging.error("failure.")
