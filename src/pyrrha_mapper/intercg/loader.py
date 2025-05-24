@@ -28,7 +28,8 @@ from pyrrha_mapper.exceptions import FsMapperError
 
 
 
-def load_program(binary: Binary, disass: Disassembler, export: ExportFormat, log_prefix: str = "") -> dict[Symbol, list[str]]:
+def load_program(binary: Binary, disass: Disassembler,
+                 export: ExportFormat, log_prefix: str = "") -> dict[Symbol, list[str]]:
     """Create a Binary object from a given file using lief and qbinary.
 
     It modifies the provided binary object in place.
@@ -65,17 +66,16 @@ def load_program(binary: Binary, disass: Disassembler, export: ExportFormat, log
             export_file = aux_file
             break
 
-    
     if export_file is None:  # Need to export it
         try:
             program: Program | None = Program.from_binary(binary.real_path, disass, export)
         except Exception as e:
-            raise FsMapperError(f"Cannot export {binary.name} with {disass.name} | {export.name}") from e
+            raise FsMapperError(f"Cannot export {binary.name}: {e} ({disass.name}|{export.name})") from e
     else:
         try:
             program: Program = Program.open(export_file, binary.real_path)  # type will be infered with export_file
         except Exception as e:
-            raise FsMapperError(f"Cannot open export {export_file}") from e
+            raise FsMapperError(f"Cannot open export {export_file, binary.real_path} {e}") from e
     
     if program is None:
         raise FsMapperError(f"program still None")
@@ -105,9 +105,7 @@ class _FuncData(NamedTuple):
         return self.symbol.addr
 
 
-def _generate_calls_list(
-    func: _FuncData, call_graph: dict[int, _FuncData], log_prefix: str
-) -> list[str]:
+def _generate_calls_list(func: _FuncData, call_graph: dict[int, _FuncData], log_prefix: str) -> list[str]:
     """Given a function return its call list.
 
     It only contains functions that are contained in the call graph and have a name.
@@ -123,9 +121,7 @@ def _generate_calls_list(
     return res
 
 
-def combine_program_analysis_binary(
-    binary: Binary, program: Program, log_prefix: str
-) -> dict[int, _FuncData]:
+def combine_program_analysis_binary(binary: Binary, program: Program, log_prefix: str) -> dict[int, _FuncData]:
     """Combine program and binary objects by computing useful data.
 
     It updates binary object if new functions are determined.
@@ -153,15 +149,13 @@ def combine_program_analysis_binary(
         program_data[f_addr] = _FuncData(
             symbol=f_symb,
             type=f.type,
-            calls=list(set(x.start for x in f.calls)),
-            callers=list(set(x.start for x in f.callers)),
+            calls=list(f.children),
+            callers=list(f.parents),
         )
     return program_data
 
 
-def compute_call_graph(
-    binary: Binary, program: Program, log_prefix: str = ""
-) -> dict[Symbol, list[str]]:
+def compute_call_graph(binary: Binary, program: Program, log_prefix: str = "") -> dict[Symbol, list[str]]:
     """Compute the call graph of the program using Quokka/Binexport.
 
     It fill the call attribute of binary.
@@ -201,10 +195,10 @@ def compute_call_graph(
     removed_trampoline: dict[str, str] = dict()
     for f in program_data.values():
         if (
-            f.type in [FunctionType.NORMAL, FunctionType.LIBRARY]
+            f.type in [FunctionType.normal, FunctionType.library]
             # If thunk AND exported or thunk AND call several func, keep it (for later resolution)
             or (
-                f.type == FunctionType.THUNK
+                f.type == FunctionType.thunk
                 and ((f.addr in exports) or (f.addr + 1 in exports) or len(f.calls) > 1)
             )
         ):
@@ -212,9 +206,9 @@ def compute_call_graph(
             continue
 
         # Replace thunk calling only one function (and only one)        
-        elif f.type == FunctionType.THUNK and len(f.calls) == 1 and f.calls[0] in program_data:
+        elif f.type == FunctionType.thunk and len(f.calls) == 1 and f.calls[0] in program_data:
             sub_callee = program_data[f.calls[0]]
-            if sub_callee.type in [FunctionType.IMPORTED, FunctionType.EXTERN]:
+            if sub_callee.type == FunctionType.imported:
                 # Keep the name of the thunk "strcpy, sprintf"
                 name, target = sub_callee.name, f.name
                 # in case of nested functions (starting with _, keep the less nested one)
@@ -231,7 +225,7 @@ def compute_call_graph(
                     removed_trampoline[key] = target
 
         # If terminal thunk keep it in binary
-        elif f.type == FunctionType.THUNK and len(f.calls) == 0 and len(f.callers) > 0:  
+        elif f.type == FunctionType.thunk and len(f.calls) == 0 and len(f.callers) > 0:  
             continue
 
         # remove any function not explicitely kept (THUNK, IMPORTED, EXTERN)

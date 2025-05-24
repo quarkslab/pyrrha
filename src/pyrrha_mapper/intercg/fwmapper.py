@@ -113,7 +113,6 @@ class InterImageCGMapper(FileSystemImportsMapper):
                 f"{binary.real_path.name} (skip)"
             )
 
-        quokka_file = binary.auxiliary_file(append=QUOKKA_EXT)
         try:
             prefix = f"[binary mapping] {binary.name}"
             unresolved_cg = load_program(binary,
@@ -122,7 +121,7 @@ class InterImageCGMapper(FileSystemImportsMapper):
                                          prefix)
             return binary, unresolved_cg
         except (FileNotFoundError, FsMapperError, SyntaxError) as e:
-            logging.error(f"ERROR: cannot load Quokka files: {quokka_file}: {e}")
+            logging.error(f"ERROR: Loading error: {binary.name}: {e}")
             return binary, None
 
 
