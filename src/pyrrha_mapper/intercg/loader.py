@@ -165,7 +165,7 @@ def compute_call_graph(binary: Binary, program: Program, log_prefix: str = "") -
     """
 
     def _nb_initial_underscore(x: str) -> int:
-        return len(x) - len(x.strip("_"))
+        return len(x) - len(x.strip("_."))
 
     # Call graph fun_name -> [callee_name1, callee_name2]
     call_graph: dict[Symbol, list[str]] = {}
