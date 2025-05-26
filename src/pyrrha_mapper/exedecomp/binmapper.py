@@ -27,6 +27,13 @@ from numbat import SourcetrailDB
 # third-party imports
 from quokka import Function, Program
 from quokka.types import FunctionType
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    TextColumn,
+    TimeElapsedColumn,
+)
 
 DECOMPILE_SCRIPT = Path(__file__).parent / "decompile.py"
 
@@ -67,7 +74,7 @@ def normalize_name(name: str) -> str:
 
 
 def find_all_call_references(
-    f: Function, source: str
+    f: Function, source: str, log_prefix: str = ""
 ) -> tuple[Location, dict[int, list[Location]]]:
     decl_loc = None
     refs = defaultdict(list)  # dict: call_addr -> list[Location]
@@ -115,7 +122,7 @@ def find_all_call_references(
             col, (caddr, cname) = sorted_matches.pop(0)
             if col < cursor:  # means the match is overlapping a previous match
                 logging.warning(
-                    f"fun:{f.name} skip match {cname}[{col}] overlap with previous one {previous[0]}[{previous[1]}]"
+                    f"{log_prefix}: skip match {cname}[{col}] overlap with previous one {previous[0]}[{previous[1]}]"
                 )
             else:  # its okay we add it
                 refs[caddr].append(Location(idx + 1, col + 1, idx + 1, col + len(cname)))
@@ -123,10 +130,10 @@ def find_all_call_references(
                 previous = (col, cname)
 
     if decl_loc is None:
-        logging.error(f"function declaration '{f.name}' not found in source code")
+        logging.error(f"{log_prefix}: function declarationnot found in source code")
     for ref in (x for x in call_addr_to_name if x not in refs):
         logging.error(
-            f"[{f.name}] call to {ref:#08x}:'{call_addr_to_name[ref]}' not found in source code"
+            f"{log_prefix}: call to {ref:#08x}:'{call_addr_to_name[ref]}' not found in source code"
         )
 
     return decl_loc, refs
@@ -134,7 +141,7 @@ def find_all_call_references(
 
 def decompile_program(program: Program) -> Path:
     """Generate a PROGRAM_NAME.decompiled file which contained the binary decompilee obtained with IDA.
-    
+
     :param program: Program object of the file to decompiled
     :return: path of the created decompiled file.
     """
@@ -155,7 +162,9 @@ def load_decompiled(program: Program) -> dict[int, DecompiledFunction]:
         for f_addr, source_text in data.items():
             f = program[f_addr]
 
-            decl, refs = find_all_call_references(f, source_text)
+            decl, refs = find_all_call_references(
+                f, source_text, log_prefix=f"[Decompiled binary loading] {f.name}"
+            )
 
             final_data[f_addr] = DecompiledFunction(
                 address=f_addr, name=f.name, text=source_text, location=decl, references=refs
@@ -199,7 +208,11 @@ def set_function_color(db: SourcetrailDB, p: Program, fun: Function, f_id: int) 
 
 
 def add_source_file(
-    db: SourcetrailDB, mangled_name: str, symbol_id: int, info: DecompiledFunction
+    db: SourcetrailDB,
+    mangled_name: str,
+    symbol_id: int,
+    info: DecompiledFunction,
+    log_prefix: str = "",
 ) -> bool:
     tmp = Path("/tmp/" + mangled_name)
     with open(tmp, "w") as f:
@@ -213,14 +226,14 @@ def add_source_file(
     tmp.unlink()  # QUESTION: Maybe we want to keep it for further analyses ?
 
     # Add the function to the file
-    logging.info(f"add function {mangled_name} to file {file_id}")
+    logging.debug(f"{log_prefix}: add function to file {file_id}")
     info.numbat_id = file_id
     # record de symbol declaration
     if info.location:
         l1, col1, l2, col2 = info.location
         db.record_symbol_location(symbol_id, file_id, l1, col1, l2, col2)
     else:
-        logging.warning(f"{f.name} declaration not found in source code")
+        logging.warning(f"{log_prefix}: declaration not found in source code")
 
     return True
 
@@ -250,61 +263,75 @@ def map_binary(db: SourcetrailDB, program_path: Path) -> bool:
         logging.error("failed to obtain decompiled code")
         return False
 
-    # Index all the functions
-    f_mapping = {}  # f_addr -> numbat_id
-    for f_addr, f in program.items():
-        logging.info(f"============= process: {f.name} {f.type} =============")
-        if f.type in [FunctionType.EXTERN, FunctionType.IMPORTED]:
-            logging.info(f"skip {f.name} extern function")
-            continue  # do not add EXTERN functions
-        is_imp = is_thunk_to_import(program, f)
-        f_id = db.record_function(
-            f.name, parent_id=None
-        )  # , hover_display=f"{f.type.name.lower()} function")
-        f_mapping[f_addr] = f_id
+    with Progress(
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TimeElapsedColumn(),
+    ) as progress:
+        # Index all the functions
+        f_mapping = {}  # f_addr -> numbat_id
+        func_map = progress.add_task("[deep_pink2]Functions analysis", total=len(program))
+        for f_addr, f in program.items():
+            log_prefix = f"[Func analysis] {f.name} ({f.type})"
+            if f.type in [FunctionType.EXTERN, FunctionType.IMPORTED]:
+                logging.debug(f"{log_prefix}: extern function, skip")
+                progress.update(func_map, advance=1)
+                continue  # do not add EXTERN functions
+            is_imp = is_thunk_to_import(program, f)
+            f_id = db.record_function(
+                f.name,
+                parent_id=None,
+                is_indexed=not is_imp,
+            )  # , hover_display=f"{f.type.name.lower()} function")
+            f_mapping[f_addr] = f_id
 
-        # Change node color based on its type
-        set_function_color(db, program, f, f_id)
+            if not is_imp:
+                # Change node color based on its type
+                set_function_color(db, program, f, f_id)
 
-        # Add custom command to open that function in IDA
-        abs_path = program.executable.exec_file.absolute()
-        cmd = ["ida64", f"-ONumbatJump:{f_addr:#08x}", str(abs_path)]
-        db.set_custom_command(f_id, cmd, "Open in IDA Pro")
+                # Add custom command to open that function in IDA
+                abs_path = program.executable.exec_file.absolute()
+                cmd = ["ida64", f"-ONumbatJump:{f_addr:#08x}", str(abs_path)]
+                db.set_custom_command(f_id, cmd, "Open in IDA Pro")
 
-        # Add source code if any
-        if f_addr in decompiled and not is_imp:
-            info = decompiled[f_addr]
-            if not add_source_file(db, f.mangled_name, f_id, info):
-                logging.warning(f"failed to add decompiled code for: {f.name}")
-        else:
-            if f.type not in [FunctionType.EXTERN, FunctionType.IMPORTED]:
-                logging.warning(f"function {f.name} not in decompiled dict")
-                
+                # Add source code if any
+                if f_addr in decompiled:
+                    info = decompiled[f_addr]
+                    if not add_source_file(db, f.mangled_name, f_id, info):
+                        logging.warning(f"{log_prefix}: failed to add decompiled code")
 
-    # Index the call graph
-    logging.info("============= start indexing call graph =============")
-    for f_addr, f in program.items():
-        decomp_fun = decompiled.get(f_addr, None)
+                else:
+                    logging.warning(f"{log_prefix}: function not in decompiled dict")
+            progress.update(func_map, advance=1)
 
-        for callee in f.calls:
-            try:
-                callee_id = f_mapping[callee.start]
-                ref_id = db.record_ref_call(f_mapping[f_addr], callee_id)  # record the call
+        # Index the call graph
+        cg_map = progress.add_task("[orange_red1]Call Graph Indexing", total=len(program))
 
-                if decomp_fun:  # if we have info about the decompiled function
-                    if refs := decomp_fun.references.get(
-                        callee.start
-                    ):  # get the refs associated with callee
-                        for li, coli, le, cole in refs:  # iterate them and add them
-                            db.record_reference_location(
-                                ref_id, decomp_fun.numbat_id, li, coli, le, cole
+        for f_addr, f in program.items():
+            log_prefix = f"[Call Graph Indexing] {f.name}"
+            decomp_fun = decompiled.get(f_addr, None)
+
+            for callee in f.calls:
+                try:
+                    callee_id = f_mapping[callee.start]
+                    ref_id = db.record_ref_call(f_mapping[f_addr], callee_id)  # record the call
+
+                    if decomp_fun:  # if we have info about the decompiled function
+                        if refs := decomp_fun.references.get(
+                            callee.start
+                        ):  # get the refs associated with callee
+                            for li, coli, le, cole in refs:  # iterate them and add them
+                                db.record_reference_location(
+                                    ref_id, decomp_fun.numbat_id, li, coli, le, cole
+                                )
+                        else:
+                            logging.warning(
+                                f"{log_prefix}: calls {callee.name} but not references in DecompiledFunction"
                             )
-                    else:
-                        logging.warning(
-                            f"{f.name} calls {callee.name} but not references in DecompiledFunction"
-                        )
 
-            except KeyError:
-                pass  # ignore call to non recognized functions
+                except KeyError:
+                    pass  # ignore call to non recognized functions
 
+            progress.update(cg_map, advance=1)
     return True
