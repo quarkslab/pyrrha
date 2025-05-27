@@ -140,7 +140,7 @@ def find_all_call_references(
         logging.error(f"{log_prefix}: function declaration not found in source code")
     for ref in (x for x in call_addr_to_name if x not in refs):
         logging.error(
-            f"{log_prefix}: call to {ref:#08x}:'{call_addr_to_name[ref]}' not found in source code"
+            f"{log_prefix}: call to {ref:#08x}: '{call_addr_to_name[ref]}' not found in source code"
         )
 
     return decl_loc, refs
@@ -157,7 +157,7 @@ def decompile_program(program: Program) -> Path:
     :return: path of the created decompiled file.
     """
     bin_path = program.executable.exec_file
-    ida = IDA(bin_path, str(DECOMPILE_SCRIPT), [], timeout=180, exit_virtualenv=True)
+    ida = IDA(bin_path, str(DECOMPILE_SCRIPT), [], timeout=600, exit_virtualenv=True)
     ida.start()
     ida.wait()
     return _decompile_path(bin_path)
