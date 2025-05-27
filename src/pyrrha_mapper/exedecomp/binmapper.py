@@ -150,13 +150,16 @@ def decompile_program(program: Program) -> Path:
     return Path(str(bin_path) + ".decompiled")
 
 
-def load_decompiled(program: Program) -> dict[int, DecompiledFunction]:
-    decompile_file = Path(str(program.executable.exec_file) + ".decompiled")
+def load_decompiled(program: Program, progress: Progress) -> dict[int, DecompiledFunction]:
+    decompile_file = program.executable.exec_file.with_suffix(
+        f"{program.executable.exec_file.suffix}.decompiled"
+    )
     if decompile_file.exists():
         logging.info(f"load decompilation file: {decompile_file}")
         data = {int(k): v for k, v in json.loads(decompile_file.read_text()).items()}
         final_data = {}
         # Iterate the decompiled data to try make references inside
+        decomp_load = progress.add_task("[deep_pink2]Decompiled binary loading", total=len(data))
         for f_addr, source_text in data.items():
             f = program[f_addr]
 
@@ -167,13 +170,14 @@ def load_decompiled(program: Program) -> dict[int, DecompiledFunction]:
             final_data[f_addr] = DecompiledFunction(
                 address=f_addr, name=f.name, text=source_text, location=decl, references=refs
             )
+            progress.update(decomp_load, advance=1)
 
         return final_data
     else:
         logging.info("extracting decompilation file (with idascript)")
         decompile_file = decompile_program(program)
         if decompile_file.exists():
-            return load_decompiled(program)  # call ourselves again
+            return load_decompiled(program, progress)  # call ourselves again
         else:
             logging.warning("can't find decompilation file and idascript failed")
             return {}
@@ -255,21 +259,21 @@ def map_binary(db: SourcetrailDB, program_path: Path) -> bool:
         logging.error("can't generate exported binary")
         return False
 
-    # Load the decompilation file
-    decompiled = load_decompiled(program)
-    if not decompiled:  # empty
-        logging.error("failed to obtain decompiled code")
-        return False
-
     with Progress(
         TextColumn("[progress.description]{task.description}"),
         BarColumn(),
         MofNCompleteColumn(),
         TimeElapsedColumn(),
     ) as progress:
+        # Load the decompilation file
+        decompiled = load_decompiled(program, progress)
+        if not decompiled:  # empty
+            logging.error("failed to obtain decompiled code")
+            return False
+
         # Index all the functions
         f_mapping = {}  # f_addr -> numbat_id
-        func_map = progress.add_task("[deep_pink2]Functions analysis", total=len(program))
+        func_map = progress.add_task("[orange_red1]Functions analysis", total=len(program))
         for f_addr, f in program.items():
             log_prefix = f"[Func analysis] {f.name} ({f.type})"
             if f.type in [FunctionType.EXTERN, FunctionType.IMPORTED]:
@@ -304,7 +308,7 @@ def map_binary(db: SourcetrailDB, program_path: Path) -> bool:
             progress.update(func_map, advance=1)
 
         # Index the call graph
-        cg_map = progress.add_task("[orange_red1]Call Graph Indexing", total=len(program))
+        cg_map = progress.add_task("[orange1]Call Graph Indexing", total=len(program))
 
         for f_addr, f in program.items():
             log_prefix = f"[Call Graph Indexing] {f.name}"
@@ -324,7 +328,7 @@ def map_binary(db: SourcetrailDB, program_path: Path) -> bool:
                                     ref_id, decomp_fun.numbat_id, li, coli, le, cole
                                 )
                         else:
-                            logging.warning(
+                            logging.debug(  # correspond to the previous error
                                 f"{log_prefix}: calls {callee.name} but not references in DecompiledFunction"
                             )
 
