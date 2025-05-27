@@ -146,6 +146,10 @@ def find_all_call_references(
     return decl_loc, refs
 
 
+def _decompile_path(exec_file: Path) -> Path:
+    return exec_file.with_suffix(f"{exec_file.suffix}.decompiled")
+
+
 def decompile_program(program: Program) -> Path:
     """Generate a PROGRAM_NAME.decompiled file which contained the binary decompilee obtained with IDA.
 
@@ -156,15 +160,15 @@ def decompile_program(program: Program) -> Path:
     ida = IDA(bin_path, str(DECOMPILE_SCRIPT), [], timeout=600, exit_virtualenv=True)
     ida.start()
     ida.wait()
-    return Path(str(bin_path) + ".decompiled")
+    return _decompile_path(bin_path)
 
 
-def load_decompiled(program: Program, progress: Progress) -> dict[int, DecompiledFunction]:
-    decompile_file = program.executable.exec_file.with_suffix(
-        f"{program.executable.exec_file.suffix}.decompiled"
-    )
+def load_decompiled(
+    program: Program, progress: Progress, log_prefix: str = ""
+) -> dict[int, DecompiledFunction]:
+    decompile_file = _decompile_path(program.executable.exec_file)
     if decompile_file.exists():
-        logging.info(f"load decompilation file: {decompile_file}")
+        logging.info(f"{log_prefix}: load file: {decompile_file}")
         data = {int(k): v for k, v in json.loads(decompile_file.read_text()).items()}
         final_data = {}
         # Iterate the decompiled data to try make references inside
@@ -173,7 +177,7 @@ def load_decompiled(program: Program, progress: Progress) -> dict[int, Decompile
             f = program[f_addr]
 
             decl, refs = find_all_call_references(
-                f, source_text, log_prefix=f"[Decompiled binary loading] {f.name}"
+                f, source_text, log_prefix=f"{log_prefix} {f.name}"
             )
 
             final_data[f_addr] = DecompiledFunction(
@@ -183,22 +187,12 @@ def load_decompiled(program: Program, progress: Progress) -> dict[int, Decompile
 
         return final_data
     else:
-        logging.info("extracting decompilation file (with idascript)")
+        logging.info(f"{log_prefix}: extracting decompilation file (with idascript)")
         decompile_file = decompile_program(program)
         if decompile_file.exists():
             return load_decompiled(program, progress)  # call ourselves again
         else:
-            logging.warning("can't find decompilation file and idascript failed")
-            return {}
-
-
-def load_program(bin_path: Path) -> Program:
-    quokka_file = Path(f"{bin_path}.quokka")
-    if quokka_file.exists():
-        logging.info("loading existing Quokka file")
-        return Program(quokka_file, bin_path)
-    else:  # Quokka file does not exists
-        return Program.from_binary(bin_path, quokka_file)
+            raise FileNotFoundError("can't find decompilation file and idascript failed")
 
 
 def set_function_color(db: SourcetrailDB, p: Program, fun: Function, f_id: int) -> None:
@@ -225,6 +219,7 @@ def add_source_file(
     info: DecompiledFunction,
     log_prefix: str = "",
 ) -> bool:
+    """:return: True if successfully added source info.text as a source file in DB."""
     with NamedTemporaryFile(mode="wt", delete_on_close=False) as tmp:
         tmp.write(info.text)
         tmp.close()
@@ -248,6 +243,7 @@ def add_source_file(
 
 
 def is_thunk_to_import(p: Program, f: Function) -> bool:
+    """:return: True if teh function is a thunk which call an extern/imported function"""
     if f.type == FunctionType.THUNK:
         if len(f.calls) == 1:
             c = f.calls[0]
