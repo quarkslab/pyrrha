@@ -20,11 +20,11 @@ import logging
 from collections import defaultdict, namedtuple
 from dataclasses import dataclass
 from pathlib import Path
-
-from idascript import IDA
-from numbat import SourcetrailDB
+from tempfile import NamedTemporaryFile
 
 # third-party imports
+from idascript import IDA
+from numbat import SourcetrailDB
 from quokka import Function, Program
 from quokka.types import FunctionType
 from rich.progress import (
@@ -216,16 +216,14 @@ def add_source_file(
     info: DecompiledFunction,
     log_prefix: str = "",
 ) -> bool:
-    tmp = Path("/tmp/" + mangled_name)
-    with open(tmp, "w") as f:
-        f.write(info.text)
-
-    # Record file
-    file_id = db.record_file(Path(tmp))  # , indexed=False)
-    if file_id is None:
-        return False
-    db.record_file_language(file_id, "cpp")
-    tmp.unlink()  # QUESTION: Maybe we want to keep it for further analyses ?
+    with NamedTemporaryFile(mode="wt", delete_on_close=False) as tmp:
+        tmp.write(info.text)
+        tmp.close()
+        # Record file
+        file_id = db.record_file(Path(tmp.name), name=mangled_name)
+        if file_id is None:
+            return False
+        db.record_file_language(file_id, "cpp")
 
     # Add the function to the file
     logging.debug(f"{log_prefix}: add function to file {file_id}")
@@ -285,7 +283,11 @@ def map_binary(db: SourcetrailDB, program_path: Path) -> bool:
                 f.name,
                 parent_id=None,
                 is_indexed=not is_imp,
-            )  # , hover_display=f"{f.type.name.lower()} function")
+            )
+            if f_id is None:
+                logging.error(f"{log_prefix}: error while recording function in db")
+                progress.update(func_map, advance=1)
+                continue
             f_mapping[f_addr] = f_id
 
             if not is_imp:
