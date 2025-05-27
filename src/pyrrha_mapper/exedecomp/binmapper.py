@@ -87,7 +87,7 @@ def find_all_call_references(
         c.start: normalize_name(c.name) for c in f.calls if c.name
     }  # don't have a name, usually these are calls
     # to unrecognized function e.g: loc_185CC
-    for idx, line in enumerate(source.split("\n")):
+    for idx, line in enumerate(source.splitlines()):
         # try to find function declaration
         if decl_loc is None:
             ppname = normalize_name(f.name)
@@ -95,18 +95,12 @@ def find_all_call_references(
             if col != -1:
                 decl_loc = Location(idx + 1, col + 1, idx + 1, col + len(ppname))
 
-        # # iterate each calls and try to find them in the line
-        # for cname, caddr in call_name_to_addr.items():
-        #     col = line.find(cname)
-        #     if col != -1:
-        #         refs[caddr].append(Location(idx+1, col+1, idx+1, col+len(cname)))
-
         # For a given line, this dict keeps the column (index) of all call matched
         matches: dict[int, tuple[int, str]] = {}
 
         # iterate each calls and try to find them in the line
         for cname, caddr in call_name_to_addr.items():
-            col = line.find(cname)
+            col = line.find(f"{cname}(")
             if col != -1:
                 matches[col] = (caddr, cname)
 
@@ -121,16 +115,20 @@ def find_all_call_references(
         while sorted_matches:
             col, (caddr, cname) = sorted_matches.pop(0)
             if col < cursor:  # means the match is overlapping a previous match
-                logging.warning(
-                    f"{log_prefix}: skip match {cname}[{col}] overlap with previous one {previous[0]}[{previous[1]}]"
-                )
+                if col + len(cname) == cursor and previous[1].endswith(cname):
+                    logging.debug(f"{log_prefix}: skip match {cname}, end of the {previous[1]}")
+                else:
+                    logging.warning(
+                        f"{log_prefix}: skip match {cname} [col {col}] overlap with previous one  "
+                        f"{previous[1]} [col: {previous[0]}]"
+                    )
             else:  # its okay we add it
                 refs[caddr].append(Location(idx + 1, col + 1, idx + 1, col + len(cname)))
                 cursor = col + len(cname)
                 previous = (col, cname)
 
     if decl_loc is None:
-        logging.error(f"{log_prefix}: function declarationnot found in source code")
+        logging.error(f"{log_prefix}: function declaration not found in source code")
     for ref in (x for x in call_addr_to_name if x not in refs):
         logging.error(
             f"{log_prefix}: call to {ref:#08x}:'{call_addr_to_name[ref]}' not found in source code"
