@@ -20,17 +20,10 @@ from typing import NamedTuple
 
 # third-party imports
 from quokka import Program
-from quokka.exc import ChunkMissingError
 from quokka.types import FunctionType
 
 # local imports
-from pyrrha_mapper.common import Binary, Symbol
-from pyrrha_mapper.exceptions import FsMapperError
-
-QUOKKA_EXT = ".quokka"
-
-logger = logging.getLogger("quokka")
-logger.setLevel(logging.WARNING)
+from pyrrha_mapper.common import Binary, Symbol, load_program_export
 
 """
 [<FunctionType.NORMAL: 1>,
@@ -64,16 +57,7 @@ def load_program(binary: Binary, log_prefix: str = "") -> dict[Symbol, list[str]
     if file_path is None:
         raise FileNotFoundError(file_path)
 
-    quokka_file = binary.auxiliary_file(append=QUOKKA_EXT)
-    try:
-        if quokka_file.exists():
-            program: Program | None = Program(quokka_file, file_path)
-        else:
-            program = Program.from_binary(file_path, quokka_file, timeout=3600)
-    except ChunkMissingError as e:
-        raise FsMapperError(e) from e
-    if program is None:
-        raise FsMapperError("Quokka does not produce a Program object")
+    program = load_program_export(file_path, log_prefix)
 
     # Load the call graph
     return compute_call_graph(binary, program, log_prefix)
@@ -207,7 +191,7 @@ def compute_call_graph(
             call_graph[f.symbol] = _generate_calls_list(f, program_data, log_prefix)
             continue
 
-        # Replace thunk calling only one function (and only one)        
+        # Replace thunk calling only one function (and only one)
         elif f.type == FunctionType.THUNK and len(f.calls) == 1 and f.calls[0] in program_data:
             sub_callee = program_data[f.calls[0]]
             if sub_callee.type in [FunctionType.IMPORTED, FunctionType.EXTERN]:
@@ -227,7 +211,7 @@ def compute_call_graph(
                     removed_trampoline[key] = target
 
         # If terminal thunk keep it in binary
-        elif f.type == FunctionType.THUNK and len(f.calls) == 0 and len(f.callers) > 0:  
+        elif f.type == FunctionType.THUNK and len(f.calls) == 0 and len(f.callers) > 0:
             continue
 
         # remove any function not explicitely kept (THUNK, IMPORTED, EXTERN)
