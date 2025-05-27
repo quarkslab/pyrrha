@@ -100,7 +100,11 @@ def find_all_call_references(
 
         # iterate each calls and try to find them in the line
         for cname, caddr in call_name_to_addr.items():
-            col = line.find(f"{cname}(")
+            if cname.endswith(")"): # to handle cases of func name with typing of parameter 
+                name = cname.split("(")[0]
+            else:
+                name = cname
+            col = line.find(f"{name}(")
             if col != -1:
                 matches[col] = (caddr, cname)
 
