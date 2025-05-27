@@ -39,7 +39,7 @@ dependencies = [
     'click',
     'coloredlogs',
     'lief>=0.15.0',
-    'numbat>=0.2.5',
+    'numbat>=0.2.6',
     'pydantic',
     'rich',
     # InterCG mapper
