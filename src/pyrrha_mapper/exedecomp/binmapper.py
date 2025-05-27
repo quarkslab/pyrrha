@@ -35,6 +35,11 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 
+from pyrrha_mapper.common import load_program_export
+
+# local imports
+from pyrrha_mapper.exceptions import FsMapperError
+
 DECOMPILE_SCRIPT = Path(__file__).parent / "decompile.py"
 
 once_check = True
@@ -256,21 +261,26 @@ def is_thunk_to_import(p: Program, f: Function) -> bool:
 
 def map_binary(db: SourcetrailDB, program_path: Path) -> bool:
     # Load the Quokka file
-    program = load_program(program_path)
-    if program is None:
-        logging.error("can't generate exported binary")
-        return False
-
     with Progress(
         TextColumn("[progress.description]{task.description}"),
         BarColumn(),
         MofNCompleteColumn(),
         TimeElapsedColumn(),
     ) as progress:
-        # Load the decompilation file
-        decompiled = load_decompiled(program, progress)
-        if not decompiled:  # empty
-            logging.error("failed to obtain decompiled code")
+        # Load the decompilation and quokka files
+        log_prefix = "[Decompiled binary loading]"
+        try:
+            program = load_program_export(program_path, log_prefix)
+        except FileNotFoundError as e:
+            logging.error(f"{log_prefix}: Cannot found {program_path}: {e}")
+            return False
+        except FsMapperError as e:
+            logging.error(f"{log_prefix}: Error during Quokka export generation/loading: {e}")
+            return False
+        try:
+            decompiled = load_decompiled(program, progress, log_prefix)
+        except FileNotFoundError as e:
+            logging.error(f"{log_prefix}: failed to obtain decompiled code: {e}")
             return False
 
         # Index all the functions

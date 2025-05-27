@@ -13,8 +13,9 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-"""Common objects that can be used for any mapper."""
+"""Common objects and functions that can be used for any mapper."""
 
+from .binary_export import load_program_export
 from .filesystem_mapper import FileSystemMapper, hide_progress
 from .objects import Binary, FileSystem, Symbol, Symlink
 
@@ -23,6 +24,7 @@ __all__ = [
     "Binary",
     "FileSystem",
     "hide_progress",
+    "load_program_export",
     "Symbol",
     "Symlink",
 ]
