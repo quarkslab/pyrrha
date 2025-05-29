@@ -18,14 +18,18 @@
 import logging
 import multiprocessing
 from pathlib import Path
-
+import os
+import sys
+import json
 import click
 import coloredlogs  # type: ignore # no typing used in this library
 from numbat import SourcetrailDB
 
 from pyrrha_mapper import exedecomp, fs, intercg
 from pyrrha_mapper.common import FileSystem
-from pyrrha_mapper.types import Disassembler, Exporters, ResolveDuplicateOption
+from pyrrha_mapper.types import ResolveDuplicateOption
+
+from qbinary.types import ExportFormat, Disassembler
 
 # -------------------------------------------------------------------------------
 #                           Common stuff for mappers
@@ -248,10 +252,10 @@ def fs_mapper(# noqa: D103
 @click.option(
     "--exporter",
     required=False,
-    type=Exporters,
-    default=Exporters.AUTO,
+    type=ExportFormat,
+    default=ExportFormat.AUTO,
     show_default=True,
-    help="Binary exporter to use for binary analysis.",
+    help="Binary export format to use for binary analysis.",
 )
 @click.argument(
     "root_directory",
@@ -264,8 +268,8 @@ def fs_call_graph_mapper(  # noqa: D103
     jobs: int,
     resolve_duplicates: ResolveDuplicateOption,
     disassembler: Disassembler,
-    exporter: Exporters,
-    root_directory,
+    exporter: ExportFormat,
+    root_directory: Path,
 ):
     setup_logs(debug, db)
     db_instance = setup_db(db)
@@ -274,11 +278,13 @@ def fs_call_graph_mapper(  # noqa: D103
         click.echo("disassembler not yet supported")
         # TODO: add support for other disassembler
         return 1
+    intercg.InterImageCGMapper.DISASS = disassembler # type: ignore
 
-    if exporter not in [Exporters.AUTO, Exporters.QUOKKA]:
+    if exporter not in [ExportFormat.AUTO, ExportFormat.QUOKKA]:
         click.echo(f"binary exporter: {exporter.name} not yet supported")
         # TODO: add support for other disassembler
         return 1
+    intercg.InterImageCGMapper.EXPORT = exporter # type: ignore
 
     root_directory = root_directory.absolute()
 
@@ -311,30 +317,92 @@ def fs_call_graph_mapper(  # noqa: D103
     type=Disassembler,
     default=Disassembler.AUTO,
     show_default=True,
-    help="Disassembler to use for disassembly.",
+    help="Disassembler to use for disassembly and decompilation.",
+)
+@click.option(
+    "--exporter",
+    required=False,
+    type=ExportFormat,
+    default=ExportFormat.AUTO,
+    show_default=True,
+    help="Binary export format to use for binary analysis.",
 )
 @click.argument(
     "executable",
-    type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
+    type=click.Path(exists=False, file_okay=True, dir_okay=False, path_type=Path),
 )
 def fs_exe_decompiled_mapper(  # noqa: D103
-    debug: bool, db: Path, disassembler: Disassembler, executable: Path
+    debug: bool, db: Path, disassembler: Disassembler, exporter: ExportFormat, executable: Path
 ):
+    # Change default db name. By default will be <executable>.srctrldb
+    if db.name == "exe-decomp.srctrldb":
+        db = Path(str(executable)+".srctrldb")
+
     setup_logs(debug, db)
     db_instance = setup_db(db)
 
     if disassembler not in [Disassembler.AUTO, Disassembler.IDA]:
-        click.echo("disassembler not yet supported")
+        click.echo(f"disassembler {disassembler.name} not yet supported")
         # TODO: add support for other disassembler (forward parameter to mapper)
         return 1
 
-    if exedecomp.map_binary(db_instance, executable):
+    if exedecomp.map_binary(db_instance, executable, disassembler, exporter):
         logging.info("success.")
     else:
         logging.error("failure.")
 
+    logging.info(f"write db into: {db_instance.path}")
     db_instance.commit()
     db_instance.close()
+
+
+
+@pyrrha.command("workspace-utils", short_help="Help managing workspaces (for cross-binary referencing).")
+@click.option("-l", "--list", is_flag=True, default=False, help="List all workspaces.")
+@click.option("-a", "--add", is_flag=True, default=False, help="Add a rootfs as workspace.")
+@click.option("-d", "--delete", is_flag=True, default=False, help="Remove a rootfs as workspace.")
+@click.argument(
+    "path",
+    type=click.Path(exists=True, file_okay=True, dir_okay=True, path_type=Path),
+    required=False,
+)
+def workspace_utils(list: bool, add: bool, delete: bool, path: Path):
+    """Manage workspaces for cross-binary referencing."""
+
+    # Configure logs (there is not debug ones)
+    setup_logs(False)
+
+    # Get the base config directory
+    if sys.platform == "win32":
+        heimdallr_settings = Path(os.path.expandvars("%APPDATA%/heimdallr/settings.json"))
+    else:
+        heimdallr_settings = Path(os.path.expandvars("$HOME/.config/heimdallr/settings.json"))
+    if not heimdallr_settings.exists():
+        click.echo(f"heimdallr config directory {heimdallr_settings} does not exists")
+        return -1
+
+    # Load settings
+    settings = json.loads(heimdallr_settings.read_text())
+    idb_path = settings.get("idb_path")
+    if idb_path is None:
+        click.echo(f"heimdallr settings file {heimdallr_settings} does not contain idb_path")
+        return -1
+
+    if list:
+        for path in idb_path:
+            logging.info(f"- {path}")
+    
+    if add:
+        settings["idb_path"].append(str(Path(path).absolute()))
+        heimdallr_settings.write_text(json.dumps(settings, indent=4))  # Write it back
+
+    if delete:
+        try:
+            settings["idb_path"].remove(str(path))
+            heimdallr_settings.write_text(json.dumps(settings, indent=4))  # Write it back
+        except ValueError:
+            click.echo(f"Path {path} not in idb_path of settings.")
+            return -1
 
 
 if __name__ == "__main__":

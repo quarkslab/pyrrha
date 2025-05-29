@@ -31,7 +31,7 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 
-from pyrrha_mapper.common.objects import Binary, FileSystem, Symlink
+from pyrrha_mapper.common.objects import Binary, FileSystem, Symlink, Symbol
 from pyrrha_mapper.exceptions import PyrrhaError
 from pyrrha_mapper.types import ResolveDuplicateOption
 
@@ -152,10 +152,12 @@ class FileSystemMapper(ABC):
                     parent_id=binary.id,
                     prefix=hex(symbol.addr) if symbol.addr is not None else "None",
                 )
+
             if symbol.id is None:
                 logging.error(f"{log_prefix}: Record of symbol '{symbol.demangled_name}' failed.")
             else:
                 try:
+                    self.symbol_recorded(binary, symbol)
                     self.db_interface.record_public_access(symbol.id)
                     recorded_symb[symbol.demangled_name] = symbol.id
                 except DBException as e:
@@ -163,6 +165,7 @@ class FileSystemMapper(ABC):
                         f"{log_prefix}: Cannot register access to symbol {symbol.demangled_name}: "
                         f"{e}"
                     ) from e
+                
         for symbol in set(binary.iter_not_exported_functions()):
             symbol.id = self.db_interface.record_method(
                 symbol.demangled_name,
@@ -173,6 +176,7 @@ class FileSystemMapper(ABC):
                 logging.error(f"{log_prefix}: Record of symbol '{symbol.demangled_name}' failed.")
             else:
                 try:
+                    self.symbol_recorded(binary, symbol)
                     self.db_interface.record_private_access(symbol.id)
                 except DBException as e:
                     raise PyrrhaError(
@@ -181,6 +185,16 @@ class FileSystemMapper(ABC):
                     ) from e
 
         return binary
+
+    def symbol_recorded(self, binary: Binary, symbol: Symbol) -> None:
+        """Hook called when a symbol is recorded in the DB.
+
+        This method can be overridden to add custom behavior.
+        
+        :param binary: the Binary object containing the method
+        :param symbol: the Symbol object representing the method
+        """
+        pass  # Default implementation does nothing
 
     def record_symlink_in_db(self, sym: Symlink, log_prefix: str = "") -> Symlink:
         """Record into DB the symlink and its link to its target.

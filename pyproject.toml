@@ -43,7 +43,8 @@ dependencies = [
     'pydantic',
     'rich',
     # InterCG mapper
-    'quokka-project',
+    'quokka-project', # to be removed: will be installed by deps to qbinary
+    "qbinary @ https://github.com/quarkslab/qbinary/archive/refs/heads/refactor-qbinary-api.zip",
     # Exedecomp mapper
     'idascript',
 ]
