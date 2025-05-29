@@ -4,6 +4,7 @@ from pathlib import Path
 from collections import defaultdict
 from dataclasses import dataclass
 import sys
+from typing import Generator, NamedTuple
 
 # third-party imports
 from qbinary import Program, Function, FunctionType
