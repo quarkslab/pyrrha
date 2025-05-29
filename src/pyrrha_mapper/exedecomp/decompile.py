@@ -30,6 +30,7 @@ def main_ida():
             funs[fun_ea] = str(decomp)
 
     with open(output_file, "w") as f:
+        print("Writing to", output_file)
         f.write(json.dumps(funs))
 
     ida_pro.qexit(0)

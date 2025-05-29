@@ -1,7 +1,7 @@
 import logging
 import json
 from pathlib import Path
-from collections import namedtuple, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass
 
 
@@ -15,9 +15,27 @@ from idascript import IDA
 
 DECOMPILE_SCRIPT = Path(__file__).parent / "decompile.py"
 
+# Determine the command to open URLs based on the platform
+try:
+    URL_OPEN_CMD = {
+        "linux": "xdg-open",
+        "win32": "start",
+        "darwin": "open"
+    }[sys.platform]
+except KeyError:
+    logging.warning(f"Unsupported platform: {sys.platform} (will not add URL handler)")
+    URL_OPEN_CMD = "" # type: ignore
+
+
 once_check = True
 
-Location = namedtuple("Location", "start_line start_col end_line end_col")
+
+
+class Location(NamedTuple):
+    start_line: int
+    start_col: int
+    end_line: int
+    end_col: int
 
 
 
@@ -31,18 +49,6 @@ class DecompiledFunction:
     numbat_id: int = -1
 
 
-def is_new_numbat(db: SourcetrailDB) -> bool:
-    global once_check
-    if hasattr(db, "change_node_color"):  # check that attribute but could have been another one
-        return True
-    else:
-        if once_check:
-            logging.warning("Numbat does not support advanced features")
-            once_check = False
-            return False
-
-
-
 def normalize_name(name: str) -> str:
     """ Transform function name  """
     return name.strip("_").strip(".")
@@ -50,7 +56,7 @@ def normalize_name(name: str) -> str:
 
 def find_all_call_references(p: Program, f: Function, source: str) -> tuple[Location, dict[int, list[Location]]]:
     decl_loc = None
-    refs = defaultdict(list)  # dict: call_addr -> list[Location]
+    refs: dict[int, list[Location]] = defaultdict(list)  # dict: call_addr -> list[Location]
     #ppname = lambda name: name.strip("_").strip(".")
 
     call_name_to_addr = {normalize_name(p[c].name): c for c in f.children if p[c].name}  # NOTE: we exclude by design calls that
@@ -138,6 +144,8 @@ def load_decompiled(program: Program) -> dict[int, DecompiledFunction]:
 
             decl, refs = find_all_call_references(program, f, source_text)
 
+            assert decl is not None, f"function {f.name} declaration not found in source code"
+
             final_data[f_addr] = DecompiledFunction(
                 address=f_addr,
                 name=f.name,
@@ -176,22 +184,19 @@ def load_program(bin_path: Path, disass: Disassembler, format: ExportFormat) -> 
     return Program.from_binary(bin_path, disass, format)
 
 
-
 def set_function_color(db: SourcetrailDB, p: Program, fun: Function, f_id: int) -> None:
-    if is_new_numbat(db):  # Check that we have the capability
-        # Change node color based on its type
-        if is_thunk_to_import(p, fun):
-            db.change_node_color(f_id, fill_color="#bee0af", border_color="#395f33")
-        elif fun.type == FunctionType.thunk:
-            db.change_node_color(f_id, fill_color="gray")
-        # elif fun.type == FunctionType.EXTERN:
-        #     db.change_node_color(f_id, fill_color="magenta")
-        # elif fun.type == FunctionType.IMPORTED:
-        #     db.change_node_color(f_id, fill_color="mediumvioletred")
-        else:
-            pass  # Normal function let default color
+    # Change node color based on its type
+    if is_thunk_to_import(p, fun):
+        db.change_node_color(f_id, fill_color="#bee0af", border_color="#395f33")
+    elif fun.type == FunctionType.THUNK:
+        db.change_node_color(f_id, fill_color="gray")
+    # elif fun.type == FunctionType.EXTERN:
+    #     db.change_node_color(f_id, fill_color="magenta")
+    # elif fun.type == FunctionType.IMPORTED:
+    #     db.change_node_color(f_id, fill_color="mediumvioletred")
     else:
-        return
+        pass  # Normal function let default color
+
 
 
 def add_source_file(db: SourcetrailDB, mangled_name: str, symbol_id: int, info: DecompiledFunction) -> bool:
@@ -200,8 +205,9 @@ def add_source_file(db: SourcetrailDB, mangled_name: str, symbol_id: int, info: 
         f.write(info.text)
 
     # Record file
-    file_id = db.record_file(Path(tmp)) #, indexed=False)
-    if file_id is None:
+    try:
+        file_id = db.record_file(Path(tmp)) #, indexed=False)
+    except FileNotFoundError:
         return False
     db.record_file_language(file_id, 'cpp')
     tmp.unlink()  # QUESTION: Maybe we want to keep it for further analyses ?
@@ -228,6 +234,16 @@ def is_thunk_to_import(p: Program, f: Function) -> bool:
         return False
     else:
         return False
+
+
+def add_url_handler(db: SourcetrailDB, program: Program, function: Function, f_id: int) -> None:
+    """ Open the function using a dedicated URL handler. (Use Heimdallr) """
+    if URL_OPEN_CMD:
+        url = f"disas://{program.hash}?idb={program.executable.exec_file.with_suffix(".i64")}&offset={function.start:#08x}"
+        cmd: list[str] = [URL_OPEN_CMD, url]
+        db.set_custom_command(f_id, cmd, "Open in Disassembler") # type: ignore
+    else:
+        pass  # Can't add URL unsuported platform
 
 
 def map_binary(db: SourcetrailDB, program_path: Path, disass: Disassembler, format: ExportFormat) -> bool:
@@ -259,9 +275,8 @@ def map_binary(db: SourcetrailDB, program_path: Path, disass: Disassembler, form
         set_function_color(db, program, f, f_id)
 
         # Add custom command to open that function in IDA
-        abs_path = Path(program.exec_path).absolute()
-        cmd = ["ida64", f"-ONumbatJump:{f_addr:#08x}", str(abs_path)]
-        db.set_custom_command(f_id, cmd, "Open in IDA Pro")
+        add_url_handler(db, program, f, f_id)
+
 
         # Add source code if any
         if f_addr in decompiled and not is_imp:

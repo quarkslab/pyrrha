@@ -18,7 +18,9 @@
 import logging
 import multiprocessing
 from pathlib import Path
-
+import os
+import sys
+import json
 import click
 import coloredlogs  # type: ignore # no typing used in this library
 from numbat import SourcetrailDB
@@ -327,11 +329,15 @@ def fs_call_graph_mapper(  # noqa: D103
 )
 @click.argument(
     "executable",
-    type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
+    type=click.Path(exists=False, file_okay=True, dir_okay=False, path_type=Path),
 )
 def fs_exe_decompiled_mapper(  # noqa: D103
     debug: bool, db: Path, disassembler: Disassembler, exporter: ExportFormat, executable: Path
 ):
+    # Change default db name. By default will be <executable>.srctrldb
+    if db.name == "exe-decomp.srctrldb":
+        db = Path(str(executable)+".srctrldb")
+
     setup_logs(debug, db)
     db_instance = setup_db(db)
 
@@ -345,8 +351,58 @@ def fs_exe_decompiled_mapper(  # noqa: D103
     else:
         logging.error("failure.")
 
+    logging.info(f"write db into: {db_instance.path}")
     db_instance.commit()
     db_instance.close()
+
+
+
+@pyrrha.command("workspace-utils", short_help="Help managing workspaces (for cross-binary referencing).")
+@click.option("-l", "--list", is_flag=True, default=False, help="List all workspaces.")
+@click.option("-a", "--add", is_flag=True, default=False, help="Add a rootfs as workspace.")
+@click.option("-d", "--delete", is_flag=True, default=False, help="Remove a rootfs as workspace.")
+@click.argument(
+    "path",
+    type=click.Path(exists=True, file_okay=True, dir_okay=True, path_type=Path),
+    required=False,
+)
+def workspace_utils(list: bool, add: bool, delete: bool, path: Path):
+    """Manage workspaces for cross-binary referencing."""
+
+    # Configure logs (there is not debug ones)
+    setup_logs(False)
+
+    # Get the base config directory
+    if sys.platform == "win32":
+        heimdallr_settings = Path(os.path.expandvars("%APPDATA%/heimdallr/settings.json"))
+    else:
+        heimdallr_settings = Path(os.path.expandvars("$HOME/.config/heimdallr/settings.json"))
+    if not heimdallr_settings.exists():
+        click.echo(f"heimdallr config directory {heimdallr_settings} does not exists")
+        return -1
+
+    # Load settings
+    settings = json.loads(heimdallr_settings.read_text())
+    idb_path = settings.get("idb_path")
+    if idb_path is None:
+        click.echo(f"heimdallr settings file {heimdallr_settings} does not contain idb_path")
+        return -1
+
+    if list:
+        for path in idb_path:
+            logging.info(f"- {path}")
+    
+    if add:
+        settings["idb_path"].append(str(Path(path).absolute()))
+        heimdallr_settings.write_text(json.dumps(settings, indent=4))  # Write it back
+
+    if delete:
+        try:
+            settings["idb_path"].remove(str(path))
+            heimdallr_settings.write_text(json.dumps(settings, indent=4))  # Write it back
+        except ValueError:
+            click.echo(f"Path {path} not in idb_path of settings.")
+            return -1
 
 
 if __name__ == "__main__":
