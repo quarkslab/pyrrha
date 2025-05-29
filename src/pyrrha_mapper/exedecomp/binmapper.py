@@ -1,4 +1,3 @@
-<<<<<<< src/pyrrha_mapper/exedecomp/binmapper.py
 # -*- coding: utf-8 -*-
 
 #  Copyright 2023-2025 Quarkslab
