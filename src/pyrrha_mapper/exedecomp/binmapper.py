@@ -21,7 +21,7 @@ from pathlib import Path
 from collections import defaultdict
 from dataclasses import dataclass
 import sys
-from typing import Generator, NamedTuple
+from typing import NamedTuple
 
 # third-party imports
 from qbinary import Program, Function, FunctionType
@@ -40,8 +40,6 @@ from rich.progress import (
     TextColumn,
     TimeElapsedColumn,
 )
-
-from pyrrha_mapper.common import load_program_export
 
 # local imports
 from pyrrha_mapper.exceptions import FsMapperError
