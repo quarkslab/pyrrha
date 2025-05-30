@@ -22,6 +22,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 import sys
 from typing import NamedTuple
+from tempfile import NamedTemporaryFile
+import hashlib
 
 # third-party imports
 from qbinary import Program, Function, FunctionType
@@ -31,8 +33,6 @@ from qbinary.types import Disassembler, ExportFormat
 from numbat import SourcetrailDB
 from idascript import IDA
 from numbat import SourcetrailDB
-from quokka import Function, Program
-from quokka.types import FunctionType
 from rich.progress import (
     BarColumn,
     MofNCompleteColumn,
@@ -88,7 +88,7 @@ def normalize_name(name: str) -> str:
     return name.strip("_").strip(".")
 
 
-def find_all_call_references(f: Function, source: str,
+def find_all_call_references(p:Program, f: Function, source: str,
                              log_prefix: str = "") -> tuple[Location, dict[int, list[Location]]]:
     decl_loc = None
     refs: dict[int, list[Location]] = defaultdict(list)  # dict: call_addr -> list[Location]
@@ -147,14 +147,12 @@ def find_all_call_references(f: Function, source: str,
     if decl_loc is None:
         logging.error(f"{log_prefix}: function declaration not found in source code")
     for ref in (x for x in call_addr_to_name if x not in refs):
-        logging.error(
-            f"{log_prefix}: call to {ref:#08x}: '{call_addr_to_name[ref]}' not found in source code"
-        )
+        logging.error(f"{log_prefix}: call to {ref:#08x}: '{call_addr_to_name[ref]}' not found in source code")
 
     return decl_loc, refs
 
 
-def decompile_program(program: Program) -> Path:
+def decompile_program(program: Program) -> None:
     """Generate a PROGRAM_NAME.decompiled file which contained the binary decompilee obtained with IDA.
 
     :param program: Program object of the file to decompiled
@@ -165,7 +163,6 @@ def decompile_program(program: Program) -> Path:
     ida = IDA(bin_path, str(DECOMPILE_SCRIPT), [], timeout=600, exit_virtualenv=True)
     ida.start()
     ida.wait()
-    return _decompile_path(bin_path)
 
 
 def load_decompiled(program: Program, progress: Progress,
@@ -179,9 +176,13 @@ def load_decompiled(program: Program, progress: Progress,
         # Iterate the decompiled data to try make references inside
         decomp_load = progress.add_task("[deep_pink2]Decompiled binary loading", total=len(data))
         for f_addr, source_text in data.items():
-            f: Function = program[f_addr]
+            f: Function = program.get(f_addr)
+            if f is None:
+                logging.warning(f"{log_prefix}: function at {f_addr:#08x} referenced "
+                                "in decompiled code not found in exported program")
+                continue
 
-            decl, refs = find_all_call_references(f, source_text, f"{log_prefix} {f.name}")
+            decl, refs = find_all_call_references(program, f, source_text, f"{log_prefix} {f.name}")
 
             assert decl is not None, f"function {f.name} declaration not found in source code"
 
@@ -192,13 +193,12 @@ def load_decompiled(program: Program, progress: Progress,
 
         return final_data
     else:
-        logging.info(f"{log_prefix}: extracting decompilation file (with idascript)")
-        decompile_file = decompile_program(program)
+        logging.info(f"{log_prefix}: extracting decompilation file {decompile_file} (with idascript)")
+        decompile_program(program)
         if decompile_file.exists():
-            return load_decompiled(program, progress)  # call ourselves again
+            return load_decompiled(program, progress, log_prefix)  # call ourselves again
         else:
-            logging.error("can't find decompilation file (idascript failed)")
-            return {}
+            raise FileNotFoundError("can't find decompilation file (idascript failed)")
 
 
 def load_program(bin_path: Path, disass: Disassembler, format: ExportFormat) -> Program | None:
@@ -244,12 +244,12 @@ def add_source_file(
     """:return: True if successfully added source info.text as a source file in DB."""
     with NamedTemporaryFile(mode="wt", delete_on_close=True) as tmp:
         tmp.write(info.text)
-        tmp.close()
         # Record file
         file_id = db.record_file(Path(tmp.name), name=mangled_name)
         if file_id is None:
             return False
         db.record_file_language(file_id, "cpp")
+        tmp.close()
 
     # Add the function to the file
     logging.debug(f"{log_prefix}: add function to file {file_id}")
@@ -276,10 +276,10 @@ def is_thunk_to_import(p: Program, f: Function) -> bool:
         return False
 
 
-def add_url_handler(db: SourcetrailDB, program: Program, function: Function, f_id: int) -> None:
+def add_url_handler(db: SourcetrailDB, program: Program, hash: str, function: Function, f_id: int) -> None:
     """ Open the function using a dedicated URL handler. (Use Heimdallr) """
     if URL_OPEN_CMD:
-        url = f"disas://{program.hash}?idb={program.executable.exec_file.with_suffix(".i64")}&offset={function.start:#08x}"
+        url = f"disas://{hash}?idb={program.exec_path+".i64"}&offset={function.addr:#08x}"
         cmd: list[str] = [URL_OPEN_CMD, url]
         db.set_custom_command(f_id, cmd, "Open in Disassembler") # type: ignore
     else:
@@ -295,7 +295,7 @@ def map_binary(db: SourcetrailDB, program_path: Path, disass: Disassembler, form
         TimeElapsedColumn(),
     ) as progress:
         # Load the decompilation and quokka files
-        log_prefix = "[Decompiled binary loading]"
+        log_prefix = "[binary loading]"
         try:
             program = load_program(program_path, disass, format)
             if program is None:
@@ -315,11 +315,14 @@ def map_binary(db: SourcetrailDB, program_path: Path, disass: Disassembler, form
             logging.error(f"{log_prefix}: failed to obtain decompiled code: {e}")
             return False
 
+        # Compute MD5 hash for URL handler
+        p_hash = hashlib.md5(Path(program.exec_path).read_bytes()).hexdigest()
+
         # Index all the functions
         f_mapping = {}  # f_addr -> numbat_id
         func_map = progress.add_task("[orange_red1]Functions analysis", total=len(program))
         for f_addr, f in program.items():
-            log_prefix = f"[Func analysis] {f.name} ({f.type})"
+            log_prefix = f"[func analysis] {f.name} ({f.type})"
             if f.type == FunctionType.imported:
                 logging.debug(f"{log_prefix}: extern function, skip")
                 progress.update(func_map, advance=1)
@@ -336,7 +339,7 @@ def map_binary(db: SourcetrailDB, program_path: Path, disass: Disassembler, form
             set_function_color(db, program, f, f_id)
 
             # Add custom command to open that function in IDA
-            add_url_handler(db, program, f, f_id)
+            add_url_handler(db, program, p_hash, f, f_id)
 
             # Add source code if any
             if f_addr in decompiled and not is_imp:
@@ -353,7 +356,7 @@ def map_binary(db: SourcetrailDB, program_path: Path, disass: Disassembler, form
         cg_map = progress.add_task("[orange1]Call Graph Indexing", total=len(program))
 
         for f_addr, f in program.items():
-            log_prefix = f"[Call Graph Indexing] {f.name}"
+            log_prefix = f"[callgraph indexing] {f.name}"
             decomp_fun = decompiled.get(f_addr, None)
 
             for callee in f.children:
