@@ -244,18 +244,18 @@ def fs_mapper(# noqa: D103
 @click.option(
     "--disassembler",
     required=False,
-    type=Disassembler,
-    default=Disassembler.AUTO,
+    type=click.Choice([x.name.lower() for x in Disassembler], case_sensitive=False),
+    default=Disassembler.AUTO.name,
     show_default=True,
-    help="Disassembler to use for disassembly.",
+    help=f"Disassembler to use",
 )
 @click.option(
     "--exporter",
     required=False,
-    type=ExportFormat,
-    default=ExportFormat.AUTO,
+    type=click.Choice([x.name.lower() for x in ExportFormat], case_sensitive=False),
+    default=ExportFormat.AUTO.name,
     show_default=True,
-    help="Binary export format to use for binary analysis.",
+    help=f"Binary exporter",
 )
 @click.argument(
     "root_directory",
@@ -267,24 +267,22 @@ def fs_call_graph_mapper(  # noqa: D103
     db: Path,
     jobs: int,
     resolve_duplicates: ResolveDuplicateOption,
-    disassembler: Disassembler,
-    exporter: ExportFormat,
+    disassembler: str,
+    exporter: str,
     root_directory: Path,
 ):
     setup_logs(debug, db)
     db_instance = setup_db(db)
 
-    if disassembler not in [Disassembler.AUTO, Disassembler.IDA]:
+    disass = Disassembler[disassembler.upper()]
+    if disass not in [Disassembler.AUTO, Disassembler.IDA]:
         click.echo("disassembler not yet supported")
         # TODO: add support for other disassembler
         return 1
-    intercg.InterImageCGMapper.DISASS = disassembler # type: ignore
+    intercg.InterImageCGMapper.DISASS = disass # type: ignore
 
-    if exporter not in [ExportFormat.AUTO, ExportFormat.QUOKKA]:
-        click.echo(f"binary exporter: {exporter.name} not yet supported")
-        # TODO: add support for other disassembler
-        return 1
-    intercg.InterImageCGMapper.EXPORT = exporter # type: ignore
+    exporter_fmt = ExportFormat[exporter.upper()]
+    intercg.InterImageCGMapper.EXPORT = exporter_fmt # type: ignore
 
     root_directory = root_directory.absolute()
 

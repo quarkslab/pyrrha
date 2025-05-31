@@ -19,8 +19,8 @@ import logging
 from typing import NamedTuple
 
 # third-party imports
-from qbinary import Program
-from qbinary.types import FunctionType, Disassembler, ExportFormat
+from qbinary import Program, FunctionType, DisassExportNotImplemented, ExportException, \
+                    Disassembler, ExportFormat
 
 # local imports
 from pyrrha_mapper.common import Binary, Symbol
@@ -53,36 +53,21 @@ def load_program(binary: Binary, disass: Disassembler,
     if file_path is None:
         raise FileNotFoundError(file_path)
 
-    # First try to identify if the binary has already been exported
-    if export == ExportFormat.AUTO:
-        exports = [ExportFormat.QUOKKA, ExportFormat.BINEXPORT]
-    else:
-        exports = [export]
-
-    export_file = None
-    for exp_typ in exports:
-        aux_file = binary.auxiliary_file(append=exp_typ.extension)
-        if aux_file.exists():
-            export_file = aux_file
-            break
-
-    if export_file is None:  # Need to export it
-        try:
-            program: Program | None = Program.from_binary(binary.real_path, disass, export)
-        except Exception as e:
-            raise FsMapperError(f"Cannot export {binary.name}: {e} ({disass.name}|{export.name})") from e
-    else:
-        try:
-            program: Program = Program.open(export_file, binary.real_path)  # type will be infered with export_file
-        except Exception as e:
-            raise FsMapperError(f"Cannot open export {export_file, binary.real_path} {e}") from e
-    
-    if program is None:
-        raise FsMapperError(f"program still None")
-
-    assert program is not None, "Program should not be None"
-    # Load the call graph
-    return compute_call_graph(binary, program, log_prefix) # type: ignore
+    try:
+        program = Program.from_binary(file_path,
+                                   export_format=export,
+                                   disassembler=disass,
+                                   timeout=-1,  # TODO: Receive through command line ?
+                                   override=False)  # if export exists use it
+        # Load the call graph
+        return compute_call_graph(binary, program, log_prefix) # type: ignore
+    except DisassExportNotImplemented as e:
+        logging.error(f"Disassembler {disass} does not support export format {export}: {e}")
+        raise FsMapperError(f"{e}") from e
+    except ExportException as e:
+        logging.error(f"Error while loading binary {file_path}: {e}")
+        raise FsMapperError(f"{e}") from e
+    return None
 
 
 class _FuncData(NamedTuple):

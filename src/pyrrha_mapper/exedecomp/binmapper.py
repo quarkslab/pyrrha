@@ -27,7 +27,7 @@ import hashlib
 
 # third-party imports
 from qbinary import Program, Function, FunctionType
-from qbinary.types import Disassembler, ExportFormat
+from qbinary.types import Disassembler, ExportFormat, DisassExportNotImplemented, ExportException
 
 
 from numbat import SourcetrailDB
@@ -203,21 +203,18 @@ def load_decompiled(program: Program, progress: Progress,
 
 def load_program(bin_path: Path, disass: Disassembler, format: ExportFormat) -> Program | None:
     # First try to find pre-existing exported files if format is AUTO
-    export_file = None
-    if format == ExportFormat.AUTO:
-        for fmt in [ExportFormat.QUOKKA, ExportFormat.BINEXPORT]:
-            export_file = Path(f"{bin_path}{fmt.extension}")
-            if export_file.exists():
-                break
-    else:
-        export_file = Path(f"{bin_path}{format.extension}")
-    
-    if export_file is not None:
-        if export_file.exists():
-            logging.info(f"loading existing export file: {export_file}")
-            return Program.open(export_file, bin_path)
-    # Try to generate the export
-    return Program.from_binary(bin_path, disass, format)
+    try:
+        return Program.from_binary(bin_path,
+                                   export_format=format,
+                                   disassembler=disass,
+                                   timeout= 600,  # TODO: Receive through command line ?
+                                   override=False,  # if export exists use it
+        )
+    except DisassExportNotImplemented as e:
+        logging.error(f"Disassembler {disass} does not support export format {format}: {e}")
+    except ExportException as e:
+        logging.error(f"Error while loading binary {bin_path}: {e}")
+    return None
 
 
 def set_function_color(db: SourcetrailDB, p: Program, fun: Function, f_id: int) -> None:
