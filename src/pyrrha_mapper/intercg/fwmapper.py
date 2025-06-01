@@ -131,7 +131,7 @@ class InterImageCGMapper(FileSystemImportsMapper):
         """ Open the function using a dedicated URL handler. (Use Heimdallr) """
         if not hash:
             return  # no hash, no URL handler
-        url = f"disas://{hash}?idb={Path(binary.name).with_suffix(".i64")}&offset={symbol.addr:#08x}"
+        url = f"disas://{hash}?idb={binary.name+".i64"}&offset={symbol.addr:#08x}"
         cmd: list[str] = ["xdg-open", url]
         self.db_interface.set_custom_command(symbol.id, cmd, "Open in Disassembler") # type: ignore
 
