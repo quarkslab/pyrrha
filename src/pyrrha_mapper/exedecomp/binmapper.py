@@ -146,8 +146,10 @@ def find_all_call_references(p:Program, f: Function, source: str,
 
     if decl_loc is None:
         logging.error(f"{log_prefix}: function declaration not found in source code")
-    for ref in (x for x in call_addr_to_name if x not in refs):
-        logging.error(f"{log_prefix}: call to {ref:#08x}: '{call_addr_to_name[ref]}' not found in source code")
+
+    if not is_thunk_to_import(p, f):  # it is normal no to find the call in thunks to imports
+        for ref in (x for x in call_addr_to_name if x not in refs):
+            logging.warning(f"{log_prefix}: call to {ref:#08x}: '{call_addr_to_name[ref]}' not found in source code")
 
     return decl_loc, refs
 
@@ -241,6 +243,7 @@ def add_source_file(
     """:return: True if successfully added source info.text as a source file in DB."""
     with NamedTemporaryFile(mode="wt", delete_on_close=True) as tmp:
         tmp.write(info.text)
+        tmp.flush()  # Ensure the file is written before we try to record it
         # Record file
         file_id = db.record_file(Path(tmp.name), name=mangled_name)
         if file_id is None:
@@ -249,7 +252,7 @@ def add_source_file(
         tmp.close()
 
     # Add the function to the file
-    logging.debug(f"{log_prefix}: add function to file {file_id}")
+    logging.debug(f"{log_prefix}: add function {mangled_name} to file {file_id}")
     info.numbat_id = file_id
     # record de symbol declaration
     if info.location:
@@ -343,9 +346,11 @@ def map_binary(db: SourcetrailDB, program_path: Path, disass: Disassembler, form
                 info = decompiled[f_addr]
                 if not add_source_file(db, f.mangled_name, f_id, info):
                     logging.warning(f"{log_prefix}: failed to add decompiled code")
-            else:
+            elif f_addr not in decompiled and not is_imp:
                 logging.warning(f"{log_prefix}: function not in decompiled dict")
-            
+            else:
+                pass # do not add decompiled code for thunks to imports
+
             progress.update(func_map, advance=1)
 
 
