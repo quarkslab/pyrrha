@@ -44,7 +44,7 @@ dependencies = [
     'rich',
     # InterCG mapper
     'quokka-project', # to be removed: will be installed by deps to qbinary
-    "qbinary @ https://github.com/quarkslab/qbinary/archive/refs/heads/refactor-qbinary-api.zip",
+    "qbinary>=0.0.2",
     # Exedecomp mapper
     'idascript',
 ]
