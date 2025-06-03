@@ -66,6 +66,7 @@ doc = [
     'mkdocs-glightbox',
     'mkdocs-material',
     'mkdocs-section-index',
+    'mike'
 ]
 linting = ['ruff']
 test = ['pytest', 'pytest-cov']
