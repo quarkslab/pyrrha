@@ -11,25 +11,25 @@
       
       
       
-        <link rel="prev" href="..">
+        <link rel="prev" href="../fs/">
       
       
-        <link rel="next" href="../mappers/mappers/">
+        <link rel="next" href="../exe-decomp/">
       
       
-      <link rel="icon" href="../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.14">
     
     
       
-        <title>Installation - Pyrrha Documentation</title>
+        <title>Filesystem (CallGraph) - Pyrrha Documentation</title>
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.342714a4.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.342714a4.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
       
       
 
@@ -48,14 +48,14 @@
       
     
     
-    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
     
     
     
-   <link href="../assets/stylesheets/glightbox.min.css" rel="stylesheet"/><style>
+   <link href="../../assets/stylesheets/glightbox.min.css" rel="stylesheet"/><style>
     html.glightbox-open { overflow: initial; height: 100%; }
     .gslide-title { margin-top: 0px; user-select: text; }
     .gslide-desc { color: #666; user-select: text; }
@@ -64,7 +64,7 @@
     .gdesc-inner { font-size: 0.75rem; }
     body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color);}
     body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color);}
-    body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color);}</style> <script src="../assets/javascripts/glightbox.min.js"></script></head>
+    body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color);}</style> <script src="../../assets/javascripts/glightbox.min.js"></script></head>
   
   
     
@@ -83,7 +83,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#installation" class="md-skip">
+        <a href="#fs-cg-inter-image-call-graph-mapper" class="md-skip">
           Skip to content
         </a>
       
@@ -99,7 +99,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href=".." title="Pyrrha Documentation" class="md-header__button md-logo" aria-label="Pyrrha Documentation" data-md-component="logo">
+    <a href="../.." title="Pyrrha Documentation" class="md-header__button md-logo" aria-label="Pyrrha Documentation" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -119,7 +119,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Installation
+              Filesystem (CallGraph)
             
           </span>
         </div>
@@ -235,7 +235,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href=".." title="Pyrrha Documentation" class="md-nav__button md-logo" aria-label="Pyrrha Documentation" data-md-component="logo">
+    <a href="../.." title="Pyrrha Documentation" class="md-nav__button md-logo" aria-label="Pyrrha Documentation" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -265,7 +265,7 @@
   
   
     <li class="md-nav__item">
-      <a href=".." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -282,6 +282,98 @@
     
       
       
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Installation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../mappers/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    Mappers
+    
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Mappers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Filesystem (Quick)
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
   
   
     
@@ -301,7 +393,7 @@
   
   
   <span class="md-ellipsis">
-    Installation
+    Filesystem (CallGraph)
     
   </span>
   
@@ -314,7 +406,7 @@
   
   
   <span class="md-ellipsis">
-    Installation
+    Filesystem (CallGraph)
     
   </span>
   
@@ -337,60 +429,18 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#numbatui-installation" class="md-nav__link">
+  <a href="#introduction" class="md-nav__link">
     <span class="md-ellipsis">
-      NumbatUI Installation
+      Introduction
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#pyrrha-installation" class="md-nav__link">
+  <a href="#usage" class="md-nav__link">
     <span class="md-ellipsis">
-      Pyrrha Installation
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Pyrrha Installation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#python-package" class="md-nav__link">
-    <span class="md-ellipsis">
-      Python Package
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#external-dependencies" class="md-nav__link">
-    <span class="md-ellipsis">
-      External Dependencies
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#docker" class="md-nav__link">
-    <span class="md-ellipsis">
-      Docker
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#documentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      Documentation
+      Usage
     </span>
   </a>
   
@@ -403,73 +453,6 @@
     </li>
   
 
-    
-      
-      
-  
-  
-  
-  
-    
-    
-    
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
-        
-          
-          <div class="md-nav__link md-nav__container">
-            <a href="../mappers/mappers/" class="md-nav__link ">
-              
-  
-  
-  <span class="md-ellipsis">
-    Mappers
-    
-  </span>
-  
-
-            </a>
-            
-              
-              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
-                <span class="md-nav__icon md-icon"></span>
-              </label>
-            
-          </div>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3">
-            <span class="md-nav__icon md-icon"></span>
-            Mappers
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../mappers/fs/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Filesystem (Quick)
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
               
             
               
@@ -479,30 +462,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../mappers/fs-cg/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Filesystem (CallGraph)
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../mappers/exe-decomp/" class="md-nav__link">
+      <a href="../exe-decomp/" class="md-nav__link">
         
   
   
@@ -570,7 +530,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../contributing/dev_mapper/" class="md-nav__link">
+      <a href="../../contributing/dev_mapper/" class="md-nav__link">
         
   
   
@@ -600,7 +560,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../changelog/" class="md-nav__link">
+      <a href="../../changelog/" class="md-nav__link">
         
   
   
@@ -622,7 +582,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../license/" class="md-nav__link">
+      <a href="../../license/" class="md-nav__link">
         
   
   
@@ -664,60 +624,18 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#numbatui-installation" class="md-nav__link">
+  <a href="#introduction" class="md-nav__link">
     <span class="md-ellipsis">
-      NumbatUI Installation
+      Introduction
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#pyrrha-installation" class="md-nav__link">
+  <a href="#usage" class="md-nav__link">
     <span class="md-ellipsis">
-      Pyrrha Installation
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Pyrrha Installation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#python-package" class="md-nav__link">
-    <span class="md-ellipsis">
-      Python Package
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#external-dependencies" class="md-nav__link">
-    <span class="md-ellipsis">
-      External Dependencies
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#docker" class="md-nav__link">
-    <span class="md-ellipsis">
-      Docker
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#documentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      Documentation
+      Usage
     </span>
   </a>
   
@@ -742,72 +660,44 @@
   
 
 
-<h1 id="installation">Installation</h1>
-<p>The installation is done in two parts:</p>
-<ul>
-<li>installing <code>Pyrrha</code> (as a Python module);</li>
-<li>installing mappers external dependencies if required;</li>
-<li>installing <code>NumbatUI</code> to be able to visualize Pyrrha's results.</li>
-</ul>
-<h2 id="numbatui-installation">NumbatUI Installation</h2>
-<p>NumbatUI should be compiled locally, as explained in its <a href="https://github.com/quarkslab/NumbatUI/blob/main/README.md">README</a>. For the moment it has only be tested on Ubuntu/Debian distributions. Here are the summarized compilation instructions:</p>
-<p><strong>Prerequisites</strong>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>apt-get update
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>apt-get install -y \
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>        cmake \
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>        git \
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>        build-essential \
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        libboost-filesystem-dev libboost-program-options-dev libboost-system-dev libboost-date-time-dev \
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        qt6-svg-dev qt6-base-dev qt6-5compat-dev \
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        unzip wget \
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        libclang-17-dev clang-17
-</span></code></pre></div></p>
-<p><strong>Compilation</strong>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>git clone https://github.com/quarkslab/NumbatUI.git numbatui 
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>cd numbatui
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>mkdir -p build/Release 
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>cd build/Release
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>cmake -DCMAKE_BUILD_TYPE=&quot;Release&quot; -DBUILD_CXX_LANGUAGE_PACKAGE=ON -DBUILD_PYTHON_LANGUAGE_PACKAGE=ON ../.. &amp;&amp; make NumbatUI -j $(nproc)
-</span></code></pre></div></p>
-<h2 id="pyrrha-installation">Pyrrha Installation</h2>
-<h3 id="python-package">Python Package</h3>
-<p>Pyrrha requires a Python version &gt;= 3.10.
-It is recommended to install the Python package inside a virtualenv. You can use <code>pip</code> to install it.
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">pip</span> <span class="n">install</span> <span class="n">pyrrha</span><span class="o">-</span><span class="n">mapper</span>
+<h1 id="fs-cg-inter-image-call-graph-mapper"><code>fs-cg</code>: Inter Image Call Graph mapper</h1>
+<h2 id="introduction">Introduction</h2>
+<p>The <code>fs-cg</code> push deeper to <code>fs</code> mapper concept by mapping the call graph of
+all executables on a firmware. So it not only relates imports to exports but
+track precisely where within the executables. It is thus possible to know
+precisely which function is called by which across the firmware. As such,
+anyone can follow control-flow between programs.</p>
+<p>The main drawback is that computing a program call graph requires disassembly
+and is thus more computationaly intensive. That task is currently done using
+the <a href="https://github.com/quarkslab/quokka">Quokka exporter</a>.</p>
+<h2 id="usage">Usage</h2>
+<p>This mapper uses the output of the <code>fs</code> mapper to resolve symlinks automatically.
+The dump should be provided on the command line. The <code>ROOT_DIRECTORY</code> should contain
+the whole filesystem to be indexed.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Usage: pyrrha fs-cg [OPTIONS] ROOT_DIRECTORY
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  Map a the Inter-Image Call Graph of a whole filesystem into a numbatui-compatible db.It disassembles executables
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  using a disassembler and extract the call graph.It then results all call references across binaries.
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>Options:
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>  -d, --debug                  Set log level to DEBUG
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>  --db PATH                    NumbatUI DB file path (.srctrldb).  [default: pyrrha.srctrldb]
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  -j, --jobs INT               Number of parallel jobs created (threads).  [default: 1; 1&lt;=x&lt;=11]
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>  --ignore                     When resolving duplicate imports, ignore them
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>  --arbitrary                  When resolving duplicate imports, select the first one available
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>  --interactive                When resolving duplicate imports, user manually select which one to use
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>  --fs-mapper-dump FILE        Pyrrha fs mapper dump.  [required]
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>  --disassembler DISASSEMBLER  Disassembler to use for disassembly.  [default: Disassembler.AUTO]
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>  --exporter EXPORTERS         Binary exporter to use for binary analysis.  [default: Exporters.AUTO]
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>  -h, --help                   Show this message and exit.
 </span></code></pre></div>
-If you prefer using sources to install Pyrrha, do the following:
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a># Do not forget to activate your virtualenv
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>pip install &#39;pyrrha @ git+https://github.com/quarkslab/pyrrha&#39;
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a># If you prefer, you can manually clone the repository and then install the package
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>git clone https://github.com/quarkslab/pyrrha
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>cd pyrrha
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>pip install &#39;.&#39;
-</span></code></pre></div></p>
-<h3 id="external-dependencies">External Dependencies</h3>
-<p>The <code>fs-cg</code> and the <code>exec-decomp</code> mappers require to have a proper installation of <a href="https://github.com/quarkslab/quokka">Quokka</a> and so of IDA. The <code>exec-decomp</code> also requires to have an IDA license with decompiler.</p>
-<p>The Quokka plugin for IDA can directly be downloaded from the <a href="https://github.com/quarkslab/quokka/releases">Release page</a>. The associated Python package is directly installed during Pyrrha Python package installation. </p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>The <code>fs-cg</code> and the <code>exec-decomp</code> mappers could be used without Quokka and IDA if you already have the cache files for your firmware (<code>.decompiled</code> and <code>.quokka</code> files). More details in the corresponding mapper documentation.</p>
+<p>This mapper create the Quokka export of each binary nearby each executable file. If this file already exists, it loads it without regenerate it. Like that it also allowed to use <code>pyrrha</code> in systems without Quokka and/or IDA. </p>
 </div>
-<h3 id="docker">Docker</h3>
-<p><code>pyrrha</code> can be used with a docker. It provides Pyrrha, but you still need to install NumbatUI on your system as described in the <a href="#numbatui-installation">NumbatUI Installation</a> section.</p>
-<p>The docker image is directly available from our <a href="https://github.com/orgs/quarkslab/packages/container/package/pyrrha">Github registry</a>.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>cd ROOT_DIRECTORY/..
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>docker run  --rm -t -v $PWD:/tmp/pyrrha ghcr.io/quarkslab/pyrrha:latest fs [OPTIONS] ROOT_DIRECTORY
-</span></code></pre></div>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>The docker image has only be built for the <code>fs</code> mapper.</p>
-</div>
-<h2 id="documentation">Documentation</h2>
-<p>If you want to build the documentation, you need to install Pyrrha with the <code>[doc]</code> dependencies and then serve the documentation on a local server with <code>mkdocs</code>.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;pyrrha-mapper[doc]&#39;</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1"># serve doc locally</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>mkdocs<span class="w"> </span>serve
-</span></code></pre></div>
+<p>After firmware analysis, you can the resulting project with <code>numbatui</code>. You can now navigate on the resulting cartography. The user interface is described in depth in the <a href="https://github.com/quarkslab/NumbatUI/blob/main/DOCUMENTATION.md#user-interface">NumbatUI documentation</a>.
+Do not hesitate to take a look at  all the possibilities offered by NumbatUI, especially <a href="https://github.com/quarkslab/NumbatUI/blob/main/DOCUMENTATION.md#custom-trail-dialog">Custom Trails</a>.</p>
 
 
 
@@ -894,10 +784,10 @@ If you prefer using sources to install Pyrrha, do the following:
     
     
       
-      <script id="__config" type="application/json">{"base": "..", "features": ["content.code.annotate", "content.code.copy", "footer"], "search": "../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.annotate", "content.code.copy", "footer"], "search": "../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.13a4f30d.min.js"></script>
+      <script src="../../assets/javascripts/bundle.13a4f30d.min.js"></script>
       
     
   <script id="init-glightbox">const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});
