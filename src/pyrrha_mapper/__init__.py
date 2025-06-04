@@ -18,6 +18,6 @@
 
 from pyrrha_mapper.common import Binary, FileSystem, FileSystemMapper, Symbol, Symlink
 
-__version__ = "0.4.3"
+__version__ = "1.0.0"
 
 __all__ = ["Binary", "FileSystem", "FileSystemMapper", "Symbol", "Symlink"]
