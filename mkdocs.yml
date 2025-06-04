@@ -73,6 +73,8 @@ markdown_extensions:
       alternate_style: true
 
 extra:
+  version:
+    provider: mike
   social:
     - icon: fontawesome/solid/globe
       link: https:www.quarkslab.com
