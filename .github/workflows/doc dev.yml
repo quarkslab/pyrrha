@@ -18,5 +18,9 @@ jobs:
       - name: Install Dependencies
         run: |
           pip install '.[doc]'
+      - name: Setup Docs Deploy
+        run: |
+          git config --global user.name "Docs Deploy"
+          git config --global user.email "docs.deploy@unicorn.unicorn"
       - name: Build and deploy documentation
         run: mike deploy --push dev
