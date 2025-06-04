@@ -1,12 +1,19 @@
 # Installation
-The installation is done in two parts:
+The installation is done in three parts:
 
 - installing `Pyrrha` (as a Python module);
 - installing mappers external dependencies if required;
 - installing `NumbatUI` to be able to visualize Pyrrha's results.
 
+!!! info
+    It is also possible to visualize results with `Sourcetrail`, it is the base from which `NumbatUI` was forked. The user won't be able to use new features like the renaming of the node or the launch of external programs from Sourcetrail/NumbatUI.
+
+    Installation can be done from [its last release](https://github.com/CoatiSoftware/Sourcetrail/releases/tag/2021.4.19), using its [documentation](https://github.com/CoatiSoftware/Sourcetrail/blob/master/DOCUMENTATION.md#installation).
+
+
 ## NumbatUI Installation
-NumbatUI should be compiled locally, as explained in its [README](https://github.com/quarkslab/NumbatUI/blob/main/README.md). For the moment it has only be tested on Ubuntu/Debian distributions. Here are the summarized compilation instructions:
+NumbatUI should be compiled locally, as explained in its [README](https://github.com/quarkslab/NumbatUI/blob/main/README.md). For the moment it has only be tested on Ubuntu/Debian distributions. 
+Here are the summarized compilation instructions:
 
 **Prerequisites**
 ```commandline
@@ -29,6 +36,7 @@ mkdir -p build/Release
 cd build/Release
 cmake -DCMAKE_BUILD_TYPE="Release" -DBUILD_CXX_LANGUAGE_PACKAGE=ON -DBUILD_PYTHON_LANGUAGE_PACKAGE=ON ../.. && make NumbatUI -j $(nproc)
 ```
+
 
 
 ## Pyrrha Installation

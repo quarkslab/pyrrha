@@ -18,7 +18,10 @@ the [Quokka exporter](https://github.com/quarkslab/quokka).
 
 This mapper uses the output of the `fs` mapper to resolve symlinks automatically.
 The dump should be provided on the command line. The `ROOT_DIRECTORY` should contain
-the whole filesystem to be indexed.
+the whole filesystem to be indexed. 
+
+!!! tip
+    You can use `IDAPATH` 
 
 ```commandline
 Usage: pyrrha fs-cg [OPTIONS] ROOT_DIRECTORY

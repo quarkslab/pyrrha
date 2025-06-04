@@ -69,6 +69,8 @@ markdown_extensions:
       base_path: [ ".", ".." ]
       check_paths: true
   - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
 
 extra:
   social:
