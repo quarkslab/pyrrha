@@ -29,8 +29,8 @@ Options:
     This mapper create the Quokka export of the binary as well as a cache version of all the decompiled function of the analyzed binary.. If these files already exist, it loads them without regenerate them. Like that it also allowed to use `pyrrha` in systems without Quokka and/or IDA. 
 
 
-After firmware analysis, you can the resulting project with `numbatui`. You can now navigate on the resulting cartography. The user interface is described in depth in the [NumbatUI documentation](https://github.com/quarkslab/NumbatUI/blob/main/DOCUMENTATION.md#user-interface).
-Do not hesitate to take a look at  all the possibilities offered by NumbatUI, especially [Custom Trails](https://github.com/quarkslab/NumbatUI/blob/main/DOCUMENTATION.md#custom-trail-dialog).
+After firmware analysis, you can visualize and navigate into the results with `numbatui`. The user interface is described in depth in the [NumbatUI documentation](https://github.com/quarkslab/NumbatUI/blob/main/DOCUMENTATION.md#user-interface).
+    Do not hesitate to take a look at  all the possibilities offered by NumbatUI, especially [Custom Trails](https://github.com/quarkslab/NumbatUI/blob/main/DOCUMENTATION.md#custom-trail-dialog).
 
 <!-- ## JumpTo Disassembler Feature
 

@@ -1,7 +1,10 @@
 # `fs`: ELF/PE imports/exports and the associated symlinks
 
-
+!!! example "Demo"
+    An live demo of this mapper and how you can use NumbatUI to visualize its results is available [here](https://www.youtube.com/watch?v=-dMl-SvQl4k&t=12m33s).
+    
 ## Usage
+
 ### Mapping with Pyrrha 
 First, create your db with `pyrrha`. The `ROOT_DIRECTORY` should contain the whole filesystem you want to map, it should be already extracted or mounted. `ROOT_DIRECTORY` will be considered by Pyrrha as the filesystem root for all the symlink resolutions. 
 
@@ -27,43 +30,42 @@ You can also export your Pyrrha results as a JSON file (option `-j`) to be able 
 ### Visualization with NumbatUI
 Open the resulting project with `numbatui`. You can now navigate on the resulting cartography. The user interface is described in depth in the [NumbatUI documentation](https://github.com/quarkslab/NumbatUI/blob/main/DOCUMENTATION.md#user-interface).
 
-<figure markdown>
-  ![](../img/imports.png)
-  <figcaption> An example of the symbols and libraries imported by <code>libgcc_s.so.1</code> and of the symbols which reference this library.</figcaption>
-</figure>
+<div class="grid cards" markdown>
 
-<figure markdown>
-  ![](../img/symlinks.png)
-  <figcaption> An example of the symlinks which point on <code>busybox</code>.</figcaption>
-</figure>
+- ![](../img/imports.png) <center> _Symbols and libraries imported by `libgcc_s.so.1`._</center>
+
+- ![](../img/symlinks.png) <center>_Symlinks pointing on `busybox`._</center>
+</div>
 
 Do not hesitate to take a look at [NumbatUI documentation](https://github.com/quarkslab/NumbatUI/blob/main/DOCUMENTATION.md#graph-view-1) to explore all the possibilities offered by Sourcetrail. [Custom Trails](https://github.com/quarkslab/NumbatUI/blob/main/DOCUMENTATION.md#custom-trail-dialog) could be really useful in a lot of cases.
 
-!!! example "Demo"
-    An live demo of how we can use NumbatUI to visualize this mapper results is available [here](https://www.youtube.com/watch?v=-dMl-SvQl4k&t=12m33s).
+!!! note "Sourcetrail Representation"
+    If you are visualizing results with Sourcetrail, the exported functions and symbols, and the symlinks are represented as follows:
+    
+    Binaries |    Exported functions    |     Exported symbols     | Symlinks
+    :---:|:------------------------:|:------------------------:| :---:
+    ![](../img/classes.png) | ![](../img/function.png) | ![](../img/variable.png) | ![](../img/typedefs.png)
 
 ##  Quick Start—Usage Example
 Let's take the example of an OpenWRT firmware which is a common Linux distribution for embedded targets like routers.
 
 First, download the firmware and extract its root-fs into a directory. Here we download the last OpenWRT version for generic x86_64 systems.
 ```commandline
-$ wget https://downloads.openwrt.org/releases/22.03.5/targets/x86/64/openwrt-22.03.5-x86-64-rootfs.tar.gz -O openwrt_rootfs.tar.gz
-$ mkdir openwrt_root_fs && cd openwrt_root_fs
-$ tar -xf ../openwrt_rootfs.tar.gz
-$ cd .. && rm openwrt_rootfs.tar.gz
+wget https://downloads.openwrt.org/releases/22.03.5/targets/x86/64/openwrt-22.03.5-x86-64-rootfs.tar.gz -O openwrt_rootfs.tar.gz
+mkdir openwrt_root_fs && cd openwrt_root_fs
+tar -xf ../openwrt_rootfs.tar.gz
+cd .. && rm openwrt_rootfs.tar.gz
 ```
 
 Then we can run Pyrrha on it. It will produce some logs indicating which symlinks or imports cannot be solved directly by the tool. 
 *(Do not forget to activate your virtualenv if you have created one for Pyrrha installation.)*
 ```commandline
-> pyrrha fs --db openwrt_db openwrt_root_fs
-> ls 
-openwrt_root_fs openwrt_db.srctrldb  openwrt_db.srctrlprj
+pyrrha fs --db openwrt_db openwrt_root_fs -j $(nproc)
 ```
 
 You can now navigate into the resulting cartography with NumbatUI.
 ```commandline
-> numbatui openwrt_db.srctrlprj
+numbatUI openwrt_db.srctrlprj
 ```
 
 <figure markdown>
@@ -80,8 +82,8 @@ Diffing could be a solution. However, as binary diffing can be quite time-consum
 
 The following script prints on the standard output the list of files that has been added/removed and then the symbol changes file by file.
 
-???+ abstract "`examples/diffing_pyrrha_export.py`"
+???+ abstract "Diffing Pyrrha Exports"
 
     ``` py 
-    --8<-- "examples/diffing_pyrrha_exports.py"
+    --8<-- "diffing_pyrrha_exports.py"
     ```

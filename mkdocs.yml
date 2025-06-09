@@ -1,5 +1,7 @@
 site_name: Pyrrha Documentation
 site_description: "A mapper collection for firmware analysis."
+site_url: https://quarkslab.github.io/pyrrha/
+site_author: "Quarkslab"
 repo_url: "https://github.com/quarkslab/pyrrha"
 repo_name: "quarkslab/pyrrha"
 watch: [ mkdocs.yml, README.md, CHANGELOG.md, src/pyrrha_mapper ]
@@ -35,7 +37,7 @@ nav:
   - Installation: installation.md
   - Mappers:
       - mappers/mappers.md
-      - Filesystem (Quick): mappers/fs.md
+      - Filesystem (Overview): mappers/fs.md
       - Filesystem (CallGraph): mappers/fs-cg.md
       - Exe-Decomp: mappers/exe-decomp.md
   - Contributing:
@@ -49,8 +51,7 @@ plugins:
   - glightbox # picture zoom
   - search
   - section-index
-
-
+  - social
 
 markdown_extensions:
   - admonition
@@ -66,7 +67,11 @@ markdown_extensions:
       pygments_lang_class: true
   - pymdownx.inlinehilite
   - pymdownx.snippets:
-      base_path: [ ".", ".." ]
+      base_path: 
+        - "README.md"
+        - "LICENSE"
+        - "CHANGELOG.md"
+        - "docs/.snippets/"
       check_paths: true
   - pymdownx.superfences
   - pymdownx.tabbed:
