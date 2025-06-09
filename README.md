@@ -57,14 +57,17 @@ The usage workflow is composed of two steps which allow you to separate DB creat
  <!-- # --8<-- [start:publications]-->
 ## Publications
 
-Pyrrha has been presented by Eloïse Brocas at two conferences listed below. These talks include live demo of the `fs` parser which map links between libraries and executables files.
+Pyrrha presentations, including live demos:
 
-- Pyrrha: navigate easily into your system binaries, *Hack.lu'23*. [[slides]](https://github.com/quarkslab/conf-presentations/blob/master/Confs/HackLu23/pyrrha.pdf) [[video]](https://www.youtube.com/watch?v=-dMl-SvQl4k) 
-- Map your Firmware!, *PTS'23*. [[slides]](https://github.com/quarkslab/conf-presentations/blob/master/Confs/PTS23/PTS2023-Talk-14-Pyrrha-map-your-firmware.pdf) [[video]](https://passthesalt.ubicast.tv/videos/2023-map-your-firmware/) 
+- **Pyrrha & Friends: Diving into Firmware Cartography**, Eloïse Brocas & Robin Davis, *SSTIC*, Rennes, France, 2025. [[slides]](https://www.sstic.org/media/SSTIC2025/SSTIC-actes/pyrrha_diving_into_firmware_cartography/SSTIC2025-Slides-pyrrha_diving_into_firmware_cartography-brocas_david.pdf) [[video]](https://static.sstic.org/videos2025/1080p/pyrrha_diving_into_firmware_cartography.mp4) 
 
-The theoritical details below the `fs-cg` and `exe-decomp` mappers implementation have been presented by Robin David.
+- **Pyrrha: navigate easily into your system binaries**, Eloïse Brocas, *Hack.lu*, Luxembourg, 2023. [[slides]](https://github.com/quarkslab/conf-presentations/blob/master/Confs/HackLu23/pyrrha.pdf) [[video]](https://www.youtube.com/watch?v=-dMl-SvQl4k) 
 
-- Streamlining Firmware Analysis with Inter-Image Call Graphs and Decompilation, *RE/verse.io 2025*. [[slides]](https://github.com/quarkslab/conf-presentations/blob/master/Confs/REverse-25/REverse_firmware_analysis_2025.pdf) [[video]](https://www.youtube.com/watch?v=LsDnrfZt_Xs)
+- **Map your Firmware!**, Eloïse Brocas, *Pass The SALT*, Lille, France, 2023. [[slides]](https://github.com/quarkslab/conf-presentations/blob/master/Confs/PTS23/PTS2023-Talk-14-Pyrrha-map-your-firmware.pdf) [[video]](https://passthesalt.ubicast.tv/videos/2023-map-your-firmware/) 
+
+Theory behind implementations
+
+- **Streamlining Firmware Analysis with Inter-Image Call Graphs and Decompilation**, Robin David, *RE//verse.io*, USA, 2025. [[slides]](https://github.com/quarkslab/conf-presentations/blob/master/Confs/REverse-25/REverse_firmware_analysis_2025.pdf) [[video]](https://www.youtube.com/watch?v=LsDnrfZt_Xs)
 
  <!-- # --8<-- [end:publications] -->
 
