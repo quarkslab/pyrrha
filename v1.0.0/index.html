@@ -10,6 +10,8 @@
       
       
       
+        <link rel="canonical" href="https://quarkslab.github.io/pyrrha/v1.0.0/">
+      
       
       
         <link rel="next" href="installation/">
@@ -52,6 +54,32 @@
 
     
     
+      
+        <meta  property="og:type"  content="website" >
+      
+        <meta  property="og:title"  content="Pyrrha Documentation" >
+      
+        <meta  property="og:description"  content="A mapper collection for firmware analysis." >
+      
+        <meta  property="og:image"  content="https://quarkslab.github.io/pyrrha/v1.0.0/assets/images/social/index.png" >
+      
+        <meta  property="og:image:type"  content="image/png" >
+      
+        <meta  property="og:image:width"  content="1200" >
+      
+        <meta  property="og:image:height"  content="630" >
+      
+        <meta  property="og:url"  content="https://quarkslab.github.io/pyrrha/v1.0.0/" >
+      
+        <meta  name="twitter:card"  content="summary_large_image" >
+      
+        <meta  name="twitter:title"  content="Pyrrha Documentation" >
+      
+        <meta  name="twitter:description"  content="A mapper collection for firmware analysis." >
+      
+        <meta  name="twitter:image"  content="https://quarkslab.github.io/pyrrha/v1.0.0/assets/images/social/index.png" >
+      
+    
     
    <link href="assets/stylesheets/glightbox.min.css" rel="stylesheet"/><style>
     html.glightbox-open { overflow: initial; height: 100%; }
@@ -81,7 +109,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#pyrrha-a-mapper-collection-for-firmware-analysis" class="md-skip">
+        <a href="#installation" class="md-skip">
           Skip to content
         </a>
       
@@ -270,8 +298,6 @@
       <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
       
       
-        
-      
       
         <label class="md-nav__link md-nav__link--active" for="__toc">
           
@@ -299,8 +325,6 @@
 <nav class="md-nav md-nav--secondary" aria-label="Table of contents">
   
   
-  
-    
   
   
     <label class="md-nav__title" for="__toc">
@@ -442,7 +466,7 @@
         
   
   <span class="md-ellipsis">
-    Filesystem (Quick)
+    Filesystem (Overview)
   </span>
   
 
@@ -621,8 +645,6 @@
   
   
   
-    
-  
   
     <label class="md-nav__title" for="__toc">
       <span class="md-nav__icon md-icon"></span>
@@ -699,7 +721,22 @@
   
 
 
-<h1 id="pyrrha-a-mapper-collection-for-firmware-analysis">Pyrrha: A mapper collection for firmware analysis</h1>
+  <h1>Home</h1>
+
+<p align="center">
+  <a href="https://github.com/quarkslab/pyrrha/pypi">
+    <img src="https://img.shields.io/pypi/v/pyrrha-mapper.svg">
+  </a>
+  <a href="https://github.com/quarkslab/pyrrha/releases">
+    <img src="https://img.shields.io/github/actions/workflow/status/quarkslab/pyrrha/release.yml">
+  </a>
+  <a href="https://pypi.org/project/pyrrha-mapper/">
+    <img src="https://img.shields.io/pypi/pyversions/pyrrha-mapper">
+  </a>
+  <a class="glightbox" href="https://img.shields.io/pypi/dm/pyrrha-mapper" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img src="https://img.shields.io/pypi/dm/pyrrha-mapper"/></a>
+  <a class="glightbox" href="https://img.shields.io/github/license/quarkslab/pyrrha" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img src="https://img.shields.io/github/license/quarkslab/pyrrha"/></a>
+</p>
+
 <p>Pyrrha is a filesystem cartography and correlation software focusing on visualization. It currently focuses on the relationship between executable files but aims at enabling anyone to map and visualize any relationship types. It uses the open-source code source
 explorer <a href="https://github.com/quarkslab/NumbatUI">NumbatUI</a> to provide users with an easy way to navigate through and search for 
 path to function.</p>
@@ -715,15 +752,11 @@ path to function.</p>
 
 <h2 id="installation">Installation</h2>
 <p>The installation is done in three parts:</p>
-<ul>
-<li>Installing mapper external dependencies: <ul>
-<li>IDA dissassembler (with the decompilation option for the <code>exe-decomp</code> mapper).</li>
-<li><a href="https://github.com/quarkslab/quokka/releases"><code>Quokka</code> IDA plugin</a>.</li>
-</ul>
-</li>
-<li>Installing <code>Pyrrha</code> as a Python module (<code>pip install pyrrha-mapper</code> or from the sources).</li>
-<li>Installing <a href="https://github.com/quarkslab/NumbatUI"><code>NumbatUI</code></a> (or <a href="https://github.com/CoatiSoftware/Sourcetrail"><code>Sourcetrail</code></a>) to be able to visualize Pyrrha's results. </li>
-</ul>
+<ol>
+<li>Install mapper external dependencies: IDA dissassembler (with the decompilation option for the <code>exe-decomp</code> mapper) and <a href="https://github.com/quarkslab/quokka/releases"><code>Quokka</code> IDA plugin</a>.</li>
+<li>Install <code>Pyrrha</code> itself.</li>
+<li>Install <a href="https://github.com/quarkslab/NumbatUI"><code>NumbatUI</code></a> (or <a href="https://github.com/CoatiSoftware/Sourcetrail"><code>Sourcetrail</code></a>) to be able to visualize Pyrrha's results. </li>
+</ol>
 <div class="admonition example">
 <p class="admonition-title">Quick Start</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Sourcetrail</label><label for="__tabbed_1_2">NumbatUI (Ubuntu/Debian)</label></div>
@@ -806,29 +839,20 @@ path to function.</p>
 </div>
 </div>
 </div>
-<p>Detailed instructions can be found on the <a href="https://quarkslab.github.io/pyrrha/installation/">dedicated documentation page</a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Detailed instructions can be found on the <a href="installation/">dedicated documentation page</a>.</p>
+</div>
 <h2 id="usage">Usage</h2>
 <p>The usage workflow is composed of two steps which allow you to separate DB creation and result visualization.</p>
 <ol>
-<li>Run Pyrrha to obtain NumbatUI compatible files (<code>*.srctrlprj</code> for the project file and <code>*.srctrldb</code> for the DB file). With the python package, you can just launch the command:
-   <div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>&gt; pyrrha
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>Usage: pyrrha [OPTIONS] COMMAND [ARGS]...
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>Mapper collection for firmware analysis.
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>Options:
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a> -h, --help  Show this message and exit.
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>Commands:
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a> exe-decomp  Map an executable call graph with its decompiled code.
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a> fs          Map PE and ELF files of a filesystem into a sourcetrail-compatible db.
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a> fs-cg       Map the Call Graph of every firmware executable a sourcetrail-compatible db.
-</span></code></pre></div></li>
-<li>Visualize your results with Sourcetrail
-   <div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>&gt; numbatui PROJECT_NAME.srctrlprj
-</span></code></pre></div></li>
+<li>Run Pyrrha to obtain NumbatUI compatible files (<code>*.srctrlprj</code> for the project file and <code>*.srctrldb</code> for the DB file). With the python package, you can just launch the command <code>pyrrha</code>.</li>
+<li>Visualize your results with Sourcetrail/NumbatUI. </li>
 </ol>
-<p>The detailed documentation of each mapper is available in the <a href="https://quarkslab.github.io/pyrrha/mappers/mappers/">documentation</a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The detailed documentation of each mapper is available in the <a href="mappers/mappers/">documentation</a>.</p>
+</div>
 <h2 id="publications">Publications</h2>
 <p>Pyrrha has been presented by Eloïse Brocas at two conferences listed below. These talks include live demo of the <code>fs</code> parser which map links between libraries and executables files.</p>
 <ul>
@@ -854,6 +878,9 @@ path to function.</p>
 
 
 
+
+  
+  
 
 
 

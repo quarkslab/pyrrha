@@ -10,6 +10,8 @@
       
       
       
+        <link rel="canonical" href="https://quarkslab.github.io/pyrrha/v1.0.0/installation/">
+      
       
         <link rel="prev" href="..">
       
@@ -53,6 +55,32 @@
       
 
     
+    
+      
+        <meta  property="og:type"  content="website" >
+      
+        <meta  property="og:title"  content="Installation - Pyrrha Documentation" >
+      
+        <meta  property="og:description"  content="A mapper collection for firmware analysis." >
+      
+        <meta  property="og:image"  content="https://quarkslab.github.io/pyrrha/v1.0.0/assets/images/social/installation.png" >
+      
+        <meta  property="og:image:type"  content="image/png" >
+      
+        <meta  property="og:image:width"  content="1200" >
+      
+        <meta  property="og:image:height"  content="630" >
+      
+        <meta  property="og:url"  content="https://quarkslab.github.io/pyrrha/v1.0.0/installation/" >
+      
+        <meta  name="twitter:card"  content="summary_large_image" >
+      
+        <meta  name="twitter:title"  content="Installation - Pyrrha Documentation" >
+      
+        <meta  name="twitter:description"  content="A mapper collection for firmware analysis." >
+      
+        <meta  name="twitter:image"  content="https://quarkslab.github.io/pyrrha/v1.0.0/assets/images/social/installation.png" >
+      
     
     
    <link href="../assets/stylesheets/glightbox.min.css" rel="stylesheet"/><style>
@@ -332,53 +360,29 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#numbatui-installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      NumbatUI Installation
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#pyrrha-installation" class="md-nav__link">
     <span class="md-ellipsis">
       Pyrrha Installation
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Pyrrha Installation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#python-package" class="md-nav__link">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#visualizer-installation" class="md-nav__link">
     <span class="md-ellipsis">
-      Python Package
+      Visualizer Installation
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
+      
+        <li class="md-nav__item">
   <a href="#external-dependencies" class="md-nav__link">
     <span class="md-ellipsis">
       External Dependencies
     </span>
   </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#docker" class="md-nav__link">
-    <span class="md-ellipsis">
-      Docker
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -453,7 +457,7 @@
         
   
   <span class="md-ellipsis">
-    Filesystem (Quick)
+    Filesystem (Overview)
   </span>
   
 
@@ -642,53 +646,29 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#numbatui-installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      NumbatUI Installation
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#pyrrha-installation" class="md-nav__link">
     <span class="md-ellipsis">
       Pyrrha Installation
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Pyrrha Installation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#python-package" class="md-nav__link">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#visualizer-installation" class="md-nav__link">
     <span class="md-ellipsis">
-      Python Package
+      Visualizer Installation
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
+      
+        <li class="md-nav__item">
   <a href="#external-dependencies" class="md-nav__link">
     <span class="md-ellipsis">
       External Dependencies
     </span>
   </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#docker" class="md-nav__link">
-    <span class="md-ellipsis">
-      Docker
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -729,67 +709,113 @@
 <div class="admonition info">
 <p class="admonition-title">Info</p>
 <p>It is also possible to visualize results with <code>Sourcetrail</code>, it is the base from which <code>NumbatUI</code> was forked. The user won't be able to use new features like the renaming of the node or the launch of external programs from Sourcetrail/NumbatUI.</p>
-<p>Installation can be done from <a href="https://github.com/CoatiSoftware/Sourcetrail/releases/tag/2021.4.19">its last release</a>, using its <a href="https://github.com/CoatiSoftware/Sourcetrail/blob/master/DOCUMENTATION.md#installation">documentation</a>.</p>
 </div>
-<h2 id="numbatui-installation">NumbatUI Installation</h2>
-<p>NumbatUI should be compiled locally, as explained in its <a href="https://github.com/quarkslab/NumbatUI/blob/main/README.md">README</a>. For the moment it has only be tested on Ubuntu/Debian distributions. 
-Here are the summarized compilation instructions:</p>
-<p><strong>Prerequisites</strong>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>apt-get update
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>apt-get install -y \
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>        cmake \
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>        git \
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>        build-essential \
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        libboost-filesystem-dev libboost-program-options-dev libboost-system-dev libboost-date-time-dev \
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        qt6-svg-dev qt6-base-dev qt6-5compat-dev \
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        unzip wget \
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        libclang-17-dev clang-17
-</span></code></pre></div></p>
-<p><strong>Compilation</strong>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>git clone https://github.com/quarkslab/NumbatUI.git numbatui 
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>cd numbatui
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>mkdir -p build/Release 
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>cd build/Release
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>cmake -DCMAKE_BUILD_TYPE=&quot;Release&quot; -DBUILD_CXX_LANGUAGE_PACKAGE=ON -DBUILD_PYTHON_LANGUAGE_PACKAGE=ON ../.. &amp;&amp; make NumbatUI -j $(nproc)
-</span></code></pre></div></p>
 <h2 id="pyrrha-installation">Pyrrha Installation</h2>
-<h3 id="python-package">Python Package</h3>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Python Package</label><label for="__tabbed_1_2">Docker</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
 <p>Pyrrha requires a Python version &gt;= 3.10.
 It is recommended to install the Python package inside a virtualenv. You can use <code>pip</code> to install it.
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">pip</span> <span class="n">install</span> <span class="n">pyrrha</span><span class="o">-</span><span class="n">mapper</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">pip</span> <span class="n">install</span> <span class="n">pyrrha</span><span class="o">-</span><span class="n">mapper</span>
 </span></code></pre></div>
 If you prefer using sources to install Pyrrha, do the following:
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a># Do not forget to activate your virtualenv
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>pip install &#39;pyrrha @ git+https://github.com/quarkslab/pyrrha&#39;
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a># If you prefer, you can manually clone the repository and then install the package
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>git clone https://github.com/quarkslab/pyrrha
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>cd pyrrha
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>pip install &#39;.&#39;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a># Do not forget to activate your virtualenv
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>pip install &#39;pyrrha @ git+https://github.com/quarkslab/pyrrha&#39;
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a># If you prefer, you can manually clone the repository and then install the package
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>git clone https://github.com/quarkslab/pyrrha
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>cd pyrrha
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>pip install &#39;.&#39;
 </span></code></pre></div></p>
-<h3 id="external-dependencies">External Dependencies</h3>
+</div>
+<div class="tabbed-block">
+<p><code>pyrrha</code> can be used with a docker. It provides Pyrrha, but you still need to install NumbatUI on your system as described in the <a href="#numbatui-installation">NumbatUI Installation</a> section.</p>
+<p>The docker image is directly available from our <a href="https://github.com/orgs/quarkslab/packages/container/package/pyrrha">Github registry</a>.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>cd ROOT_DIRECTORY/..
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>docker run  --rm -t -v $PWD:/tmp/pyrrha ghcr.io/quarkslab/pyrrha:latest fs [OPTIONS] ROOT_DIRECTORY
+</span></code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The docker image has only be built for the <code>fs</code> mapper.</p>
+</div>
+</div>
+</div>
+</div>
+<h2 id="visualizer-installation">Visualizer Installation</h2>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">NumbatUI</label><label for="__tabbed_2_2">Sourcetrail</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p><a name="numbatui-installation"></a>NumbatUI should be compiled locally, as explained in its <a href="https://github.com/quarkslab/NumbatUI/blob/main/README.md">README</a>. For the moment it has only be tested on Ubuntu/Debian distributions. 
+Here are the summarized compilation instructions:</p>
+<p><strong>Prerequisites</strong>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>apt-get update
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>apt-get install -y \
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>        cmake \
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>        git \
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>        build-essential \
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>        libboost-filesystem-dev libboost-program-options-dev libboost-system-dev libboost-date-time-dev \
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>        qt6-svg-dev qt6-base-dev qt6-5compat-dev \
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>        unzip wget \
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>        libclang-17-dev clang-17
+</span></code></pre></div></p>
+<p><strong>Compilation</strong>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>git clone https://github.com/quarkslab/NumbatUI.git numbatui 
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>cd numbatui
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>mkdir -p build/Release 
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>cd build/Release
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>cmake -DCMAKE_BUILD_TYPE=&quot;Release&quot; -DBUILD_CXX_LANGUAGE_PACKAGE=ON -DBUILD_PYTHON_LANGUAGE_PACKAGE=ON ../.. &amp;&amp; make NumbatUI -j $(nproc)
+</span></code></pre></div></p>
+</div>
+<div class="tabbed-block">
+<div class="tabbed-set tabbed-alternate" data-tabs="3:3"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><input id="__tabbed_3_2" name="__tabbed_3" type="radio" /><input id="__tabbed_3_3" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">Linux</label><label for="__tabbed_3_2">Windows</label><label for="__tabbed_3_3">MacOS</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nv">SOURCETRAIL_URL</span><span class="o">=</span><span class="s1">&#39;https://github.com/CoatiSoftware/Sourcetrail/releases/download/2021.4.19/Sourcetrail_2021_4_19_Linux_64bit.tar.gz&#39;</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nv">CHECKSUM</span><span class="o">=</span><span class="s2">&quot;&quot;</span>f65a401daad8e16f29f7b2ff062a559999b6a8d44606db36cdf803de0cd7816d
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="nv">EXTRACTION_DIR</span><span class="o">=</span><span class="s2">&quot;/tmp/Sourcetrail_2021_4_19_Linux_64bit&quot;</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="nv">DOWNLOAD_PATH</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$EXTRACTION_PATH</span><span class="s2">.tar.gz&quot;</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>wget<span class="w"> </span><span class="nv">$SOURCETRAIL_URL</span><span class="w"> </span>-O<span class="w"> </span><span class="nv">$DOWNLOAD_PATH</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="nb">echo</span><span class="w"> </span><span class="nv">$CHECKSUM</span><span class="w"> </span><span class="nv">$DOWNLOAD_PATH</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sha256sum<span class="w"> </span>-c<span class="w"> </span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="k">if</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="nv">$?</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">    </span><span class="nb">echo</span><span class="w"> </span><span class="s1">&#39;==== Install Sourcetrail&#39;</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">    </span>tar<span class="w"> </span>xf<span class="w"> </span><span class="nv">$DOWNLOAD_PATH</span><span class="w"> </span>-C<span class="w"> </span><span class="nv">$EXTRACTION_DIR</span>
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">    </span>sudo<span class="w"> </span><span class="nv">$EXTRACTION_DIR</span>/Sourcetrail/install.sh
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">    </span>rm<span class="w"> </span>-rf<span class="w"> </span><span class="nv">$DOWNLOAD_PATH</span><span class="w"> </span><span class="nv">$EXTRACTION_DIR</span>
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="k">fi</span>
+</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>
+</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="c1"># Install pyrrha</span>
+</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="k">if</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="nv">$?</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+</span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a><span class="w">    </span><span class="nb">echo</span><span class="w"> </span><span class="s1">&#39;==== Install Pyrrha&#39;</span>
+</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="w">    </span>pip<span class="w"> </span>install<span class="w"> </span>pyrrha-mapper
+</span><span id="__span-5-20"><a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a><span class="k">fi</span>
+</span></code></pre></div>
+</div>
+<div class="tabbed-block">
+<p>Download last Sourcetrail <a href="https://github.com/CoatiSoftware/Sourcetrail/releases">release</a>, unzip it and run the <code>setup.exe</code>.</p>
+</div>
+<div class="tabbed-block">
+<p>Download last Sourcetrail <a href="https://github.com/CoatiSoftware/Sourcetrail/releases">release</a>, and install it following <a href="https://github.com/CoatiSoftware/Sourcetrail/releases">Sourcetrail documentation</a>.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<h2 id="external-dependencies">External Dependencies</h2>
 <p>The <code>fs-cg</code> and the <code>exec-decomp</code> mappers require to have a proper installation of <a href="https://github.com/quarkslab/quokka">Quokka</a> and so of IDA. The <code>exec-decomp</code> also requires to have an IDA license with decompiler.</p>
 <p>The Quokka plugin for IDA can directly be downloaded from the <a href="https://github.com/quarkslab/quokka/releases">Release page</a>. The associated Python package is directly installed during Pyrrha Python package installation. </p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>The <code>fs-cg</code> and the <code>exec-decomp</code> mappers could be used without Quokka and IDA if you already have the cache files for your firmware (<code>.decompiled</code> and <code>.quokka</code> files). More details in the corresponding mapper documentation.</p>
 </div>
-<h3 id="docker">Docker</h3>
-<p><code>pyrrha</code> can be used with a docker. It provides Pyrrha, but you still need to install NumbatUI on your system as described in the <a href="#numbatui-installation">NumbatUI Installation</a> section.</p>
-<p>The docker image is directly available from our <a href="https://github.com/orgs/quarkslab/packages/container/package/pyrrha">Github registry</a>.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>cd ROOT_DIRECTORY/..
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>docker run  --rm -t -v $PWD:/tmp/pyrrha ghcr.io/quarkslab/pyrrha:latest fs [OPTIONS] ROOT_DIRECTORY
-</span></code></pre></div>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>The docker image has only be built for the <code>fs</code> mapper.</p>
-</div>
 <h2 id="documentation">Documentation</h2>
 <p>If you want to build the documentation, you need to install Pyrrha with the <code>[doc]</code> dependencies and then serve the documentation on a local server with <code>mkdocs</code>.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;pyrrha-mapper[doc]&#39;</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1"># serve doc locally</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>mkdocs<span class="w"> </span>serve
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;pyrrha-mapper[doc]&#39;</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="c1"># serve doc locally</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>mkdocs<span class="w"> </span>serve
 </span></code></pre></div>
 
 
@@ -797,6 +823,9 @@ If you prefer using sources to install Pyrrha, do the following:
 
 
 
+
+  
+  
 
 
 
