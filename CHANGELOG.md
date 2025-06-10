@@ -1,3 +1,31 @@
+## v1.0.1—Improve exe-decomp mapper
+
+### Features
+- doc: setup multi version doc
+- doc: update doc for last version of mappers
+
+### Fixes
+
+- `exe-decomp` mapper: increase IDA timeout and use `TempFile` to be multiplatform compatible
+- `exe-decomp` mapper: improve resolution of calls
+
+**Full Changelog**: [https://github.com/quarkslab/pyrrha/compare/v1.0.0...v1.0.1](https://github.com/quarkslab/pyrrha/compare/v1.0.0...v1.0.1)
+
+
+## v1.0.0—New mappers
+
+### Features
+- Add two new mappers: `fs-cg` and `exe-decomp`.
+- Rework internal representation of filesystem and binaries.
+- `fs` and `fs-cg` results could be exported and then loaded/manipulated trough the `FileSystem` object now exposed by Pyrrha.
+- Add unit tests for internal data structures and `fs`/`fs-cg` mappers.
+
+### Fixes
+
+- Various fixes following tests, check changelog for details.
+
+**Full Changelog**: [https://github.com/quarkslab/pyrrha/compare/v0.4.3...v1.0.0](https://github.com/quarkslab/pyrrha/compare/v0.4.3...v1.0.0)
+
 ## v0.4.3—Resolution Strategies
 
 ### Features
