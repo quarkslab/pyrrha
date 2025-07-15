@@ -16,3 +16,10 @@ data/
 *.nam
 .coverage
 *.log
+*.run
+*.hexlic
+*.reg
+*.key
+*.i64
+*.BinExport
+*.quokka
