@@ -1,16 +1,17 @@
-image: python:latest
-
-
-before_script:
-  - python --version ; pip --version  # For debugging
-  - pip install virtualenv
-  - virtualenv venv
+.setup-venv: &before-setup-venv
+  - python --version ; pip --version  # For debugging+
+  - python3 -m venv venv
   - source venv/bin/activate
 
-test:
+.test_template:
+  stage: test
+  variables:
+    TEST_PATH: tests/
+  before_script:
+    - *before-setup-venv
   script:
     - pip install ".[test]"
-    - pytest  --junitxml=report.xml  --cov="pyrrha_mapper" --cov-report xml -v tests/
+    - pytest  --junitxml=report.xml  --cov="pyrrha_mapper" --cov-report xml -vvv -x ${TEST_SUP_OPTIONS} ${TEST_PATH}
     - coverage report
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:
@@ -21,5 +22,52 @@ test:
         coverage_format: cobertura
         path: coverage.xml
 
+data_structures: 
+  extends: .test_template
+  image: python:latest
+  script:
+    - pip install ".[test]"
+    - pytest  --junitxml=report.xml  --cov="pyrrha_mapper" --cov-report xml -vvv -x tests/test_filesystem_objects.py
+    - coverage report
+
+fs: 
+  extends: .test_template
+  image: python:latest
+  variables:
+    TEST_PATH: tests/test_cli.py::TestFSMapper
+
+.test_fs-cg: 
+  extends: .test_template
+  variables:
+    DISASSEMBLER: ida ghidra binary_ninja
+    TEST_PATH: tests/test_cli.py::TestFsCgMapper
+    TEST_SUP_OPTIONS: "--disassembler ${DISASSEMBLER} --exporter ${EXPORTER}"
 
 
+fs-cg_ida:
+  extends: .test_fs-cg
+  image: $CONTAINER_PATH/ida${VERSION}
+  variables:
+    DISASSEMBLER: ida
+  parallel:
+    matrix:
+      - VERSION: 84
+        EXPORTER: [quokka, binexport]
+      - VERSION: 91
+        EXPORTER: quokka
+  rules:
+    - if: $VERSION == "84"
+      variables: 
+        KEY: $IDA_KEY
+        KEY_NAME: ida.key
+        REG: $IDA84_REG
+    - if: $VERSION == "91"
+      variables: 
+        KEY: $LICENSE
+        KEY_NAME: ida.hexlic
+        REG: $IDA_REG
+  before_script:
+    - *before-setup-venv
+    - mkdir -p /root/.idapro/
+    - echo $KEY | base64 -d  > /root/.idapro/$KEY_NAME
+    - echo $REG | base64 -d  > /root/.idapro/ida.reg
