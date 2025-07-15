@@ -80,7 +80,6 @@ class BaseTestFsMapper(ABC):
     }
     FW_TEST_SYMLINKS_PATHS = {Path("/lib/libssl.so")}
 
-
     # =============================== INTERNAL STUFFS ==================================
 
     class ExecResults(NamedTuple):  # noqa: D106
@@ -133,7 +132,7 @@ class BaseTestFsMapper(ABC):
     @pytest.mark.parametrize("pyrrha_exec", [1, 16], indirect=True)
     def test_numbat_project_creation(self, pyrrha_exec: ExecResults):
         """Two files are generated with correct extensions."""
-        assert pyrrha_exec.res.exit_code == 0
+        assert pyrrha_exec.res.exit_code == 0, pyrrha_exec.res.exc_info
         assert pyrrha_exec.db_path.exists()
         assert pyrrha_exec.db_path.with_suffix(".srctrldb").exists(), "Missing DB file"
         assert pyrrha_exec.db_path.with_suffix(".srctrlprj").exists(), "Missing project file"
@@ -232,7 +231,7 @@ class TestFSMapper(BaseTestFsMapper):
             f"{self.FW_TEST_PATH}",
         ]
         return self.ExecResults(res=runner.invoke(self.COMMAND, args), db_path=tmp_path)
-    
+
     # =================================== TESTS ========================================
 
     @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
@@ -263,6 +262,29 @@ class TestFsCgMapper(BaseTestFsMapper):
     # =============================== FIXTURES =========================================
 
     @pytest.fixture(scope="class")
+    def pyrrha_exec(self, request, tmp_path_factory) -> BaseTestFsMapper.ExecResults:
+        """Run pyrrha whith the given thread number and the given db path."""
+        runner = CliRunner()
+        tmp_path = (
+            tmp_path_factory.mktemp("db", numbered=True)
+            / f"{self.SUBCOMMAND}-{request.param}.srctrlprj"
+        )
+        args = [
+            self.SUBCOMMAND,
+            "--disassembler",
+            f"{request.config.getoption('--disassembler')}",
+            "--exporter",
+            f"{request.config.getoption('--exporter')}",
+            "--db",
+            f"{tmp_path}",
+            "-j",
+            request.param,
+            f"{self.FW_TEST_PATH}",
+        ]
+        return self.ExecResults(res=runner.invoke(self.COMMAND, args), db_path=tmp_path)
+
+
+    @pytest.fixture(scope="class")
     def export_res(self, tmp_path_factory, request) -> BaseTestFsMapper.ExecResults:
         """Run Pyrrha with export activated."""
         runner = CliRunner()
@@ -272,6 +294,10 @@ class TestFsCgMapper(BaseTestFsMapper):
         )
         args = [
             self.SUBCOMMAND,
+            "--disassembler",
+            f"{request.config.getoption('--disassembler')}",
+            "--exporter",
+            f"{request.config.getoption('--exporter')}",
             "--db",
             f"{tmp_path}",
             "-j",
@@ -279,7 +305,7 @@ class TestFsCgMapper(BaseTestFsMapper):
             f"{self.FW_TEST_PATH}",
         ]
         return self.ExecResults(res=runner.invoke(self.COMMAND, args), db_path=tmp_path)
-    
+
     # =================================== TESTS ========================================
 
     @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
