@@ -98,11 +98,23 @@ class InterImageCGMapper(FileSystemImportsMapper):
                 )
             )
         )
+    
+    def load_binary_args(self) -> dict[str, Any]:
+        """Return dict of args for load_binary that are always the same for the wholde firmware.
+        
+        Use to optimize multiprocessing. Set here there real values.
+        """
+        res = super().load_binary_args()
+        res["disass"] = self.DISASS
+        res["exporter"] = self.EXPORT
+        return res
 
     @staticmethod
     def load_binary(
         root_directory: Path,
         file_path: Path,
+        disass: Disassembler = DISASS,
+        exporter: ExportFormat = EXPORT,
     ) -> tuple[Binary, dict[Symbol, list[str]] | None] | str:
         """Load all the binaries located in the filesystem as Binary objects.
 
@@ -130,10 +142,7 @@ class InterImageCGMapper(FileSystemImportsMapper):
 
         try:
             prefix = f"[binary mapping] {binary.name}"
-            unresolved_cg = load_program(binary,
-                                         InterImageCGMapper.DISASS,
-                                         InterImageCGMapper.EXPORT,
-                                         prefix)
+            unresolved_cg = load_program(binary, disass, exporter, prefix)
             return binary, unresolved_cg
         except (FileNotFoundError, FsMapperError, SyntaxError) as e:
             logging.error(f"ERROR: Loading error: {binary.name}: {e}")

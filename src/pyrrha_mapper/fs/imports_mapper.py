@@ -18,7 +18,9 @@
 import logging
 import queue
 from abc import ABC
+from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 from multiprocessing import Queue, get_context
 from pathlib import Path
 from typing import Any
@@ -55,6 +57,14 @@ class FileSystemImportsMapper(FileSystemMapper):
         :return: True is the path point on a file
         """
         return p.is_file() and not p.is_symlink() and (lief.is_elf(str(p)) or lief.is_pe(str(p)))
+    
+    def load_binary_args(self) -> dict[str, Any]:
+        """Return dict of args for load_binary that are always the same for the wholde firmware.
+        
+        Use to optimize multiprocessing. Set here there real values.
+        """
+        return {"root_directory": self.root_directory}
+
 
     @staticmethod
     def load_binary(root_directory: Path, file_path: Path) -> tuple[Binary, Any] | str:
@@ -143,20 +153,20 @@ class FileSystemImportsMapper(FileSystemMapper):
         return (bin_obj, None)
 
     @classmethod
-    def parse_binary_job(cls, ingress: Queue, egress: Queue, root_directory: Path) -> None:
+    def parse_binary_job(cls, ingress: Queue, egress: Queue, parse_func: Callable) -> None:
         """Parse an executable file and create the associated Binary object.
 
         It is used for multiprocessing.
         :param ingress: input Queue, contain a Path
         :param egress: output Queue, send back (file path, Binary result or
         logging string if an issue happen)
-        :param root_directory: path of the virtual root of the firmware
+        :param parse_func: func which take a path as argument (called file_path) and parse it
         """
         while True:
             try:
                 path = ingress.get(timeout=0.5)
                 try:
-                    egress.put((path, cls.load_binary(root_directory, path)))
+                    egress.put((path, parse_func(file_path = path)))
                 except Exception as e:
                     egress.put((path, e))
             except queue.Empty:
@@ -430,16 +440,18 @@ import, drop case"
 
         logging.debug(f"[main] Start Binaries parsing: {len(binary_paths)} binaries to parse")
         binaries_map = progress.add_task("[deep_pink2]Binaries mapping", total=len(binary_paths))
+        load_bin_func = partial(self.load_binary, **self.load_binary_args())
         if threads > 1:  # multiprocessed case
             ctx = get_context("spawn")  # fork usage deprecated starting 3.12
             manager = ctx.Manager()
             ingress = manager.Queue()
             egress = manager.Queue()
             pool = ctx.Pool(threads)
+            parse_job = partial(self.parse_binary_job, parse_func=load_bin_func)
 
             # Launch all workers and fill input queue
             for _ in range(threads - 1):
-                pool.apply_async(self.parse_binary_job, (ingress, egress, self.root_directory))
+                pool.apply_async(parse_job, (ingress, egress))
             for path in binary_paths:
                 ingress.put(path)
             logging.debug(f"[main] {threads - 1} threads created")
@@ -456,7 +468,7 @@ import, drop case"
         else:
             logging.debug("[main] One thread mode")
             for path in binary_paths:
-                res = self.load_binary(self.root_directory, path)
+                res = load_bin_func(file_path=path)
                 self._treat_bin_parsing_result(path, res)
                 progress.update(binaries_map, advance=1)
         self.commit()
