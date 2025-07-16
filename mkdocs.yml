@@ -42,6 +42,7 @@ nav:
       - Exe-Decomp: mappers/exe-decomp.md
   - Contributing:
       - Mapper Development: contributing/dev_mapper.md
+  - Disassembler Integration: disassembler.md
   - Changelog: changelog.md
   - License: license.md
 

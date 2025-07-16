@@ -354,5 +354,54 @@ def fs_exe_decompiled_mapper(  # noqa: D103
     db_instance.close()
 
 
+
+@pyrrha.command("workspace-utils", short_help="Help managing workspaces (for cross-binary referencing).")
+@click.option("-l", "--list", is_flag=True, default=False, help="List all workspaces.")
+@click.option("-a", "--add", is_flag=True, default=False, help="Add a rootfs as workspace.")
+@click.option("-d", "--delete", is_flag=True, default=False, help="Remove a rootfs as workspace.")
+@click.argument(
+    "path",
+    type=click.Path(exists=True, file_okay=True, dir_okay=True, path_type=Path),
+    required=False,
+)
+def workspace_utils(list: bool, add: bool, delete: bool, path: Path):
+    """Manage workspaces for cross-binary referencing."""
+
+    # Configure logs (there is not debug ones)
+    setup_logs(False)
+
+    # Get the base config directory
+    if sys.platform == "win32":
+        heimdallr_settings = Path(os.path.expandvars("%APPDATA%/heimdallr/settings.json"))
+    else:
+        heimdallr_settings = Path(os.path.expandvars("$HOME/.config/heimdallr/settings.json"))
+    if not heimdallr_settings.exists():
+        click.echo(f"heimdallr config directory {heimdallr_settings} does not exists")
+        return -1
+
+    # Load settings
+    settings = json.loads(heimdallr_settings.read_text())
+    idb_path = settings.get("idb_path")
+    if idb_path is None:
+        click.echo(f"heimdallr settings file {heimdallr_settings} does not contain idb_path")
+        return -1
+
+    if list:
+        for path in idb_path:
+            logging.info(f"- {path}")
+    
+    if add:
+        settings["idb_path"].append(str(Path(path).absolute()))
+        heimdallr_settings.write_text(json.dumps(settings, indent=4))  # Write it back
+
+    if delete:
+        try:
+            settings["idb_path"].remove(str(path))
+            heimdallr_settings.write_text(json.dumps(settings, indent=4))  # Write it back
+        except ValueError:
+            click.echo(f"Path {path} not in idb_path of settings.")
+            return -1
+
+
 if __name__ == "__main__":
     pyrrha()
