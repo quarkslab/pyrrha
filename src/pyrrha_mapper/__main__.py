@@ -19,6 +19,7 @@ import json
 import logging
 import multiprocessing
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -242,16 +243,16 @@ def fs_mapper(  # noqa: D103
 @click.option(
     "--disassembler",
     required=False,
-    type=click.Choice([x.name.lower() for x in Disassembler], case_sensitive=False),
-    default=Disassembler.AUTO.name,
+    type=click.Choice(Disassembler, case_sensitive=False),
+    default=Disassembler.AUTO,
     show_default=True,
     help="Disassembler to use",
 )
 @click.option(
     "--exporter",
     required=False,
-    type=click.Choice([x.name.lower() for x in ExportFormat], case_sensitive=False),
-    default=ExportFormat.AUTO.name,
+    type=click.Choice(ExportFormat, case_sensitive=False),
+    default=ExportFormat.AUTO,
     show_default=True,
     help="Binary exporter",
 )
@@ -265,22 +266,28 @@ def fs_call_graph_mapper(  # noqa: D103
     db: Path,
     jobs: int,
     resolve_duplicates: ResolveDuplicateOption,
-    disassembler: str,
-    exporter: str,
+    disassembler: Disassembler,
+    exporter: ExportFormat,
     root_directory: Path,
 ):
     setup_logs(debug, db)
     db_instance = setup_db(db)
 
-    disass = Disassembler[disassembler.upper()]
-    if disass not in [Disassembler.AUTO, Disassembler.IDA]:
+    if disassembler not in [Disassembler.AUTO, Disassembler.IDA, Disassembler.GHIDRA]:
         click.echo("disassembler not yet supported")
         # TODO: add support for other disassembler
         return 1
-    intercg.InterImageCGMapper.DISASS = disass  # type: ignore
 
-    exporter_fmt = ExportFormat[exporter.upper()]
-    intercg.InterImageCGMapper.EXPORT = exporter_fmt  # type: ignore
+    if disassembler is Disassembler.GHIDRA:
+        ghidra_env_var = "GHIDRA_PATH"
+        ghidra_dir = os.environ.get(ghidra_env_var)
+        if not ghidra_dir:
+            for ghidra_name in ["ghidra", "ghidraRun"]:
+                if ghidra_path := shutil.which(ghidra_name):
+                    os.environ[ghidra_env_var] = str(Path(ghidra_path).resolve().parent)
+
+    intercg.InterImageCGMapper.DISASS = disassembler
+    intercg.InterImageCGMapper.EXPORT = exporter
 
     root_directory = root_directory.absolute()
 
