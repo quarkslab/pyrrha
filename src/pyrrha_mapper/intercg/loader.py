@@ -57,7 +57,7 @@ def load_program(binary: Binary, disass: Disassembler,
         program = Program.from_binary(file_path,
                                    export_format=export,
                                    disassembler=disass,
-                                   timeout=-1,  # TODO: Receive through command line ?
+                                   timeout=600,  # TODO: Receive through command line ?
                                    override=False)  # if export exists use it
         # Load the call graph
         return compute_call_graph(binary, program, log_prefix) # type: ignore
@@ -202,7 +202,7 @@ def compute_call_graph(binary: Binary, program: Program, log_prefix: str = "") -
             else:  # Forward the call to the underlying function name
                 name, target = f.name, sub_callee[0].name
             # resolve trampoline and update associated dict
-            while target in removed_trampoline:
+            while target in removed_trampoline and removed_trampoline[target] != target:
                 target = removed_trampoline[target]
             removed_trampoline[name] = target
             for key, val in removed_trampoline.items():
