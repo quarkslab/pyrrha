@@ -352,8 +352,9 @@ def fs_exe_decompiled_mapper(  # noqa: D103
     db_instance.close()
 
 
-
-@pyrrha.command("workspace-utils", short_help="Help managing workspaces (for cross-binary referencing).")
+@pyrrha.command(
+    "workspace-utils", short_help="Help managing workspaces (for cross-binary referencing)."
+)
 @click.option("-l", "--list", is_flag=True, default=False, help="List all workspaces.")
 @click.option("-a", "--add", is_flag=True, default=False, help="Add a rootfs as workspace.")
 @click.option("-d", "--delete", is_flag=True, default=False, help="Remove a rootfs as workspace.")
@@ -364,7 +365,6 @@ def fs_exe_decompiled_mapper(  # noqa: D103
 )
 def workspace_utils(list: bool, add: bool, delete: bool, path: Path):
     """Manage workspaces for cross-binary referencing."""
-
     # Configure logs (there is not debug ones)
     setup_logs(False)
 
@@ -387,7 +387,7 @@ def workspace_utils(list: bool, add: bool, delete: bool, path: Path):
     if list:
         for path in idb_path:
             logging.info(f"- {path}")
-    
+
     if add:
         settings["idb_path"].append(str(Path(path).absolute()))
         heimdallr_settings.write_text(json.dumps(settings, indent=4))  # Write it back
