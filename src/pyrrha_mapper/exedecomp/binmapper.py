@@ -279,7 +279,7 @@ def is_thunk_to_import(p: Program, f: Function) -> bool:
 def add_url_handler(db: SourcetrailDB, program: Program, hash: str, function: Function, f_id: int) -> None:
     """ Open the function using a dedicated URL handler. (Use Heimdallr) """
     if URL_OPEN_CMD and program.exec_path:
-        url = f"disas://{hash}?idb={Path(program.exec_path).name+".i64"}&offset={function.addr:#08x}"
+        url = f"disas://{hash}?idb={Path(program.exec_path).name+'.i64'}&offset={function.addr:#08x}"
         cmd: list[str] = [URL_OPEN_CMD, url]
         db.set_custom_command(f_id, cmd, "Open in Disassembler") # type: ignore
     else:
