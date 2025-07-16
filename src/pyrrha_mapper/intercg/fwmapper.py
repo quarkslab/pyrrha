@@ -36,18 +36,22 @@ from pyrrha_mapper.exceptions import FsMapperError
 from pyrrha_mapper.fs import FileSystemImportsMapper
 from pyrrha_mapper.intercg.loader import load_program
 from pyrrha_mapper.types import ResolveDuplicateOption
+from qbinary.types import Disassembler, ExportFormat
 
 IGNORE_LIST = ["__gmon_start__"]
 
 QUOKKA_EXT = ".quokka"
 
-NUMBAT_UI_BIN = "numbat-ui"
+NUMBAT_UI_BIN = "NumbatUi"
 
 
 class InterImageCGMapper(FileSystemImportsMapper):
     """Filesystem mapper based on Lief, which computes imports and exports."""
 
     FS_EXT = ".fs.json"
+
+    DISASS = Disassembler.AUTO
+    EXPORT = ExportFormat.AUTO
 
     def __init__(self, root_directory: Path | str, db: SourcetrailDB | None):
         super(InterImageCGMapper, self).__init__(root_directory, db)
@@ -66,6 +70,7 @@ class InterImageCGMapper(FileSystemImportsMapper):
         self.exports_to_bins: dict[str, list[Binary]] = {}
         self.progress: Progress | None = None
         self.unresolved_callgraph: dict[Path, dict[Symbol, list[str]]] = dict()
+        self._current_binary_hash = ""
 
     def _correct_map_result(self, res: Any) -> bool:
         return (
@@ -109,18 +114,17 @@ class InterImageCGMapper(FileSystemImportsMapper):
                 f"{binary.real_path.name} (skip)"
             )
 
-        quokka_file = binary.auxiliary_file(append=QUOKKA_EXT)
         try:
-            unresolved_cg = load_program(binary, f"[binary mapping] {binary.name}")
-        except SyntaxError as e:
-            logging.error(
-                f"[binary mapping] {binary.name}: cannot load Quokka files {quokka_file}: {e}"
-            )
-            return (binary, None)
-        except (FileNotFoundError, FsMapperError) as e:
-            logging.error(f"[binary mapping] {binary.name}: error during file analysis: {e}")
-            return (binary, None)
-        return (binary, unresolved_cg)
+            prefix = f"[binary mapping] {binary.name}"
+            unresolved_cg = load_program(binary,
+                                         InterImageCGMapper.DISASS,
+                                         InterImageCGMapper.EXPORT,
+                                         prefix)
+            return binary, unresolved_cg
+        except (FileNotFoundError, FsMapperError, SyntaxError) as e:
+            logging.error(f"ERROR: Loading error: {binary.name}: {e}")
+            return binary, None
+
 
     def map_binary(
         self,
@@ -269,11 +273,11 @@ class InterImageCGMapper(FileSystemImportsMapper):
         if self.dry_run_mode:
             return None
         assert self.db_interface is not None
-        cmd = ["NumbatUi", str(binary.real_path) + ".srctrlprj"]
+        cmd = [NUMBAT_UI_BIN, str(binary.real_path) + ".srctrlprj"]
         if binary.id is None:
             logging.warning(f"{log_prefix}: cannot record command as binary has no id")
         else:
-            self.db_interface.set_custom_command(binary.id, cmd, "Open in NumbatUI")
+            self.db_interface.set_custom_command(binary.id, cmd, f"Open in {NUMBAT_UI_BIN}")
 
     def _record_call_ref(self, src: Symbol, dst: Symbol, log_prefix: str = "") -> bool:
         """Add call reference between two symbols in DB.

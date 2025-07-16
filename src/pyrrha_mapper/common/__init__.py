@@ -15,7 +15,6 @@
 #  limitations under the License.
 """Common objects and functions that can be used for any mapper."""
 
-from .binary_export import load_program_export
 from .filesystem_mapper import FileSystemMapper, hide_progress
 from .objects import Binary, FileSystem, Symbol, Symlink
 
@@ -24,7 +23,6 @@ __all__ = [
     "Binary",
     "FileSystem",
     "hide_progress",
-    "load_program_export",
     "Symbol",
     "Symlink",
 ]

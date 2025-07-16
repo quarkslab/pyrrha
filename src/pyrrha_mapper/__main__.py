@@ -18,14 +18,18 @@
 import logging
 import multiprocessing
 from pathlib import Path
-
+import os
+import sys
+import json
 import click
 import coloredlogs  # type: ignore # no typing used in this library
 from numbat import SourcetrailDB
 
 from pyrrha_mapper import exedecomp, fs, intercg
 from pyrrha_mapper.common import FileSystem
-from pyrrha_mapper.types import Disassembler, Exporters, ResolveDuplicateOption
+from pyrrha_mapper.types import ResolveDuplicateOption
+
+from qbinary.types import ExportFormat, Disassembler
 
 # -------------------------------------------------------------------------------
 #                           Common stuff for mappers
@@ -240,18 +244,18 @@ def fs_mapper(# noqa: D103
 @click.option(
     "--disassembler",
     required=False,
-    type=Disassembler,
-    default=Disassembler.AUTO,
+    type=click.Choice([x.name.lower() for x in Disassembler], case_sensitive=False),
+    default=Disassembler.AUTO.name,
     show_default=True,
-    help="Disassembler to use for disassembly.",
+    help=f"Disassembler to use",
 )
 @click.option(
     "--exporter",
     required=False,
-    type=Exporters,
-    default=Exporters.AUTO,
+    type=click.Choice([x.name.lower() for x in ExportFormat], case_sensitive=False),
+    default=ExportFormat.AUTO.name,
     show_default=True,
-    help="Binary exporter to use for binary analysis.",
+    help=f"Binary exporter",
 )
 @click.argument(
     "root_directory",
@@ -263,22 +267,22 @@ def fs_call_graph_mapper(  # noqa: D103
     db: Path,
     jobs: int,
     resolve_duplicates: ResolveDuplicateOption,
-    disassembler: Disassembler,
-    exporter: Exporters,
-    root_directory,
+    disassembler: str,
+    exporter: str,
+    root_directory: Path,
 ):
     setup_logs(debug, db)
     db_instance = setup_db(db)
 
-    if disassembler not in [Disassembler.AUTO, Disassembler.IDA]:
+    disass = Disassembler[disassembler.upper()]
+    if disass not in [Disassembler.AUTO, Disassembler.IDA]:
         click.echo("disassembler not yet supported")
         # TODO: add support for other disassembler
         return 1
+    intercg.InterImageCGMapper.DISASS = disass # type: ignore
 
-    if exporter not in [Exporters.AUTO, Exporters.QUOKKA]:
-        click.echo(f"binary exporter: {exporter.name} not yet supported")
-        # TODO: add support for other disassembler
-        return 1
+    exporter_fmt = ExportFormat[exporter.upper()]
+    intercg.InterImageCGMapper.EXPORT = exporter_fmt # type: ignore
 
     root_directory = root_directory.absolute()
 
@@ -311,28 +315,41 @@ def fs_call_graph_mapper(  # noqa: D103
     type=Disassembler,
     default=Disassembler.AUTO,
     show_default=True,
-    help="Disassembler to use for disassembly.",
+    help="Disassembler to use for disassembly and decompilation.",
+)
+@click.option(
+    "--exporter",
+    required=False,
+    type=ExportFormat,
+    default=ExportFormat.AUTO,
+    show_default=True,
+    help="Binary export format to use for binary analysis.",
 )
 @click.argument(
     "executable",
-    type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
+    type=click.Path(exists=False, file_okay=True, dir_okay=False, path_type=Path),
 )
 def fs_exe_decompiled_mapper(  # noqa: D103
-    debug: bool, db: Path, disassembler: Disassembler, executable: Path
+    debug: bool, db: Path, disassembler: Disassembler, exporter: ExportFormat, executable: Path
 ):
+    # Change default db name. By default will be <executable>.srctrldb
+    if db.name == "exe-decomp.srctrldb":
+        db = Path(str(executable)+".srctrldb")
+
     setup_logs(debug, db)
     db_instance = setup_db(db)
 
     if disassembler not in [Disassembler.AUTO, Disassembler.IDA]:
-        click.echo("disassembler not yet supported")
+        click.echo(f"disassembler {disassembler.name} not yet supported")
         # TODO: add support for other disassembler (forward parameter to mapper)
         return 1
 
-    if exedecomp.map_binary(db_instance, executable):
+    if exedecomp.map_binary(db_instance, executable, disassembler, exporter):
         logging.info("success.")
     else:
         logging.error("failure.")
 
+    logging.info(f"write db into: {db_instance.path}")
     db_instance.commit()
     db_instance.close()
 
