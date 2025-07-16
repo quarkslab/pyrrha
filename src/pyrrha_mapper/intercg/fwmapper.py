@@ -19,6 +19,8 @@ import logging
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
+from hashlib import md5
+import sys
 
 # third-party imports
 from numbat import SourcetrailDB
@@ -43,6 +45,18 @@ IGNORE_LIST = ["__gmon_start__"]
 QUOKKA_EXT = ".quokka"
 
 NUMBAT_UI_BIN = "NumbatUi"
+
+# Determine the command to open URLs based on the platform
+try:
+    URL_OPEN_CMD = {
+        "linux": "xdg-open",
+        "win32": "start",
+        "darwin": "open"
+    }[sys.platform]
+except KeyError:
+    logging.warning(f"Unsupported platform: {sys.platform} (will not add URL handler)")
+    URL_OPEN_CMD = "" # type: ignore
+
 
 
 class InterImageCGMapper(FileSystemImportsMapper):
@@ -126,6 +140,17 @@ class InterImageCGMapper(FileSystemImportsMapper):
             return binary, None
 
 
+    def add_url_handler(self, hash: str, binary: Binary, symbol: Symbol) -> None:
+        """ Open the function using a dedicated URL handler. (Use Heimdallr) """
+        if not hash:
+            return  # no hash, no URL handler
+        if URL_OPEN_CMD:
+            url = f"disas://{hash}?idb={binary.name+".i64"}&offset={symbol.addr:#08x}"
+            cmd: list[str] = ["xdg-open", url]
+            self.db_interface.set_custom_command(symbol.id, cmd, "Open in Disassembler") # type: ignore
+        else:
+            pass  # Can't add URL unsuported platform
+
     def map_binary(
         self,
         bin_object: Binary,
@@ -136,6 +161,8 @@ class InterImageCGMapper(FileSystemImportsMapper):
         This function updates the filesystem representation stored as `self.fs`.
         :param bin_object: Binary object
         """
+        self._current_binary_hash = md5(Path(bin_object.real_path).read_bytes()).hexdigest()
+
         super().map_binary(bin_object)
         if additional_res is not None:
             self.unresolved_callgraph[bin_object.path] = additional_res
@@ -143,6 +170,12 @@ class InterImageCGMapper(FileSystemImportsMapper):
             self.node_ids[bin_object.id] = bin_object
             if additional_res is not None:
                 self._record_custom_command(bin_object, f"[bin mapping] {bin_object.name}")
+
+    def symbol_recorded(self, binary: Binary, symbol: Symbol) -> None:
+        """
+        Register a symbol recorded handler to add a custom command.
+        """
+        self.add_url_handler(self._current_binary_hash, binary, symbol)
 
     def _treat_bin_parsing_result(self, path: Path, res: Any):
         """Handle load_binary res, map it or display error."""
