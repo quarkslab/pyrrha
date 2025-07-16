@@ -46,7 +46,8 @@ dependencies = [
     'pydantic',
     'rich',
     # InterCG mapper
-    'quokka-project',
+    'quokka-project', # to be removed: will be installed by deps to qbinary
+    "qbinary>=0.0.2",
     # Exedecomp mapper
     'idascript<=0.3.1',
 ]
