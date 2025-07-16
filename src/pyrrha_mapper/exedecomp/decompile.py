@@ -21,16 +21,22 @@ def main_ida():
 
     input_file = ida_nalt.get_input_file_path()
     output_file = input_file+".decompiled"
+    raw_file = input_file+".c"
+
+    # First decompile the whole program
+    ida_hexrays.clear_cached_cfuncs()
+    ida_hexrays.decompile_many(raw_file, None,
+                               ida_hexrays.VDRUN_NEWFILE | ida_hexrays.VDRUN_MAYSTOP | ida_hexrays.VDRUN_SILENT)
 
     funs = {}
 
+    # Then reiterate all functions to get them individually
     for fun_ea in idautils.Functions():
         decomp = ida_hexrays.decompile(fun_ea)
         if decomp is not None:
             funs[fun_ea] = str(decomp)
 
     with open(output_file, "w") as f:
-        print("Writing to", output_file)
         f.write(json.dumps(funs))
 
     ida_pro.qexit(0)
