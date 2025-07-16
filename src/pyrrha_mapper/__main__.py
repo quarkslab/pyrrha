@@ -15,21 +15,21 @@
 #  limitations under the License.
 """CLI Module."""
 
+import json
 import logging
 import multiprocessing
-from pathlib import Path
 import os
 import sys
-import json
+from pathlib import Path
+
 import click
 import coloredlogs  # type: ignore # no typing used in this library
 from numbat import SourcetrailDB
+from qbinary.types import Disassembler, ExportFormat
 
 from pyrrha_mapper import exedecomp, fs, intercg
 from pyrrha_mapper.common import FileSystem
 from pyrrha_mapper.types import ResolveDuplicateOption
-
-from qbinary.types import ExportFormat, Disassembler
 
 # -------------------------------------------------------------------------------
 #                           Common stuff for mappers
@@ -67,9 +67,7 @@ def setup_logs(is_debug_level: bool, db_path: Path | None = None) -> None:
     :param is_debug_level: if True set the log level as DEBUG else INFO
     :param db_path: if provided, save a collocated log file.
     """
-    log_format = dict(
-        fmt="[%(asctime)s][%(levelname)s]: %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-    )
+    log_format = dict(fmt="[%(asctime)s][%(levelname)s]: %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
     level = logging.DEBUG if is_debug_level else logging.INFO
     coloredlogs.install(
         level=level,
@@ -180,8 +178,8 @@ their imports/exports plus the symlinks that points on these executable files.",
     # help='Path of the directory containing the filesystem to map.',
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
 )
-def fs_mapper(# noqa: D103
-    debug: bool,  
+def fs_mapper(  # noqa: D103
+    debug: bool,
     db: Path,
     export: bool,
     jobs: int,
@@ -247,7 +245,7 @@ def fs_mapper(# noqa: D103
     type=click.Choice([x.name.lower() for x in Disassembler], case_sensitive=False),
     default=Disassembler.AUTO.name,
     show_default=True,
-    help=f"Disassembler to use",
+    help="Disassembler to use",
 )
 @click.option(
     "--exporter",
@@ -255,7 +253,7 @@ def fs_mapper(# noqa: D103
     type=click.Choice([x.name.lower() for x in ExportFormat], case_sensitive=False),
     default=ExportFormat.AUTO.name,
     show_default=True,
-    help=f"Binary exporter",
+    help="Binary exporter",
 )
 @click.argument(
     "root_directory",
@@ -279,10 +277,10 @@ def fs_call_graph_mapper(  # noqa: D103
         click.echo("disassembler not yet supported")
         # TODO: add support for other disassembler
         return 1
-    intercg.InterImageCGMapper.DISASS = disass # type: ignore
+    intercg.InterImageCGMapper.DISASS = disass  # type: ignore
 
     exporter_fmt = ExportFormat[exporter.upper()]
-    intercg.InterImageCGMapper.EXPORT = exporter_fmt # type: ignore
+    intercg.InterImageCGMapper.EXPORT = exporter_fmt  # type: ignore
 
     root_directory = root_directory.absolute()
 
@@ -334,7 +332,7 @@ def fs_exe_decompiled_mapper(  # noqa: D103
 ):
     # Change default db name. By default will be <executable>.srctrldb
     if db.name == "exe-decomp.srctrldb":
-        db = Path(str(executable)+".srctrldb")
+        db = Path(str(executable) + ".srctrldb")
 
     setup_logs(debug, db)
     db_instance = setup_db(db)
