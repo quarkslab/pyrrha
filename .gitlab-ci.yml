@@ -43,6 +43,15 @@ fs:
     TEST_PATH: tests/test_cli.py::TestFsCgMapper
     TEST_SUP_OPTIONS: "--disassembler ${DISASSEMBLER} --exporter ${EXPORTER}"
 
+fs-cg_ghidra:
+  extends: .test_fs-cg
+  image: $CONTAINER_PATH/ghidra:${VERSION}
+  variables:
+    DISASSEMBLER: ghidra
+    EXPORTER: binexport
+  parallel:
+    matrix:
+      - VERSION: 11.1.2
 
 fs-cg_ida:
   extends: .test_fs-cg
