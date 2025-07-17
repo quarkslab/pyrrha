@@ -28,6 +28,17 @@ from pyrrha_mapper.common import FileSystem, Symbol
 from pyrrha_mapper.intercg.fwmapper import InterImageCGMapper
 
 
+def check_click_result(res: Result) -> None:
+    """Raise Assertion error if issue."""
+    assert res.exit_code == 0
+    assert not res.exception, res.exception
+    for log in res.stderr.splitlines():
+        assert (
+                "ERROR" not in log
+                and "WARNING" not in log
+                and "CRITICAL" not in log
+            ), f"Error log: {log}"
+
 class TestCLI:
     """Tests to check that the CLI works and display correct messages."""
 
@@ -40,8 +51,8 @@ class TestCLI:
         res_short = runner.invoke(self.COMMAND, ["-h"])
         res_long = runner.invoke(self.COMMAND, ["--help"])
         for res in [res_long, res_short]:
-            assert res.exit_code == 0
             assert res.output.startswith(f"Usage: {self.COMMAND.name}")
+            check_click_result(res)
         assert res_short.output == res_long.output, "Usage different with -h/--help"
 
     @pytest.mark.parametrize("subcommand", SUBCOMMANDS)
@@ -51,8 +62,8 @@ class TestCLI:
         res_short = runner.invoke(self.COMMAND, [subcommand, "-h"])
         res_long = runner.invoke(self.COMMAND, [subcommand, "--help"])
         for res in [res_long, res_short]:
-            assert res.exit_code == 0
             assert res.output.startswith(f"Usage: {self.COMMAND.name} {subcommand}")
+            check_click_result(res)
         assert res_short.output == res_long.output, "Usage different with -h/--help"
 
 
@@ -132,15 +143,14 @@ class BaseTestFsMapper(ABC):
     @pytest.mark.parametrize("pyrrha_exec", [1, 16], indirect=True)
     def test_numbat_project_creation(self, pyrrha_exec: ExecResults):
         """Two files are generated with correct extensions."""
-        assert pyrrha_exec.res.exit_code == 0, pyrrha_exec.res.exc_info
-        assert pyrrha_exec.db_path.exists()
+        check_click_result(pyrrha_exec.res)
         assert pyrrha_exec.db_path.with_suffix(".srctrldb").exists(), "Missing DB file"
         assert pyrrha_exec.db_path.with_suffix(".srctrlprj").exists(), "Missing project file"
 
     @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
     def test_export_creation(self, export_res: ExecResults) -> None:
         """Export file exist."""
-        assert export_res.res.exit_code == 0
+        check_click_result(export_res.res)
         assert export_res.export_path.exists(), "Export file does not exist"
 
     @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
@@ -282,7 +292,6 @@ class TestFsCgMapper(BaseTestFsMapper):
             f"{self.FW_TEST_PATH}",
         ]
         return self.ExecResults(res=runner.invoke(self.COMMAND, args), db_path=tmp_path)
-
 
     @pytest.fixture(scope="class")
     def export_res(self, tmp_path_factory, request) -> BaseTestFsMapper.ExecResults:
