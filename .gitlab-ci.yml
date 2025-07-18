@@ -1,61 +1,38 @@
-.setup-venv: &before-setup-venv
-  - python --version ; pip --version  # For debugging+
-  - python3 -m venv venv
-  - source venv/bin/activate
-
-.test_template:
-  stage: test
-  variables:
-    TEST_PATH: tests/
+.run_pyrrha:
+  stage: build
   before_script:
-    - *before-setup-venv
+    - python --version ; pip --version  # For debugging+
+    - python3 -m venv venv
+    - source venv/bin/activate
   script:
-    - pip install ".[test]"
-    - pytest  --junitxml=report.xml  --cov="pyrrha_mapper" --cov-report xml -vvv -x ${TEST_SUP_OPTIONS} ${TEST_PATH}
-    - coverage report
-  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+    - pip install '.'
+    - pyrrha $MAPPER --debug -j $(nproc) --db ${DB} tests/test_fw ${MAPPER_OPTIONS}
   artifacts:
-    when: always
-    reports:
-      junit: report.xml
-      coverage_report:
-        coverage_format: cobertura
-        path: coverage.xml
+      when: on_success
+      access: developer
+      expire_in: 1 week
+      paths:
+        - ${DB}.srctrldb
+        - ${DB}.srctrlprj
 
-data_structures: 
-  extends: .test_template
-  image: python:latest
-  script:
-    - pip install ".[test]"
-    - pytest  --junitxml=report.xml  --cov="pyrrha_mapper" --cov-report xml -vvv -x tests/test_filesystem_objects.py
-    - coverage report
-
-fs: 
-  extends: .test_template
+artifact_fs:
+  extends: .run_pyrrha
   image: python:latest
   variables:
-    TEST_PATH: tests/test_cli.py::TestFSMapper
+    MAPPER: fs
+    DB: fs
 
-.test_fs-cg: 
-  extends: .test_template
+.run_fs-cg:
+  extends: .run_pyrrha
+  image: $CONTAINER_PATH/${DISASSEMBLER}:${VERSION}
   variables:
-    DISASSEMBLER: ida ghidra binary_ninja
-    TEST_PATH: tests/test_cli.py::TestFsCgMapper
-    TEST_SUP_OPTIONS: "--disassembler ${DISASSEMBLER} --exporter ${EXPORTER}"
+    MAPPER: fs-cg
+    DB: ${DISASSEMBLER}_${VERSION}_${EXPORTER}
+    MAPPER_OPTIONS: '--disassembler ${DISASSEMBLER} --exporter ${EXPORTER}'
 
-fs-cg_ghidra:
-  extends: .test_fs-cg
-  image: $CONTAINER_PATH/ghidra:${VERSION}
-  variables:
-    DISASSEMBLER: ghidra
-    EXPORTER: binexport
-  parallel:
-    matrix:
-      - VERSION: 11.1.2
-
-fs-cg_ida:
-  extends: .test_fs-cg
-  image: $CONTAINER_PATH/ida${VERSION}
+artifact_fs-cg_ida:
+  extends: 
+    - .run_fs-cg
   variables:
     DISASSEMBLER: ida
   parallel:
@@ -76,7 +53,73 @@ fs-cg_ida:
         KEY_NAME: ida.hexlic
         REG: $IDA_REG
   before_script:
-    - *before-setup-venv
+    - !reference [ .run_fs-cg, before_script ]
     - mkdir -p /root/.idapro/
     - echo $KEY | base64 -d  > /root/.idapro/$KEY_NAME
     - echo $REG | base64 -d  > /root/.idapro/ida.reg
+
+
+artifact_fs-cg_ghidra:
+  extends: .run_fs-cg
+  variables:
+    DISASSEMBLER: ghidra
+  parallel:
+    matrix:
+      - VERSION: 11.1.2
+        EXPORTER: binexport
+
+
+.test_template:
+  stage: test
+  variables:
+    TEST_PATH: tests/
+  script:
+    - pip install ".[test]"
+    - pytest  --junitxml=report.xml  --cov="pyrrha_mapper" --cov-report xml -vvv -x ${TEST_SUP_OPTIONS} ${TEST_PATH}
+    - coverage report
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+  artifacts:
+    when: always
+    reports:
+      junit: report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+
+test_data_structures: 
+  extends: .test_template
+  image: python:latest
+  variables:
+    TEST_PATH: tests/test_filesystem_objects.py
+
+test_fs: 
+  extends: 
+    - artifact_fs
+    - .test_template
+  image: python:latest
+  variables:
+    TEST_PATH: tests/test_cli.py::TestFSMapper
+  needs:
+    - artifact_fs
+
+.test_fs-cg: 
+  extends:
+    - .test_template
+  image: $CONTAINER_PATH/${DISASSEMBLER}:${VERSION}
+  variables:
+    TEST_PATH: tests/test_cli.py::TestFsCgMapper
+    TEST_SUP_OPTIONS: ${MAPPER_OPTIONS}
+
+test_fs-cg_ghidra:
+  extends: 
+    - artifact_fs-cg_ghidra
+    - .test_fs-cg
+  needs:
+    - artifact_fs-cg_ghidra
+
+test_fs-cg_ida:
+  extends: 
+    - artifact_fs-cg_ida
+    - .test_fs-cg
+  needs:
+    - artifact_fs-cg_ida
