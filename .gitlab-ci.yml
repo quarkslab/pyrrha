@@ -6,7 +6,7 @@
     - source venv/bin/activate
   script:
     - pip install '.'
-    - pyrrha $MAPPER --debug -j $(nproc) --db ${DB} tests/test_fw ${MAPPER_OPTIONS}
+    - pyrrha $MAPPER --db ${DB} -j $(nproc) tests/test_fw ${MAPPER_OPTIONS}
   artifacts:
       when: on_success
       access: developer
@@ -24,7 +24,11 @@ artifact_fs:
 
 .run_fs-cg:
   extends: .run_pyrrha
-  image: $CONTAINER_PATH/${DISASSEMBLER}:${VERSION}
+  image: 
+    name: $CONTAINER_PATH/${DISASSEMBLER}:${VERSION}
+    docker:
+      user: user
+      entrypoint: ["/bin/bash"]
   variables:
     MAPPER: fs-cg
     DB: ${DISASSEMBLER}_${VERSION}_${EXPORTER}
@@ -50,14 +54,15 @@ artifact_fs-cg_ida:
     - if: $VERSION == "91"
       variables: 
         KEY: $LICENSE
-        KEY_NAME: ida.hexlic
+        KEY_NAME: ida_license.hexlic
         REG: $IDA_REG
   before_script:
     - !reference [ .run_fs-cg, before_script ]
-    - mkdir -p /root/.idapro/
-    - echo $KEY | base64 -d  > /root/.idapro/$KEY_NAME
-    - echo $REG | base64 -d  > /root/.idapro/ida.reg
-
+    - mkdir -p ~/.idapro/
+    - echo $KEY | base64 -d  > ~/.idapro/$KEY_NAME
+    - echo $REG | base64 -d  > ~/.idapro/ida.reg
+    - idapyswitch -a
+    - export IDA_LICENSE=keyfile=$KEY_NAME
 
 artifact_fs-cg_ghidra:
   extends: .run_fs-cg
@@ -105,7 +110,7 @@ test_fs:
 .test_fs-cg: 
   extends:
     - .test_template
-  image: $CONTAINER_PATH/${DISASSEMBLER}:${VERSION}
+  image: !reference [ .run_fs-cg, image ]
   variables:
     TEST_PATH: tests/test_cli.py::TestFsCgMapper
     TEST_SUP_OPTIONS: ${MAPPER_OPTIONS}
