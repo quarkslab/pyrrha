@@ -23,3 +23,4 @@ data/
 *.i64
 *.BinExport
 *.quokka
+.gitlab-ci-local*
