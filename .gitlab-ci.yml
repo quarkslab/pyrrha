@@ -28,7 +28,6 @@ artifact_fs:
     name: $CONTAINER_PATH/${DISASSEMBLER}:${VERSION}
     docker:
       user: user
-      entrypoint: ["/bin/bash"]
   variables:
     MAPPER: fs-cg
     DB: ${DISASSEMBLER}_${VERSION}_${EXPORTER}
