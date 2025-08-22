@@ -79,3 +79,8 @@ RUN if [[ ${IDA_VERSION} -eq 84 ]]; then \
     else wget ${QUOKKA_URL} -O ${IDA_INSTALL_DIR}/plugins/quokka.so ; fi \
     && apt-get purge --yes wget \
     && rm -rf /var/lib/apt/lists/*
+
+RUN useradd --create-home -u 1000 -m user && chown -R user:user $IDA_INSTALL_DIR
+USER user
+RUN $IDA_INSTALL_DIR/idapyswitch -a
+WORKDIR /home/user
