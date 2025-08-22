@@ -58,4 +58,12 @@ RUN wget ${GRADLE_URL} -O gradle.zip  \
     && rm -rf gradle.zip gradle binexport.zip binexport \
     && apt-get purge --yes wget unzip  && apt --yes autoremove
 
+# ======================== USER CREATION ==============================
+ARG USER_GHIDRA_PLUGIN_DIR=/home/user/.config/ghidra/ghidra_${GHIDRA_VERSION}_PUBLIC/Extensions
+
+RUN useradd --create-home -u 1000 -m user && chown -R user:user $GHIDRA_INSTALL_DIR 
+RUN mkdir -p ${USER_GHIDRA_PLUGIN_DIR} && mv ${GHIDRA_PLUGIN_DIR}/* ${USER_GHIDRA_PLUGIN_DIR} && chown -R user:user /home/user/.config
+USER user
+WORKDIR /home/user
+
 CMD ["/bin/bash"]
