@@ -1,45 +1,128 @@
-.run_pyrrha:
-  stage: build
-  before_script:
-    - python --version ; pip --version  # For debugging+
-    - python3 -m venv venv
-    - source venv/bin/activate
-  script:
-    - pip install '.'
-    - pyrrha $MAPPER --db ${DB} -j $(nproc) tests/test_fw ${MAPPER_OPTIONS}
-  artifacts:
-      when: on_success
-      access: developer
-      expire_in: 1 week
-      paths:
-        - ${DB}.srctrldb
-        - ${DB}.srctrlprj
+#========================== STEPS USED IN WORKFLOWS ====================================
+.step_python_setup_install: &step_python_setup_install
+  - echo -e "\e[95m===== Setup Python"
+  - python --version ; pip --version
+  - python3 -m venv venv 
+  - source venv/bin/activate
 
-artifact_fs:
-  extends: .run_pyrrha
+.step_install_pyrrha_test: &step_install_pyrrha_test
+  - echo -e "\e[95m===== Install Pyrrha with test extension"
+  - pip install '.[test]'
+
+.step_configure_disassembler: &step_configure_disassembler
+  - if [[ ${DISASSEMBLER} == "ida" ]]; then
+    echo -e "\e[95m===== Configure IDA" &&
+    mkdir -p ~/.idapro/ &&
+    echo $KEY | base64 -d  > ~/.idapro/$KEY_NAME &&
+    echo $REG | base64 -d  > ~/.idapro/ida.reg &&
+    export IDA_LICENSE=keyfile=$KEY_NAME &&
+    idapyswitch -a ; fi;
+
+.step_gen_artifacts: &step_gen_artifacts
+  - echo -e "\e[95m===== Generate artifacts"
+  - mkdir -p ${ARTIFACTS} 
+  - cp -r tests ${ARTIFACTS}
+  - (cd ${ARTIFACTS} && pyrrha $MAPPER --db ${DB} -j $(nproc) tests/test_fw ${MAPPER_OPTIONS})
+
+.step_run_tests: &step_run_tests
+  - echo -e "\e[95m===== Tests"
+  - coverage run --source=${TEST_COVERAGE_SOURCE} -m pytest  --junitxml=report.xml -vvv -x ${TEST_SUP_OPTIONS} ${TEST_PATH}
+  - coverage xml
+  - coverage report
+
+#========================== OBJECTS TESTS ====================================
+
+test_data_structures: 
+  stage: test
+  before_script: 
+    - *step_python_setup_install
+    - *step_install_pyrrha_test
+  script:
+    - *step_run_tests
   image: python:latest
   variables:
-    MAPPER: fs
-    DB: fs
+    TEST_COVERAGE_SOURCE: pyrrha_mapper.common.objects
+    TEST_PATH: tests/test_filesystem_objects.py
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+  artifacts:
+    reports:
+      junit: report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
 
-.run_fs-cg:
-  extends: .run_pyrrha
+#========================== MAPPERS TESTS ====================================
+.run_pyrrha_test_artifacts:
+  stage: test
+  before_script: 
+    - *step_python_setup_install
+    - *step_install_pyrrha_test
+  script:
+    - *step_gen_artifacts
+    - *step_run_tests
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+  artifacts:
+    name: db_$CI_JOB_NAME_SLUG
+    when: always
+    paths:
+      - ${ARTIFACTS}/${DB}.srctrldb
+      - ${ARTIFACTS}/${DB}.srctrlprj
+    reports:
+      junit: report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+  variables:
+    ARTIFACTS: tmp/artifacts
+    
+test_fs: 
+  extends: 
+    - .run_pyrrha_test_artifacts
+  image: python:latest
+  variables:
+    DB: fs
+    MAPPER: fs
+    TEST_COVERAGE_SOURCE: pyrrha_mapper.common.filesystem_mapper,pyrrha_mapper.fs
+    TEST_PATH: tests/test_cli.py::TestFSMapper
+    
+
+.test_fs-cg:
+  extends: 
+    - .run_pyrrha_test_artifacts
+  before_script: 
+    - !reference [.run_pyrrha_test_artifacts, before_script]
+    - *step_configure_disassembler
   image: 
     name: $CONTAINER_PATH/${DISASSEMBLER}:${VERSION}
     docker:
       user: user
   variables:
-    MAPPER: fs-cg
     DB: ${DISASSEMBLER}_${VERSION}_${EXPORTER}
+    MAPPER: fs-cg
     MAPPER_OPTIONS: '--disassembler ${DISASSEMBLER} --exporter ${EXPORTER}'
+    TEST_COVERAGE_SOURCE: pyrrha_mapper.common.filesystem_mapper,pyrrha_mapper.intercg
+    TEST_PATH: tests/test_cli.py::TestFsCgMapper
+    TEST_SUP_OPTIONS: ${MAPPER_OPTIONS}
 
-artifact_fs-cg_ida:
-  extends: 
-    - .run_fs-cg
+test_fs-cg_ghidra:
+  extends:
+    - .test_fs-cg
+  variables:
+    DISASSEMBLER: ghidra
+  parallel:
+    matrix:
+      - VERSION: 11.1.2
+        EXPORTER: binexport
+
+test_fs-cg_ida:
+  extends:
+    - .test_fs-cg
   variables:
     DISASSEMBLER: ida
   parallel:
     matrix:
+      - VERSION: 11.1.2
+        EXPORTER: binexport
       - VERSION: 84
         EXPORTER: [quokka, binexport]
       - VERSION: 91
@@ -55,75 +138,3 @@ artifact_fs-cg_ida:
         KEY: $LICENSE
         KEY_NAME: ida_license.hexlic
         REG: $IDA_REG
-  before_script:
-    - !reference [ .run_fs-cg, before_script ]
-    - mkdir -p ~/.idapro/
-    - echo $KEY | base64 -d  > ~/.idapro/$KEY_NAME
-    - echo $REG | base64 -d  > ~/.idapro/ida.reg
-    - idapyswitch -a
-    - export IDA_LICENSE=keyfile=$KEY_NAME
-
-artifact_fs-cg_ghidra:
-  extends: .run_fs-cg
-  variables:
-    DISASSEMBLER: ghidra
-  parallel:
-    matrix:
-      - VERSION: 11.1.2
-        EXPORTER: binexport
-
-
-.test_template:
-  stage: test
-  variables:
-    TEST_PATH: tests/
-  script:
-    - pip install ".[test]"
-    - pytest  --junitxml=report.xml  --cov="pyrrha_mapper" --cov-report xml -vvv -x ${TEST_SUP_OPTIONS} ${TEST_PATH}
-    - coverage report
-  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
-  artifacts:
-    when: always
-    reports:
-      junit: report.xml
-      coverage_report:
-        coverage_format: cobertura
-        path: coverage.xml
-
-test_data_structures: 
-  extends: .test_template
-  image: python:latest
-  variables:
-    TEST_PATH: tests/test_filesystem_objects.py
-
-test_fs: 
-  extends: 
-    - artifact_fs
-    - .test_template
-  image: python:latest
-  variables:
-    TEST_PATH: tests/test_cli.py::TestFSMapper
-  needs:
-    - artifact_fs
-
-.test_fs-cg: 
-  extends:
-    - .test_template
-  image: !reference [ .run_fs-cg, image ]
-  variables:
-    TEST_PATH: tests/test_cli.py::TestFsCgMapper
-    TEST_SUP_OPTIONS: ${MAPPER_OPTIONS}
-
-test_fs-cg_ghidra:
-  extends: 
-    - artifact_fs-cg_ghidra
-    - .test_fs-cg
-  needs:
-    - artifact_fs-cg_ghidra
-
-test_fs-cg_ida:
-  extends: 
-    - artifact_fs-cg_ida
-    - .test_fs-cg
-  needs:
-    - artifact_fs-cg_ida
