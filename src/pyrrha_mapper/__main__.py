@@ -49,9 +49,9 @@ class MapperCommand(click.Command):
             0,
             click.core.Option(
                 ("--db",),
-                help="NumbatUI DB file path (.srctrldb).",
+                help=f"NumbatUI DB file path ({SourcetrailDB.SOURCETRAIL_DB_EXT}).",
                 type=click.Path(file_okay=True, dir_okay=True, path_type=Path),
-                default=Path() / f"{self.name}.srctrldb",
+                default=Path() / f"{self.name}{SourcetrailDB.SOURCETRAIL_DB_EXT}",
                 show_default=True,
             ),
         )
@@ -104,7 +104,10 @@ def setup_db(db_path, overwrite_db: bool = True) -> SourcetrailDB:
     if SourcetrailDB.exists(db_path):
         db = SourcetrailDB.open(db_path, clear=overwrite_db)
     else:
-        db = SourcetrailDB.create(db_path)
+        path = Path(db_path)
+        if path.suffix != SourcetrailDB.SOURCETRAIL_DB_EXT:
+            path = path.with_suffix(f"{path.suffix}{SourcetrailDB.SOURCETRAIL_DB_EXT}")
+        db = SourcetrailDB.create(path)
     return db
 
 
