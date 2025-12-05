@@ -39,7 +39,7 @@ classifiers = [
     'Environment :: Console',
 ]
 dependencies = [
-    'click',
+    'click>=8.2.0',
     'coloredlogs',
     'lief>=0.15.0',
     'numbat>=0.2.6',
