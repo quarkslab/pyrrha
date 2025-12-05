@@ -320,7 +320,7 @@ def fs_call_graph_mapper(  # noqa: D103
 @click.option(
     "--disassembler",
     required=False,
-    type=Disassembler,
+    type=click.Choice(Disassembler, case_sensitive=False),
     default=Disassembler.AUTO,
     show_default=True,
     help="Disassembler to use for disassembly and decompilation.",
@@ -328,7 +328,7 @@ def fs_call_graph_mapper(  # noqa: D103
 @click.option(
     "--exporter",
     required=False,
-    type=ExportFormat,
+    type=click.Choice(ExportFormat, case_sensitive=False),
     default=ExportFormat.AUTO,
     show_default=True,
     help="Binary export format to use for binary analysis.",
