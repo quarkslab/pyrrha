@@ -59,7 +59,7 @@ The usage workflow is composed of two steps which allow you to separate DB creat
 
 Pyrrha presentations, including live demos:
 
-- **Pyrrha & Friends: Diving into Firmware Cartography**, Eloïse Brocas & Robin Davis, *SSTIC*, Rennes, France, 2025. [[slides]](https://www.sstic.org/media/SSTIC2025/SSTIC-actes/pyrrha_diving_into_firmware_cartography/SSTIC2025-Slides-pyrrha_diving_into_firmware_cartography-brocas_david.pdf) [[video]](https://static.sstic.org/videos2025/1080p/pyrrha_diving_into_firmware_cartography.mp4) 
+- **Pyrrha & Friends: Diving into Firmware Cartography**, Eloïse Brocas & Robin David, *SSTIC*, Rennes, France, 2025. [[slides]](https://www.sstic.org/media/SSTIC2025/SSTIC-actes/pyrrha_diving_into_firmware_cartography/SSTIC2025-Slides-pyrrha_diving_into_firmware_cartography-brocas_david.pdf) [[video]](https://static.sstic.org/videos2025/1080p/pyrrha_diving_into_firmware_cartography.mp4) 
 
 - **Pyrrha: navigate easily into your system binaries**, Eloïse Brocas, *Hack.lu*, Luxembourg, 2023. [[slides]](https://github.com/quarkslab/conf-presentations/blob/master/Confs/HackLu23/pyrrha.pdf) [[video]](https://www.youtube.com/watch?v=-dMl-SvQl4k) 
 
