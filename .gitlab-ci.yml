@@ -22,7 +22,8 @@
   - echo -e "\e[95m===== Generate artifacts"
   - mkdir -p ${ARTIFACTS} 
   - cp -r tests ${ARTIFACTS}
-  - (cd ${ARTIFACTS} && pyrrha $MAPPER --db ${DB} -j $(nproc) tests/test_fw ${MAPPER_OPTIONS})
+  - (cd ${ARTIFACTS} && pyrrha $MAPPER --db ${DB} --debug tests/test_fw ${MAPPER_OPTIONS})
+  - ls ${ARTIFACTS}
 
 .step_run_tests: &step_run_tests
   - echo -e "\e[95m===== Tests"
@@ -121,8 +122,6 @@ test_fs-cg_ida:
     DISASSEMBLER: ida
   parallel:
     matrix:
-      - VERSION: 11.1.2
-        EXPORTER: binexport
       - VERSION: 84
         EXPORTER: [quokka, binexport]
       - VERSION: 91

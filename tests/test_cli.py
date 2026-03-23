@@ -115,7 +115,7 @@ class BaseTestFsMapper(ABC):
         runner = CliRunner()
         tmp_path = (
             tmp_path_factory.mktemp("db", numbered=True)
-            / f"{self.SUBCOMMAND}-{request.param}.srctrlprj"
+            / f"{self.SUBCOMMAND}-{request.param}.srctrldb"
         )
         args = [
             self.SUBCOMMAND,
@@ -229,7 +229,7 @@ class TestFSMapper(BaseTestFsMapper):
         runner = CliRunner()
         tmp_path = (
             tmp_path_factory.mktemp("db", numbered=True)
-            / f"{self.SUBCOMMAND}-{request.param}-export.srctrlprj"
+            / f"{self.SUBCOMMAND}-{request.param}-export.srctrldb"
         )
         args = [
             self.SUBCOMMAND,
@@ -277,7 +277,7 @@ class TestFsCgMapper(BaseTestFsMapper):
         runner = CliRunner()
         tmp_path = (
             tmp_path_factory.mktemp("db", numbered=True)
-            / f"{self.SUBCOMMAND}-{request.param}.srctrlprj"
+            / f"{self.SUBCOMMAND}-{request.param}.srctrldb"
         )
         args = [
             self.SUBCOMMAND,
@@ -299,7 +299,7 @@ class TestFsCgMapper(BaseTestFsMapper):
         runner = CliRunner()
         tmp_path = (
             tmp_path_factory.mktemp("db", numbered=True)
-            / f"{self.SUBCOMMAND}-{request.param}-export.srctrlprj"
+            / f"{self.SUBCOMMAND}-{request.param}-export.srctrldb"
         )
         args = [
             self.SUBCOMMAND,
