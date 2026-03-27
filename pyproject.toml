@@ -47,6 +47,8 @@ dependencies = [
     'rich',
     # InterCG mapper
     "qbinary>=0.0.3", # will also install idascript
+    "ida_domain",
+    "pyghidra"
 ]
 dynamic = ['version']
 
