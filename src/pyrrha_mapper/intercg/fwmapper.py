@@ -16,11 +16,11 @@
 """InterCGMapper implementation."""
 
 import logging
+import sys
 from collections import defaultdict
+from hashlib import md5
 from pathlib import Path
 from typing import Any
-from hashlib import md5
-import sys
 
 # third-party imports
 from numbat import SourcetrailDB
@@ -36,9 +36,8 @@ from pyrrha_mapper.common import (
 )
 from pyrrha_mapper.exceptions import FsMapperError
 from pyrrha_mapper.fs import FileSystemImportsMapper
-from pyrrha_mapper.intercg.loader import load_program
-from pyrrha_mapper.types import ResolveDuplicateOption
-from qbinary.types import Disassembler, ExportFormat
+from pyrrha_mapper.intercg.loader import BinaryParser, GhidraParser, IDAParser
+from pyrrha_mapper.types import Disassembler, Exporter, ResolveDuplicateOption
 
 IGNORE_LIST = ["__gmon_start__"]
 
@@ -48,15 +47,10 @@ NUMBAT_UI_BIN = "NumbatUi"
 
 # Determine the command to open URLs based on the platform
 try:
-    URL_OPEN_CMD = {
-        "linux": "xdg-open",
-        "win32": "start",
-        "darwin": "open"
-    }[sys.platform]
+    URL_OPEN_CMD = {"linux": "xdg-open", "win32": "start", "darwin": "open"}[sys.platform]
 except KeyError:
     logging.warning(f"Unsupported platform: {sys.platform} (will not add URL handler)")
-    URL_OPEN_CMD = "" # type: ignore
-
+    URL_OPEN_CMD = ""  # type: ignore
 
 
 class InterImageCGMapper(FileSystemImportsMapper):
@@ -64,8 +58,8 @@ class InterImageCGMapper(FileSystemImportsMapper):
 
     FS_EXT = ".fs.json"
 
-    DISASS = Disassembler.AUTO
-    EXPORT = ExportFormat.AUTO
+    DISASS = Disassembler.IDA
+    EXPORT = Exporter.NONE
 
     def __init__(self, root_directory: Path | str, db: SourcetrailDB | None):
         super(InterImageCGMapper, self).__init__(root_directory, db)
@@ -98,10 +92,10 @@ class InterImageCGMapper(FileSystemImportsMapper):
                 )
             )
         )
-    
+
     def load_binary_args(self) -> dict[str, Any]:
         """Return dict of args for load_binary that are always the same for the wholde firmware.
-        
+
         Use to optimize multiprocessing. Set here there real values.
         """
         res = super().load_binary_args()
@@ -114,7 +108,7 @@ class InterImageCGMapper(FileSystemImportsMapper):
         root_directory: Path,
         file_path: Path,
         disass: Disassembler = DISASS,
-        exporter: ExportFormat = EXPORT,
+        exporter: Exporter = EXPORT,
     ) -> tuple[Binary, dict[Symbol, list[str]] | None] | str:
         """Load all the binaries located in the filesystem as Binary objects.
 
@@ -127,36 +121,26 @@ class InterImageCGMapper(FileSystemImportsMapper):
 
         :param cache_file: Cache file to load binaries from (if exists)
         """
-        res = FileSystemImportsMapper.load_binary(root_directory, file_path)
-        if isinstance(res, str):  # error message
-            return res
-        else:
-            binary, _ = res
-        if binary.real_path is None:
-            return f"ERROR: Path on the filesystem of {binary.name} not set (skip)"
-        if not binary.real_path.exists():
-            return (
-                f"ERROR cannot find executable mentioned in 'fs' mapper: "
-                f"{binary.real_path.name} (skip)"
-            )
-
         try:
-            prefix = f"[binary mapping] {binary.name}"
-            unresolved_cg = load_program(binary, disass, exporter, prefix)
-            return binary, unresolved_cg
+            if disass == Disassembler.IDA:
+                ida_parser: BinaryParser = IDAParser(root_directory, file_path)
+                return ida_parser.binary, ida_parser.call_graph
+            elif disass == Disassembler.GHIDRA:
+                ghidra_parser = GhidraParser(root_directory, file_path)
+                return ghidra_parser.binary, ghidra_parser.call_graph
+            else:
+                return f" disassembler {disass} is not supported"
         except (FileNotFoundError, FsMapperError, SyntaxError) as e:
-            logging.error(f"ERROR: Loading error: {binary.name}: {e}")
-            return binary, None
-
+            return f"[binary mapping] {file_path.name}: ERROR: Loading error: {e}"
 
     def add_url_handler(self, hash: str, binary: Binary, symbol: Symbol) -> None:
-        """ Open the function using a dedicated URL handler. (Use Heimdallr) """
+        """Open the function using a dedicated URL handler. (Use Heimdallr)"""
         if not hash:
             return  # no hash, no URL handler
         if URL_OPEN_CMD:
-            url = f"disas://{hash}?idb={binary.name+'.i64'}&offset={symbol.addr:#08x}"
+            url = f"disas://{hash}?idb={binary.name + '.i64'}&offset={symbol.addr:#08x}"
             cmd: list[str] = ["xdg-open", url]
-            self.db_interface.set_custom_command(symbol.id, cmd, "Open in Disassembler") # type: ignore
+            self.db_interface.set_custom_command(symbol.id, cmd, "Open in Disassembler")  # type: ignore
         else:
             pass  # Can't add URL unsuported platform
 
@@ -181,16 +165,16 @@ class InterImageCGMapper(FileSystemImportsMapper):
                 self._record_custom_command(bin_object, f"[bin mapping] {bin_object.name}")
 
     def symbol_recorded(self, binary: Binary, symbol: Symbol) -> None:
-        """
-        Register a symbol recorded handler to add a custom command.
-        """
+        """Register a symbol recorded handler to add a custom command."""
         self.add_url_handler(self._current_binary_hash, binary, symbol)
 
     def _treat_bin_parsing_result(self, path: Path, res: Any):
         """Handle load_binary res, map it or display error."""
-        log_prefix = f"[binary mapping] {path.name}"
+        log_prefix = f"[binary parsing] {path.name}"
         if isinstance(res, str):
             logging.error(f"{log_prefix}: {res}")
+        elif isinstance(res, BaseException):
+            logging.error(f"{log_prefix}: {repr(res)}")
         elif self._correct_map_result(res):
             bin_obj, additional_info = res
             self.map_binary(bin_obj, additional_info)
@@ -198,7 +182,7 @@ class InterImageCGMapper(FileSystemImportsMapper):
             self.map_binary(res[0], None)
             logging.info(f"{log_prefix}: fallback to lief results, internal analysis failed")
         else:
-            logging.warning(f"{log_prefix}: impossible to parse the following result {res}")
+            logging.warning(f"{log_prefix}: impossible to parse the following result {res.args}")
 
     def map_binaries_main(self, threads: int, progress: Progress) -> None:
         """Parse and map binaries of a given directory.
