@@ -154,25 +154,29 @@ class FileSystemImportsMapper(FileSystemMapper):
 
     @classmethod
     def parse_binary_job(cls, ingress: Queue, egress: Queue, parse_func: Callable) -> None:
-        """Parse an executable file and create the associated Binary object.
+        """Parse an executable file and create the associated Binary object, used to multiprocess.
 
-        It is used for multiprocessing.
-        :param ingress: input Queue, contain a Path
-        :param egress: output Queue, send back (file path, Binary result or
-        logging string if an issue happen)
-        :param parse_func: func which take a path as argument (called file_path) and parse it
+        :param ingress: input Queue, contains Path items or None as a stop sentinel
+        :param egress: output Queue, sends back (file path, Binary result) or
+            (file path, Exception) if an issue occurred
+        :param parse_func: func which takes a path as argument (called file_path) and parses it
         """
         while True:
             try:
                 path = ingress.get(timeout=0.5)
-                try:
-                    egress.put((path, parse_func(file_path = path)))
-                except Exception as e:
-                    egress.put((path, e))
             except queue.Empty:
-                pass
+                continue
             except KeyboardInterrupt:
                 break
+
+            if path is None:
+                break
+
+            try:
+                egress.put((path, parse_func(file_path=path)))
+            except Exception as e:
+                logging.error(f"[worker] Failed on {path}: {e}")
+                egress.put((path, e))
 
     def map_binary(self, bin_object: Binary, additional_res: Any = None) -> None:
         """Given a Binary object add it to the DB.
