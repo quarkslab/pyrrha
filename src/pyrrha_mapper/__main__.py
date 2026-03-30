@@ -15,25 +15,135 @@
 #  limitations under the License.
 """CLI Module."""
 
+import functools
 import json
 import logging
 import multiprocessing
 import os
-import shutil
 import sys
 from pathlib import Path
 
 import click
 import coloredlogs  # type: ignore # no typing used in this library
 from numbat import SourcetrailDB
-from qbinary.types import Disassembler, ExportFormat
 
 from pyrrha_mapper import exedecomp, fs, intercg
 from pyrrha_mapper.common import FileSystem
-from pyrrha_mapper.types import ResolveDuplicateOption
+from pyrrha_mapper.types import Disassembler, Exporter, ResolveDuplicateOption
 
 # -------------------------------------------------------------------------------
-#                           Common stuff for mappers
+#                           Shared option decorators
+# -------------------------------------------------------------------------------
+
+
+def resolve_duplicates_options(f):
+    """Add the three mutually exclusive resolve-duplicate options (decorator)."""
+
+    @click.option(
+        "--ignore",
+        "resolve_duplicates",
+        flag_value=ResolveDuplicateOption.IGNORE,
+        help="When resolving duplicate imports, ignore them.",
+        default=True,
+    )
+    @click.option(
+        "--arbitrary",
+        "resolve_duplicates",
+        flag_value=ResolveDuplicateOption.ARBITRARY,
+        help="When resolving duplicate imports, select the first one available.",
+    )
+    @click.option(
+        "--interactive",
+        "resolve_duplicates",
+        flag_value=ResolveDuplicateOption.INTERACTIVE,
+        help="When resolving duplicate imports, user manually selects which one to use.",
+    )
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        return f(*args, **kwargs)
+
+    return wrapper
+
+
+def jobs_option(max_fraction: float = 1.0):
+    """Add a ``--jobs`` option (decorator).
+
+    :param max_fraction: fraction of CPU count to use as the upper bound (default 1.0).
+    """
+
+    def decorator(f):
+        max_jobs = max(1, int(multiprocessing.cpu_count() * max_fraction))
+
+        @click.option(
+            "-j",
+            "--jobs",
+            help="Number of parallel jobs.",
+            type=click.IntRange(1, max_jobs, clamp=True),
+            metavar="INT",
+            default=1,
+            show_default=True,
+        )
+        @functools.wraps(f)
+        def wrapper(*args, **kwargs):
+            return f(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def disassembler_option(f):
+    """*Add the ``--disassembler`` option."""
+
+    @click.option(
+        "-b",
+        "--backend",
+        required=False,
+        type=click.Choice(Disassembler, case_sensitive=False),
+        default=Disassembler.IDA,
+        show_default=True,
+        help="Disassembler to use.",
+    )
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        return f(*args, **kwargs)
+
+    return wrapper
+
+
+def exporter_option(f):
+    """Add the ``--exporter`` option (decorator)."""
+    @click.option(
+        "--exporter",
+        required=False,
+        type=click.Choice(Exporter, case_sensitive=False),
+        default=Exporter.NONE,
+        show_default=True,
+        help="Binary export format to use for binary analysis.",
+    )
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        return f(*args, **kwargs)
+
+    return wrapper
+
+
+def root_directory_argument(f):
+    """Add the ``root_directory`` argument (decorator)."""
+
+    @click.argument(
+        "root_directory",
+        type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    )
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        return f(*args, **kwargs)
+
+    return wrapper
+
+
+# -------------------------------------------------------------------------------
+#                           Common command helpers
 # -------------------------------------------------------------------------------
 
 
@@ -57,16 +167,16 @@ class MapperCommand(click.Command):
         )
         self.params.insert(
             0,
-            click.core.Option(("-d", "--debug"), is_flag=True, help="Set log level to DEBUG"),
+            click.core.Option(("-d", "--debug"), is_flag=True, help="Set log level to DEBUG."),
         )
         self.no_args_is_help = True
 
 
 def setup_logs(is_debug_level: bool, db_path: Path | None = None) -> None:
-    """Set up logs.
+    """Set up coloured console logging and an optional log file.
 
-    :param is_debug_level: if True set the log level as DEBUG else INFO
-    :param db_path: if provided, save a collocated log file.
+    :param is_debug_level: if True, set the log level to DEBUG, else INFO.
+    :param db_path: if provided, write a collocated ``.log`` file.
     """
     log_format = dict(fmt="[%(asctime)s][%(levelname)s]: %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
     level = logging.DEBUG if is_debug_level else logging.INFO
@@ -82,17 +192,14 @@ def setup_logs(is_debug_level: bool, db_path: Path | None = None) -> None:
         field_styles={"asctime": {"color": "green"}, "levelname": {"bold": True}},
         **log_format,
     )
-
     if db_path:
-        log_file = db_path.with_suffix(".log")
-        # add file handler
-        file_handler = logging.FileHandler(log_file, mode="w")
-        file_handler.setLevel(level)
-        file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
-        logging.root.addHandler(file_handler)
+        handler = logging.FileHandler(db_path.with_suffix(".log"), mode="w")
+        handler.setLevel(level)
+        handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+        logging.root.addHandler(handler)
 
 
-def setup_db(db_path, overwrite_db: bool = True) -> SourcetrailDB:
+def setup_db(db_path: Path, overwrite_db: bool = True) -> SourcetrailDB:
     """Create and/or open the corresponding Sourcetrail DB.
 
     :param db_path: path of the db to open/create
@@ -100,15 +207,12 @@ def setup_db(db_path, overwrite_db: bool = True) -> SourcetrailDB:
         cleared else not
     :return: the created or opened Sourcetrail DB
     """
-    # db creation/and or opening
     if SourcetrailDB.exists(db_path):
-        db = SourcetrailDB.open(db_path, clear=overwrite_db)
-    else:
-        path = Path(db_path)
-        if path.suffix != SourcetrailDB.SOURCETRAIL_DB_EXT:
-            path = path.with_suffix(f"{path.suffix}{SourcetrailDB.SOURCETRAIL_DB_EXT}")
-        db = SourcetrailDB.create(path)
-    return db
+        return SourcetrailDB.open(db_path, clear=overwrite_db)
+    path = Path(db_path)
+    if path.suffix != SourcetrailDB.SOURCETRAIL_DB_EXT:
+        path = path.with_suffix(f"{path.suffix}{SourcetrailDB.SOURCETRAIL_DB_EXT}")
+    return SourcetrailDB.create(path)
 
 
 # -------------------------------------------------------------------------------
@@ -126,83 +230,45 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"], max_content_width=12
 def pyrrha():  # noqa: D103
     pass
 
-
-"""
- Filesystem mapper.
- Map ELF/PE files, their imports and their exports.
- Also map symlinks which target ELF/PE files.
-"""
-
-
 @pyrrha.command(
     "fs",
     cls=MapperCommand,
-    short_help="Map PE and ELF files of a filesystem into a numbatui-compatible db.",
-    help="Map a filesystem into a numbatui-compatible db. It maps ELF and PE files, \
-their imports/exports plus the symlinks that points on these executable files.",
+    short_help="Map PE and ELF files of a filesystem into a NumbatUI-compatible db.",
+    help=(
+        "Map a filesystem into a NumbatUI-compatible db. "
+        "It maps ELF and PE files, their imports/exports, "
+        "plus the symlinks that point to these executable files."
+    ),
 )
 @click.option(
     "-e",
     "--export",
-    help="Create an export of the resulting FileSystem mapping (in JSON).",
+    help="Create a JSON export of the resulting FileSystem mapping.",
     is_flag=True,
     default=False,
-    show_default=False,
 )
-@click.option(
-    "-j",
-    "--jobs",
-    help="Number of parallel jobs created (threads).",
-    type=click.IntRange(1, multiprocessing.cpu_count(), clamp=True),
-    metavar="INT",
-    default=1,
-    show_default=True,
-)
-@click.option(
-    "--ignore",
-    "resolve_duplicates",
-    flag_value=ResolveDuplicateOption.IGNORE,
-    help="When resolving duplicate imports, ignore them",
-    default=True,
-)
-@click.option(
-    "--arbitrary",
-    "resolve_duplicates",
-    flag_value=ResolveDuplicateOption.ARBITRARY,
-    help="When resolving duplicate imports, select the first one available",
-)
-@click.option(
-    "--interactive",
-    "resolve_duplicates",
-    flag_value=ResolveDuplicateOption.INTERACTIVE,
-    help="When resolving duplicate imports, user manually select which one to use",
-)
-@click.argument(
-    "root_directory",
-    # help='Path of the directory containing the filesystem to map.',
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
-)
-def fs_mapper(  # noqa: D103
+@jobs_option(max_fraction=1.0)
+@resolve_duplicates_options
+@root_directory_argument
+def fs_mapper(
     debug: bool,
     db: Path,
     export: bool,
     jobs: int,
     resolve_duplicates: ResolveDuplicateOption,
     root_directory: Path,
-):  # noqa: D103
+):
+    """Map PE and ELF files of a filesystem."""
     setup_logs(debug)
     db_instance = setup_db(db)
-
     root_directory = root_directory.absolute()
-    fs_mapper = fs.FileSystemImportsMapper(root_directory, db_instance)
 
-    filesystem = fs_mapper.map(jobs, resolve_duplicates)
+    filesystem = fs.FileSystemImportsMapper(root_directory, db_instance).map(
+        jobs, resolve_duplicates
+    )
 
-    # if enabled export enabled, save FileSystem object in a JSON
     if export:
-        # maybe in the future a user can choose the output path ?
-        output_file = db_instance.path.with_suffix(".json")
-        filesystem.write(output_file)
+        filesystem.write(db_instance.path.with_suffix(".json"))
 
     db_instance.close()
 
@@ -210,99 +276,41 @@ def fs_mapper(  # noqa: D103
 @pyrrha.command(
     "fs-cg",
     cls=MapperCommand,
-    short_help="Map the Call Graph of every firmware executable into  a NumbatUI db.",
-    help="Map a the Inter-Image Call Graph of a whole filesystem into a NumbatUI db."
-    "It disassembles executables using a disassembler and extract the call graph."
-    "It then results all call references across binaries.",
+    short_help="Map the call graph of every firmware executable into a NumbatUI db.",
+    help=(
+        "Map the inter-image call graph of a whole filesystem into a NumbatUI db. "
+        "It disassembles executables, extracts the call graph, "
+        "and resolves all call references across binaries."
+    ),
 )
-@click.option(
-    "-j",
-    "--jobs",
-    help="Number of parallel jobs created (threads).",
-    type=click.IntRange(1, int(multiprocessing.cpu_count() * 0.7), clamp=True),  # 70% of threads
-    metavar="INT",
-    default=1,
-    show_default=True,
-)
-@click.option(
-    "--ignore",
-    "resolve_duplicates",
-    flag_value=ResolveDuplicateOption.IGNORE,
-    help="When resolving duplicate imports, ignore them",
-    default=True,
-)
-@click.option(
-    "--arbitrary",
-    "resolve_duplicates",
-    flag_value=ResolveDuplicateOption.ARBITRARY,
-    help="When resolving duplicate imports, select the first one available",
-)
-@click.option(
-    "--interactive",
-    "resolve_duplicates",
-    flag_value=ResolveDuplicateOption.INTERACTIVE,
-    help="When resolving duplicate imports, user manually select which one to use",
-)
-@click.option(
-    "--disassembler",
-    required=False,
-    type=click.Choice(Disassembler, case_sensitive=False),
-    default=Disassembler.AUTO,
-    show_default=True,
-    help="Disassembler to use",
-)
-@click.option(
-    "--exporter",
-    required=False,
-    type=click.Choice(ExportFormat, case_sensitive=False),
-    default=ExportFormat.AUTO,
-    show_default=True,
-    help="Binary exporter",
-)
-@click.argument(
-    "root_directory",
-    # help='Path of the directory containing the filesystem to map.',
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
-)
-def fs_call_graph_mapper(  # noqa: D103
+@jobs_option(max_fraction=0.7)
+@resolve_duplicates_options
+@disassembler_option
+@exporter_option
+@root_directory_argument
+def fs_call_graph_mapper(
     debug: bool,
     db: Path,
     jobs: int,
     resolve_duplicates: ResolveDuplicateOption,
-    disassembler: Disassembler,
-    exporter: ExportFormat,
+    backend: Disassembler,
+    exporter: Exporter,
     root_directory: Path,
 ):
+    """Map the inter-image call graph of a firmware filesystem."""
     setup_logs(debug, db)
     db_instance = setup_db(db)
 
-    if disassembler not in [Disassembler.AUTO, Disassembler.IDA, Disassembler.GHIDRA]:
-        click.echo("disassembler not yet supported")
-        # TODO: add support for other disassembler
+    if backend not in (Disassembler.IDA, Disassembler.GHIDRA,):
+        click.echo("Backend not yet supported")
         return 1
-
-    if disassembler is Disassembler.GHIDRA:
-        ghidra_env_var = "GHIDRA_PATH"
-        ghidra_dir = os.environ.get(ghidra_env_var)
-        if not ghidra_dir:
-            for ghidra_name in ["ghidra", "ghidraRun"]:
-                if ghidra_path := shutil.which(ghidra_name):
-                    os.environ[ghidra_env_var] = str(Path(ghidra_path).resolve().parent)
-
-    intercg.InterImageCGMapper.DISASS = disassembler
-    intercg.InterImageCGMapper.EXPORT = exporter
-
+    
     root_directory = root_directory.absolute()
 
-    # Create InterCG mapper and launch mapping
     try:
-        intercg_mapper = intercg.InterImageCGMapper(root_directory, db_instance)
+        intercg_mapper = intercg.InterImageCGMapper(root_directory, db_instance, backend, exporter)
         fs_object: FileSystem = intercg_mapper.map(jobs, resolve_duplicates)
-
-        # systematically save the FileSystem object (shall be enriched with calls)
-        output_file = db_instance.path.with_suffix(intercg_mapper.FS_EXT)
-        fs_object.write(output_file)
-
+        fs_object.write(db_instance.path.with_suffix(intercg_mapper.FS_EXT))
     except RuntimeError:
         pass
 
@@ -314,45 +322,36 @@ def fs_call_graph_mapper(  # noqa: D103
     "exe-decomp",
     cls=MapperCommand,
     short_help="Map an executable call graph with its decompiled code.",
-    help="Map a single executable call graph into a numbatui-compatible database."
-    "It also index the decompiled code along with all call cross-references.",
+    help=(
+        "Map a single executable call graph into a NumbatUI-compatible database. "
+        "Also indexes the decompiled code along with all call cross-references."
+    ),
 )
-@click.option(
-    "--disassembler",
-    required=False,
-    type=click.Choice(Disassembler, case_sensitive=False),
-    default=Disassembler.AUTO,
-    show_default=True,
-    help="Disassembler to use for disassembly and decompilation.",
-)
-@click.option(
-    "--exporter",
-    required=False,
-    type=click.Choice(ExportFormat, case_sensitive=False),
-    default=ExportFormat.AUTO,
-    show_default=True,
-    help="Binary export format to use for binary analysis.",
-)
+@disassembler_option
+@exporter_option
 @click.argument(
     "executable",
     type=click.Path(exists=False, file_okay=True, dir_okay=False, path_type=Path),
 )
-def fs_exe_decompiled_mapper(  # noqa: D103
-    debug: bool, db: Path, disassembler: Disassembler, exporter: ExportFormat, executable: Path
+def fs_exe_decompiled_mapper(
+    debug: bool,
+    db: Path,
+    backend: Disassembler,
+    exporter: Exporter,
+    executable: Path,
 ):
-    # Change default db name. By default will be <executable>.srctrldb
+    """Map a single executable with decompiled code."""
     if db.name == "exe-decomp.srctrldb":
         db = Path(str(executable) + ".srctrldb")
 
     setup_logs(debug, db)
     db_instance = setup_db(db)
 
-    if disassembler not in [Disassembler.AUTO, Disassembler.IDA]:
-        click.echo(f"disassembler {disassembler.name} not yet supported")
-        # TODO: add support for other disassembler (forward parameter to mapper)
+    if backend not in (Disassembler.IDA,):
+        click.echo(f"Backend {backend.name} not yet supported")
         return 1
 
-    if exedecomp.map_binary(db_instance, executable, disassembler, exporter):
+    if exedecomp.map_binary(db_instance, executable, backend, exporter):
         logging.info("success.")
     else:
         logging.error("failure.")
@@ -375,7 +374,6 @@ def fs_exe_decompiled_mapper(  # noqa: D103
 )
 def workspace_utils(list: bool, add: bool, delete: bool, path: Path):
     """Manage workspaces for cross-binary referencing."""
-    # Configure logs (there is not debug ones)
     setup_logs(False)
 
     # Get the base config directory
