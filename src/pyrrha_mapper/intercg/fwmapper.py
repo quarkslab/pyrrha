@@ -58,10 +58,13 @@ class InterImageCGMapper(FileSystemImportsMapper):
 
     FS_EXT = ".fs.json"
 
-    DISASS = Disassembler.IDA
-    EXPORT = Exporter.NONE
-
-    def __init__(self, root_directory: Path | str, db: SourcetrailDB | None):
+    def __init__(
+        self,
+        root_directory: Path | str,
+        db: SourcetrailDB | None,
+        disassembler: Disassembler,
+        exporter: Exporter,
+    ):
         super(InterImageCGMapper, self).__init__(root_directory, db)
         # super initialize root_directory, db_interface, fs and _dry_run variables
 
@@ -79,6 +82,7 @@ class InterImageCGMapper(FileSystemImportsMapper):
         self.progress: Progress | None = None
         self.unresolved_callgraph: dict[Path, dict[Symbol, list[str]]] = dict()
         self._current_binary_hash = ""
+        self.disassembler, self.exporter = disassembler, exporter
 
     def _correct_map_result(self, res: Any) -> bool:
         return (
@@ -99,16 +103,16 @@ class InterImageCGMapper(FileSystemImportsMapper):
         Use to optimize multiprocessing. Set here there real values.
         """
         res = super().load_binary_args()
-        res["disass"] = self.DISASS
-        res["exporter"] = self.EXPORT
+        res["disass"] = self.disassembler
+        res["exporter"] = self.exporter
         return res
 
     @staticmethod
     def load_binary(
         root_directory: Path,
         file_path: Path,
-        disass: Disassembler = DISASS,
-        exporter: Exporter = EXPORT,
+        disass: Disassembler = Disassembler.IDA,
+        exporter: Exporter = Exporter.NONE,
     ) -> tuple[Binary, dict[Symbol, list[str]] | None] | str:
         """Load all the binaries located in the filesystem as Binary objects.
 

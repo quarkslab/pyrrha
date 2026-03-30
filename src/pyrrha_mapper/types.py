@@ -21,17 +21,16 @@ from enum import Enum, auto
 class Disassembler(Enum):
     """Represent a SRE (Software Reverse Engineering tool, a disassembler)."""
 
-    AUTO = auto()  # doc: Disassembler shall selected automatically
     IDA = auto()  # doc: IDA Pro disassembler
     GHIDRA = auto()  # doc: GHIDRA disassembler
     BINARY_NINJA = auto()  # doc: Binary Ninja disassembler
 
 
-class Exporters(Enum):
+class Exporter(Enum):
     """Represent export file formats used in some of the mappers."""
 
-    AUTO = auto()  # doc: The exporter shall be automatically selected
     BINEXPORT = auto()  # doc: Use Binexport as exporter
+    NONE = auto()  # doc: Use no exporter and interact directly with disassembler
     QUOKKA = auto()  # doc: Use Quokka as exporter
 
 
