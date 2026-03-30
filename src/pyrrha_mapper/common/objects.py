@@ -112,6 +112,9 @@ class Binary(FileSystemComponent):
         default_factory=dict
     )  # dict(symbol_name, list(requirements))
 
+    # Runtime-only field: virtual address at which the binary is loaded.
+    image_base: int = Field(default=0, exclude=True)
+
     @field_validator("internal_functions", "exported_functions", mode="after")
     @classmethod
     def validate_functions_field(cls, value: dict[str, Symbol]) -> dict[str, Symbol]:

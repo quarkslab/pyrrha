@@ -57,14 +57,13 @@ class FileSystemImportsMapper(FileSystemMapper):
         :return: True is the path point on a file
         """
         return p.is_file() and not p.is_symlink() and (lief.is_elf(str(p)) or lief.is_pe(str(p)))
-    
+
     def load_binary_args(self) -> dict[str, Any]:
         """Return dict of args for load_binary that are always the same for the wholde firmware.
-        
+
         Use to optimize multiprocessing. Set here there real values.
         """
         return {"root_directory": self.root_directory}
-
 
     @staticmethod
     def load_binary(root_directory: Path, file_path: Path) -> tuple[Binary, Any] | str:
@@ -88,6 +87,7 @@ class FileSystemImportsMapper(FileSystemMapper):
             if parsing_res is None:
                 return f"Lief cannot parse {file_path}"
 
+            bin_obj.image_base = parsing_res.imagebase
             # parse imported libs
             for lib in parsing_res.libraries:
                 bin_obj.add_imported_library_name(str(lib))
@@ -135,6 +135,7 @@ class FileSystemImportsMapper(FileSystemMapper):
             res: lief.Binary | None = lief.parse(str(file_path))
             if res is None:
                 return f"ERROR: Lief cannot parse {file_path}"
+            bin_obj.image_base = res.imagebase
             # parse imported libs
             for lib in res.libraries:
                 bin_obj.add_imported_library_name(str(lib))
