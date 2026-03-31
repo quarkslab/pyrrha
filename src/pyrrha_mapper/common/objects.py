@@ -333,7 +333,9 @@ class Binary(FileSystemComponent):
             name = old_func.name
         else:
             name = new_func.name
-        if self.exported_function_exists(old_func.name):
+        is_exported = self.exported_function_exists(old_func.name)
+        self.remove_function(old_func.name)
+        if is_exported:
             self.add_exported_symbol(new_func, symbol_name=name)
         else:
             self.add_function(new_func, func_name=name)
@@ -595,7 +597,7 @@ class FileSystem(BaseModel):
         # then recursively resolve symlinks
         nb_symlinks = len(res) + len(untreated_symlinks)
         while len(res) < nb_symlinks:
-            for path, content in untreated_symlinks.items():
+            for path, content in list(untreated_symlinks.items()):
                 target_path = content["target_path"]
                 if target_path in res:
                     content["target"] = res[target_path]
