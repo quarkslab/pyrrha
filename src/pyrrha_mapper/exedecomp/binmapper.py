@@ -20,7 +20,6 @@ import json
 from pathlib import Path
 from collections import defaultdict
 from dataclasses import dataclass
-import sys
 from typing import NamedTuple
 from tempfile import NamedTemporaryFile
 import hashlib
@@ -46,16 +45,6 @@ from pyrrha_mapper.exceptions import FsMapperError
 
 DECOMPILE_SCRIPT = Path(__file__).parent / "decompile.py"
 
-# Determine the command to open URLs based on the platform
-try:
-    URL_OPEN_CMD = {
-        "linux": "xdg-open",
-        "win32": "start",
-        "darwin": "open"
-    }[sys.platform]
-except KeyError:
-    logging.warning(f"Unsupported platform: {sys.platform} (will not add URL handler)")
-    URL_OPEN_CMD = "" # type: ignore
 
 
 once_check = True
@@ -276,16 +265,6 @@ def is_thunk_to_import(p: Program, f: Function) -> bool:
         return False
 
 
-def add_url_handler(db: SourcetrailDB, program: Program, hash: str, function: Function, f_id: int) -> None:
-    """ Open the function using a dedicated URL handler. (Use Heimdallr) """
-    if URL_OPEN_CMD and program.exec_path:
-        url = f"disas://{hash}?idb={Path(program.exec_path).name+'.i64'}&offset={function.addr:#08x}"
-        cmd: list[str] = [URL_OPEN_CMD, url]
-        db.set_custom_command(f_id, cmd, "Open in Disassembler") # type: ignore
-    else:
-        pass  # Can't add URL unsuported platform
-
-
 def map_binary(db: SourcetrailDB, program_path: Path, disass: Disassembler, format: ExportFormat) -> bool:
     # Load the Quokka file
     with Progress(
@@ -337,9 +316,6 @@ def map_binary(db: SourcetrailDB, program_path: Path, disass: Disassembler, form
 
             # Change node color based on its type
             set_function_color(db, program, f, f_id)
-
-            # Add custom command to open that function in IDA
-            add_url_handler(db, program, p_hash, f, f_id)
 
             # Add source code if any
             if f_addr in decompiled and not is_imp:
