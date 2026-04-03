@@ -1,22 +1,8 @@
 #========================== STEPS USED IN WORKFLOWS ====================================
-.step_python_setup_install: &step_python_setup_install
-  - echo -e "\e[95m===== Setup Python"
-  - python --version ; pip --version
-  - python3 -m venv venv 
-  - source venv/bin/activate
-
 .step_install_pyrrha_test: &step_install_pyrrha_test
   - echo -e "\e[95m===== Install Pyrrha with test extension"
   - pip install '.[test]'
 
-.step_configure_disassembler: &step_configure_disassembler
-  - if [[ ${DISASSEMBLER} == "ida" ]]; then
-    echo -e "\e[95m===== Configure IDA" &&
-    mkdir -p ~/.idapro/ &&
-    echo $KEY | base64 -d  > ~/.idapro/$KEY_NAME &&
-    echo $REG | base64 -d  > ~/.idapro/ida.reg &&
-    export IDA_LICENSE=keyfile=$KEY_NAME &&
-    idapyswitch -a ; fi;
 
 .step_gen_artifacts: &step_gen_artifacts
   - echo -e "\e[95m===== Generate artifacts"
@@ -36,7 +22,6 @@
 test_data_structures: 
   stage: test
   before_script: 
-    - *step_python_setup_install
     - *step_install_pyrrha_test
   script:
     - *step_run_tests
@@ -56,7 +41,6 @@ test_data_structures:
 .run_pyrrha_test_artifacts:
   stage: test
   before_script: 
-    - *step_python_setup_install
     - *step_install_pyrrha_test
   script:
     - *step_gen_artifacts
@@ -87,53 +71,25 @@ test_fs:
     TEST_PATH: tests/test_cli.py::TestFSMapper
     
 
-.test_fs-cg:
+test_fs-cg:
   extends: 
     - .run_pyrrha_test_artifacts
   before_script: 
     - !reference [.run_pyrrha_test_artifacts, before_script]
-    - *step_configure_disassembler
   image: 
-    name: $CONTAINER_PATH/${DISASSEMBLER}:${VERSION}
+    name: $CONTAINER_PATH/${BACKEND}:${VERSION}
     docker:
       user: user
   variables:
-    DB: ${DISASSEMBLER}_${VERSION}_${EXPORTER}
+    DB: ${BACKEND}_${VERSION}
     MAPPER: fs-cg
-    MAPPER_OPTIONS: '--disassembler ${DISASSEMBLER} --exporter ${EXPORTER}'
+    MAPPER_OPTIONS: '--backend ${BACKEND}'
     TEST_COVERAGE_SOURCE: pyrrha_mapper.common.filesystem_mapper,pyrrha_mapper.intercg
     TEST_PATH: tests/test_cli.py::TestFsCgMapper
     TEST_SUP_OPTIONS: ${MAPPER_OPTIONS}
-
-test_fs-cg_ghidra:
-  extends:
-    - .test_fs-cg
-  variables:
-    DISASSEMBLER: ghidra
+    HEXRAYS_LICENSE: "${IDA_LICENSE}"
   parallel:
     matrix:
-      - VERSION: 11.1.2
-        EXPORTER: binexport
+      - BACKEND: "ida"
+        VERSION: [91, 93]
 
-test_fs-cg_ida:
-  extends:
-    - .test_fs-cg
-  variables:
-    DISASSEMBLER: ida
-  parallel:
-    matrix:
-      - VERSION: 84
-        EXPORTER: [quokka, binexport]
-      - VERSION: 91
-        EXPORTER: quokka
-  rules:
-    - if: $VERSION == "84"
-      variables: 
-        KEY: $IDA_KEY
-        KEY_NAME: ida.key
-        REG: $IDA84_REG
-    - if: $VERSION == "91"
-      variables: 
-        KEY: $LICENSE
-        KEY_NAME: ida_license.hexlic
-        REG: $IDA_REG

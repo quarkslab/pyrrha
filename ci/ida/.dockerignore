@@ -1,0 +1,6 @@
+# Exclude version-specific ida.reg backups; only the current ida.reg
+# (copied by the build script before invoking docker build) is needed.
+ida_*.reg
+
+# Exclude licence files — never baked into images, mounted at runtime only.
+*.hexlic

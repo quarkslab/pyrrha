@@ -24,10 +24,12 @@
 #
 # Build command:
 #   docker build \
-#     --secret id=ida_installer,src=ida-pro_91.run \
+#     --build-arg IDA_VERSION=91 \
+#     --build-arg IDA_INSTALLER=ida-pro_91.run \
 #     -t pyrrha-ida .
 #
-# ida.reg is generated automatically during the build (see stage 1).
+# ida.reg is injected by Dockerfile.final after interactive EULA acceptance.
+# See build_ida.sh for the full two-phase build procedure.
 #
 # Run command (licence is mounted at runtime, never stored in the image):
 #   docker run --rm \
@@ -46,46 +48,57 @@ FROM docker.io/library/debian:testing-slim AS ida-install
 ARG IDA_VERSION=91
 ARG IDA_INSTALL_DIR=/opt/ida_${IDA_VERSION}
 
+# Path to the installer .run file on the build host, passed via --build-arg.
+# It is bind-mounted into the build container at a fixed target path so that
+# the ARG value (which Docker cannot expand inside --mount options) is only
+# used inside the shell command where substitution works normally.
+ARG IDA_INSTALLER=ida-pro_${IDA_VERSION}.run
+
 # Build-time dependencies:
 #   - libxcb-xinerama0  : required by the .run installer's Qt bootstrap
-#   - xvfb              : provides a virtual framebuffer so that idat can run
-#                         headlessly long enough to accept the licence and write
-#                         ida.reg on first launch
-#   - remaining libs    : runtime deps that are also needed at install time
+#   - libopengl0        : required by IDA's Qt layer for rendering
+#   - remaining libs    : runtime deps also needed at install time
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends \
     libfontconfig1 \
     libmagic1 \
+    libopengl0 \
     libqt5gui5 \
     libsecret-1-0 \
     libxcb-xinerama0 \
     python3-minimal \
     python-is-python3 \
-    xvfb \
-    && mkdir -p "${IDA_INSTALL_DIR}" ~/.local/share/applications/ \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* \
+    && mkdir -p "${IDA_INSTALL_DIR}" ~/.local/share/applications/
 
-# Run the installer in a secret-mount RUN so the .run binary is never
-# committed to any layer. The licence is intentionally NOT copied here;
-# it will be mounted at runtime only (see run command above).
-RUN --mount=type=secret,id=ida_installer,target=/tmp/ida_installer.run \
+# The installer is bind-mounted from the build context so the large .run
+# binary is never written to any layer. Docker cannot expand ARGs inside
+# --mount options, so src=. mounts the whole context and the ARG is used
+# only inside the shell command where substitution works normally.
+ARG IDA_INSTALLER
+RUN --mount=type=bind,src=.,target=/build/context \
+    cp "/build/context/${IDA_INSTALLER}" /tmp/ida_installer.run && \
     chmod +x /tmp/ida_installer.run && \
     DEBIAN_FRONTEND=noninteractive /tmp/ida_installer.run \
     --mode unattended \
-    --prefix "${IDA_INSTALL_DIR}"
-
-# Generate ida.reg by launching idat once inside a virtual framebuffer.
-# The -A flag auto-accepts the EULA; idat exits after startup with no project.
-# ida.reg is written to root's home by default.
-RUN Xvfb :99 -screen 0 1024x768x24 & \
-    sleep 2 && \
-    DISPLAY=:99 "${IDA_INSTALL_DIR}/idat" -A && \
-    sleep 5 && \
-    kill %1 || true
+    --prefix "${IDA_INSTALL_DIR}" && \
+    rm /tmp/ida_installer.run && \
+    # Strip unneeded files from the IDA tree to reduce COPY --from size:
+    #   - documentation
+    #   - desktop integration files
+    #   - uninstaller
+    rm -rf \
+    "${IDA_INSTALL_DIR}/README_python3.txt" \
+    "${IDA_INSTALL_DIR}/Uninstall IDA"* \
+    "${IDA_INSTALL_DIR}/uninstall"* \
+    "${IDA_INSTALL_DIR}/appico.png" \
+    "${IDA_INSTALL_DIR}/hvui.png"
 
 # ======================== IDA Runtime image =================================
-# Only the IDA tree, the licence, ida.reg, and the runtime shared libraries are
-# present here. No installer, no xvfb, no build tooling.
+# Only the IDA tree and the runtime shared libraries are present here.
+# No installer, no build tooling.
+# ida.reg is NOT present at this stage — it is injected by Dockerfile.final
+# after the user has accepted the EULA interactively (see build_ida.sh).
 FROM docker.io/library/debian:testing-slim
 
 ARG IDA_VERSION=91
@@ -102,35 +115,46 @@ ENV HEXRAYS_LICENSE=/run/secrets/ida_license
 ENV IDADIR=${IDA_INSTALL_DIR}
 
 # Runtime-only shared libraries required by IDA and its Qt layer.
+# apt-get clean and list removal are in the same layer to avoid bloat.
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends \
     libfontconfig1 \
     libmagic1 \
+    libopengl0 \
+    libpython3.13 \
     libqt5gui5 \
     libsecret-1-0 \
+    libxcb-cursor0 \
     python3-minimal \
+    python3-venv \
     python-is-python3 \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
 # Copy only the installed IDA tree from the build stage.
 COPY --from=ida-install ${IDA_INSTALL_DIR} ${IDA_INSTALL_DIR}
 
-# User creation
+# ── User creation ─────────────────────────────────────────────────────────────
 RUN useradd --create-home -u 1000 -m user && \
     chown -R user:user "${IDA_INSTALL_DIR}"
 
 USER user
 WORKDIR /home/user
 
-# Copy ida.reg (generated in stage 1) into the user's IDA config directory.
-COPY --from=ida-install /root/.idapro/ida.reg /home/user/.idapro/ida.reg
-
-# virtualenv (automatically launch at runtime)
+# virtualenv (automatically activated at runtime for both interactive and
+# non-interactive sessions via ENV PATH and .bashrc respectively)
 ENV VIRTUAL_ENV=/home/user/.venv
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 RUN python -m venv "${VIRTUAL_ENV}" && \
     echo "source ${VIRTUAL_ENV}/bin/activate" >> /home/user/.bashrc
 
-RUN "${IDA_INSTALL_DIR}/idapyswitch" -a
+# Register the venv's Python interpreter with IDA so that idascript and
+# qbinary can drive it programmatically.
+# idapyswitch -a (auto) relies on python3-config which is not installed;
+# instead point it directly to the system libpython via --force-path.
+# libpython3.13 provides the shared library on Debian testing.
+RUN libpython="$(find /usr /lib -name 'libpython3*.so*' 2>/dev/null | head -1)" && \
+    [ -n "${libpython}" ] || { echo "ERROR: libpython not found"; exit 1; } && \
+    "${IDA_INSTALL_DIR}/idapyswitch" --force-path "${libpython}"
 
 CMD ["/bin/bash"]
