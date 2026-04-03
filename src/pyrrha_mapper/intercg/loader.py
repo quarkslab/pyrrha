@@ -126,55 +126,78 @@ class BinaryParser:
         # ------------------------------------------------------------------
         # Maps a trampoline name → the canonical name it should forward to.
         trampoline_map: dict[str, str] = {}
+        to_analyse = program_data
 
-        for func_data in program_data.values():
-            exported = (
-                func_data.addr in parser_exports
-                or func_data.addr + 1 in parser_exports  # ARM THUMB
-            )
+        while len(to_analyse) > 0:
+            missed_data = dict()
+            for func_data in to_analyse.values():
+                exported = (
+                    func_data.addr in parser_exports
+                    or func_data.addr + 1 in parser_exports  # ARM THUMB
+                )
 
-            if func_data.type in (FuncType.LIBRARY, FuncType.NORMAL) or (
-                func_data.type == FuncType.THUNK and (exported or len(func_data.calls) > 1)
-            ):
-                call_graph[func_data.symbol] = self._build_calls_list(func_data, program_data)
-                continue
-
-            if (
-                func_data.type == FuncType.THUNK
-                and len(func_data.calls) == 1
-                and func_data.calls[0] in program_data
-            ):
-                callee_data = program_data[func_data.calls[0]]
-                if callee_data.type == FuncType.IMPORTED:
-                    # Keep the less-decorated name as the canonical one
-                    trampoline_name = func_data.name
-                    destination_name = callee_data.name
-                    if _count_leading_underscores(trampoline_name) > _count_leading_underscores(
-                        destination_name
-                    ):
-                        trampoline_name, destination_name = destination_name, trampoline_name
-                else:
-                    trampoline_name = func_data.name
-                    destination_name = callee_data.name
-
-                # Resolve chains: A→B, B→C becomes A→C
-                while (
-                    destination_name in trampoline_map
-                    and trampoline_map[destination_name] != destination_name
+                if func_data.type in (FuncType.LIBRARY, FuncType.NORMAL) or (
+                    func_data.type == FuncType.THUNK and (exported or len(func_data.calls) > 1)
                 ):
-                    destination_name = trampoline_map[destination_name]
-                trampoline_map[trampoline_name] = destination_name
-                for key, val in trampoline_map.items():
-                    if val == trampoline_name:
-                        trampoline_map[key] = destination_name
+                    call_graph[func_data.symbol] = self._build_calls_list(func_data, program_data)
+                    continue
 
-            elif func_data.type == FuncType.THUNK and not func_data.calls and func_data.callers:
-                # Terminal thunk with callers but no callees — keep it
-                continue
+                if func_data.type == FuncType.THUNK and len(func_data.calls) == 1:
+                    if func_data.calls[0] not in program_data:
+                        mangled_name = self._func_mangled_name(func_data.calls[0])
+                        if mangled_name == "":
+                            logging.warning("Nothing found ")
+                            continue
 
-            # Remove functions not kept as exported/library/normal
-            if self._binary.get_function_by_name(func_data.name).addr == func_data.addr:
-                self._binary.remove_function(func_data.name)
+                        func_symbol = Symbol(
+                            name=mangled_name,
+                            demangled_name=self._func_demangled_name(func_data.calls[0]),
+                            is_func=True,
+                            addr=func_data.calls[0],
+                        )
+                        self._binary.add_function(func_symbol)
+                        func = FuncData(
+                            symbol=func_symbol,
+                            type=self._func_type(func_data.calls[0]),
+                            calls=self._func_children(func_data.calls[0]),
+                            callers=self._func_parents(func_data.calls[0]),
+                        )
+                        missed_data[func_data.calls[0]] = func
+                        callee_data = func
+                    else:
+                        callee_data = program_data[func_data.calls[0]]
+                    if callee_data.type == FuncType.IMPORTED:
+                        # Keep the name of the thunk "strcpy, sprintf"
+                        trampoline_name = func_data.name
+                        destination_name = callee_data.name
+                        # in case of nested functions (starting with _, keep the less nested one)
+                        if _count_leading_underscores(trampoline_name) > _count_leading_underscores(
+                            destination_name
+                        ):
+                            trampoline_name, destination_name = destination_name, trampoline_name
+                    else:  # Forward the call to the underlying function name
+                        trampoline_name = func_data.name
+                        destination_name = callee_data.name
+                    # Resolve chains: A→B, B→C becomes A→C
+                    while (
+                        destination_name in trampoline_map
+                        and trampoline_map[destination_name] != destination_name
+                    ):
+                        destination_name = trampoline_map[destination_name]
+                    trampoline_map[trampoline_name] = destination_name
+                    for key, val in trampoline_map.items():
+                        if val == trampoline_name:
+                            trampoline_map[key] = destination_name
+
+                elif func_data.type == FuncType.THUNK and not func_data.calls and func_data.callers:
+                    # Terminal thunk with callers but no callees — keep it
+                    continue
+
+                # Remove functions not kept as exported/library/normal
+                if self._binary.get_function_by_name(func_data.name).addr == func_data.addr:
+                    self._binary.remove_function(func_data.name)
+            to_analyse = missed_data
+            program_data.update(missed_data)
 
         # Apply trampoline substitutions to the final call graph
         self._call_graph: dict[Symbol, list[str]] = {
@@ -410,9 +433,18 @@ class IDAParser(BinaryParser):
             self._ida_cached_func = func
             yield func.start_ea
 
+    def _get_import(self, addr: int) -> str | None:
+        res = self._ida_db.functions.get_at(addr)
+        if res:
+            return res.name
+        return None
+
     def _func_mangled_name(self, addr: int) -> str:
         """:return: the raw name of the function at *addr*, or ``sub_<ADDR>``."""
         func = self._get_ida_func(addr)
+        import_info = self._ida_db.imports.get_import_at(addr)
+        if import_info is not None and import_info.name is not None:
+            return import_info.name.split("@")[0]
         if func is not None:
             name = self._ida_db.functions.get_name(func)
             if name:
@@ -451,21 +483,26 @@ class IDAParser(BinaryParser):
         if func is None:
             return FuncType.NORMAL
 
-        match self._ida_db.functions.get_flags(func):
-            case FunctionFlags.LIB:
-                return FuncType.LIBRARY
-            case FunctionFlags.THUNK:
-                callees = list(self._ida_db.functions.get_callees(func))
-                if len(callees) == 1:
-                    callee_name = self._ida_db.functions.get_name(callees[0])
-                    if self._ida_db.imports.exists(callee_name):
-                        return FuncType.IMPORTED
-                return FuncType.THUNK
-            case _:
-                func_name = self._ida_db.functions.get_name(func)
-                if self._ida_db.imports.exists(func_name):
+        flags = self._ida_db.functions.get_flags(func)
+        is_imported = False
+
+        callees = list(self._ida_db.functions.get_callees(func))
+        if len(callees) == 0:
+            if self._ida_db.imports.get_import_at(addr):
+                is_imported = True
+
+        if is_imported:
+            return FuncType.IMPORTED
+        elif FunctionFlags.THUNK in flags:
+            callees = list(self._ida_db.functions.get_callees(func))
+            if len(callees) == 1:
+                callee_name = self._ida_db.functions.get_name(callees[0])
+                if self._ida_db.imports.exists(callee_name):
                     return FuncType.IMPORTED
-                return FuncType.NORMAL
+            return FuncType.THUNK
+        elif FunctionFlags.LIB in flags:
+            return FuncType.LIBRARY
+        return FuncType.NORMAL
 
 
 # ======================================================================
