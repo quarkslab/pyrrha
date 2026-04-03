@@ -1,16 +1,12 @@
 import pytest
-from qbinary.types import ExportFormat, Disassembler
+
+from pyrrha_mapper.types import Backend
+
 
 def pytest_addoption(parser):
     parser.addoption(
-        "--disassembler",
+        "--backend",
         action="store",
-        help="disassembler",
-        choices={x.name.lower() for x in Disassembler},
-    )
-    parser.addoption(
-        "--exporter",
-        action="store",
-        help="exporter",
-        choices={x.name.lower() for x in ExportFormat},
+        help="backend",
+        choices={x.name.lower() for x in Backend},
     )
