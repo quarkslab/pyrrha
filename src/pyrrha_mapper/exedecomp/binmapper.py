@@ -192,7 +192,7 @@ def load_decompiled(program: Program, progress: Progress,
             raise FileNotFoundError("can't find decompilation file (idascript failed)")
 
 
-def load_program(bin_path: Path, disass: Disassembler, format: ExportFormat) -> Program | None:
+def load_program(bin_path: Path, disass: Disassembler = Disassembler.IDA, format: ExportFormat = ExportFormat.QUOKKA) -> Program | None:
     # First try to find pre-existing exported files if format is AUTO
     try:
         return Program.from_binary(bin_path,
@@ -265,7 +265,12 @@ def is_thunk_to_import(p: Program, f: Function) -> bool:
         return False
 
 
-def map_binary(db: SourcetrailDB, program_path: Path, disass: Disassembler, format: ExportFormat) -> bool:
+def map_binary(
+    db: SourcetrailDB,
+    program_path: Path,
+    disass: Disassembler = Disassembler.IDA,
+    format: ExportFormat = ExportFormat.QUOKKA,
+) -> bool:
     # Load the Quokka file
     with Progress(
         TextColumn("[progress.description]{task.description}"),

@@ -26,7 +26,7 @@ from numbat import SourcetrailDB
 
 from pyrrha_mapper import exedecomp, fs, intercg
 from pyrrha_mapper.common import FileSystem
-from pyrrha_mapper.types import Disassembler, Exporter, ResolveDuplicateOption
+from pyrrha_mapper.types import Backend, ResolveDuplicateOption
 
 # -------------------------------------------------------------------------------
 #                           Shared option decorators
@@ -89,34 +89,17 @@ def jobs_option(max_fraction: float = 1.0):
     return decorator
 
 
-def disassembler_option(f):
-    """*Add the ``--disassembler`` option."""
+def backend_option(f):
+    """*Add the ``--backend`` option."""
 
     @click.option(
         "-b",
         "--backend",
         required=False,
-        type=click.Choice(Disassembler, case_sensitive=False),
-        default=Disassembler.IDA,
+        type=click.Choice(Backend, case_sensitive=False),
+        default=Backend.IDA,
         show_default=True,
-        help="Disassembler to use.",
-    )
-    @functools.wraps(f)
-    def wrapper(*args, **kwargs):
-        return f(*args, **kwargs)
-
-    return wrapper
-
-
-def exporter_option(f):
-    """Add the ``--exporter`` option (decorator)."""
-    @click.option(
-        "--exporter",
-        required=False,
-        type=click.Choice(Exporter, case_sensitive=False),
-        default=Exporter.NONE,
-        show_default=True,
-        help="Binary export format to use for binary analysis.",
+        help="Backend to use.",
     )
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
@@ -227,6 +210,7 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"], max_content_width=12
 def pyrrha():  # noqa: D103
     pass
 
+
 @pyrrha.command(
     "fs",
     cls=MapperCommand,
@@ -282,30 +266,31 @@ def fs_mapper(
 )
 @jobs_option(max_fraction=0.7)
 @resolve_duplicates_options
-@disassembler_option
-@exporter_option
+@backend_option
 @root_directory_argument
 def fs_call_graph_mapper(
     debug: bool,
     db: Path,
     jobs: int,
     resolve_duplicates: ResolveDuplicateOption,
-    backend: Disassembler,
-    exporter: Exporter,
+    backend: Backend,
     root_directory: Path,
 ):
     """Map the inter-image call graph of a firmware filesystem."""
     setup_logs(debug, db)
     db_instance = setup_db(db)
 
-    if backend not in (Disassembler.IDA, Disassembler.GHIDRA,):
+    if backend not in (
+        Backend.IDA,
+        Backend.GHIDRA,
+    ):
         click.echo("Backend not yet supported")
         return 1
-    
+
     root_directory = root_directory.absolute()
 
     try:
-        intercg_mapper = intercg.InterImageCGMapper(root_directory, db_instance, backend, exporter)
+        intercg_mapper = intercg.InterImageCGMapper(root_directory, db_instance, backend)
         fs_object: FileSystem = intercg_mapper.map(jobs, resolve_duplicates)
         fs_object.write(db_instance.path.with_suffix(intercg_mapper.FS_EXT))
     except RuntimeError:
@@ -324,8 +309,7 @@ def fs_call_graph_mapper(
         "Also indexes the decompiled code along with all call cross-references."
     ),
 )
-@disassembler_option
-@exporter_option
+@backend_option
 @click.argument(
     "executable",
     type=click.Path(exists=False, file_okay=True, dir_okay=False, path_type=Path),
@@ -333,8 +317,7 @@ def fs_call_graph_mapper(
 def fs_exe_decompiled_mapper(
     debug: bool,
     db: Path,
-    backend: Disassembler,
-    exporter: Exporter,
+    backend: Backend,
     executable: Path,
 ):
     """Map a single executable with decompiled code."""
@@ -344,11 +327,12 @@ def fs_exe_decompiled_mapper(
     setup_logs(debug, db)
     db_instance = setup_db(db)
 
-    if backend not in (Disassembler.IDA,):
+    if backend not in (Backend.IDA,):
         click.echo(f"Backend {backend.name} not yet supported")
         return 1
 
-    if exedecomp.map_binary(db_instance, executable, backend, exporter):
+    # todo: add backend changes
+    if exedecomp.map_binary(db_instance, executable):
         logging.info("success.")
     else:
         logging.error("failure.")

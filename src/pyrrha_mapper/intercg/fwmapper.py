@@ -35,7 +35,7 @@ from pyrrha_mapper.common import (
 from pyrrha_mapper.exceptions import FsMapperError
 from pyrrha_mapper.fs import FileSystemImportsMapper
 from pyrrha_mapper.intercg.loader import BinaryParser, GhidraParser, IDAParser
-from pyrrha_mapper.types import Disassembler, Exporter, ResolveDuplicateOption
+from pyrrha_mapper.types import Backend, ResolveDuplicateOption
 
 IGNORE_LIST = ["__gmon_start__"]
 
@@ -51,8 +51,7 @@ class InterImageCGMapper(FileSystemImportsMapper):
         self,
         root_directory: Path | str,
         db: SourcetrailDB | None,
-        disassembler: Disassembler,
-        exporter: Exporter,
+        backend: Backend,
     ):
         super(InterImageCGMapper, self).__init__(root_directory, db)
         # super initialize root_directory, db_interface, fs and _dry_run variables
@@ -70,7 +69,7 @@ class InterImageCGMapper(FileSystemImportsMapper):
         self.exports_to_bins: dict[str, list[Binary]] = {}
         self.progress: Progress | None = None
         self.unresolved_callgraph: dict[Path, dict[Symbol, list[str]]] = dict()
-        self.disassembler, self.exporter = disassembler, exporter
+        self.backend = backend
 
     def _correct_map_result(self, res: Any) -> bool:
         return (
@@ -91,16 +90,14 @@ class InterImageCGMapper(FileSystemImportsMapper):
         Use to optimize multiprocessing. Set here there real values.
         """
         res = super().load_binary_args()
-        res["disass"] = self.disassembler
-        res["exporter"] = self.exporter
+        res["backend"] = self.backend
         return res
 
     @staticmethod
     def load_binary(
         root_directory: Path,
         file_path: Path,
-        disass: Disassembler = Disassembler.IDA,
-        exporter: Exporter = Exporter.NONE,
+        disass: Backend = Backend.IDA,
     ) -> tuple[Binary, dict[Symbol, list[str]] | None] | str:
         """Load all the binaries located in the filesystem as Binary objects.
 
@@ -110,14 +107,12 @@ class InterImageCGMapper(FileSystemImportsMapper):
         enrich it with InterCG-mapper required data. It includes call graphs
         and some function normalization in case collisions. It modifies the
         FileSystem object in place.
-
-        :param cache_file: Cache file to load binaries from (if exists)
         """
         try:
-            if disass == Disassembler.IDA:
+            if disass == Backend.IDA:
                 ida_parser: BinaryParser = IDAParser(root_directory, file_path)
                 return ida_parser.binary, ida_parser.call_graph
-            elif disass == Disassembler.GHIDRA:
+            elif disass ==  Backend.GHIDRA:
                 ghidra_parser = GhidraParser(root_directory, file_path)
                 return ghidra_parser.binary, ghidra_parser.call_graph
             else:
