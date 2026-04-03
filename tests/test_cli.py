@@ -281,10 +281,8 @@ class TestFsCgMapper(BaseTestFsMapper):
         )
         args = [
             self.SUBCOMMAND,
-            "--disassembler",
-            f"{request.config.getoption('--disassembler')}",
-            "--exporter",
-            f"{request.config.getoption('--exporter')}",
+            "--backend",
+            f"{request.config.getoption('--backend')}",
             "--db",
             f"{tmp_path}",
             "-j",
@@ -303,10 +301,8 @@ class TestFsCgMapper(BaseTestFsMapper):
         )
         args = [
             self.SUBCOMMAND,
-            "--disassembler",
-            f"{request.config.getoption('--disassembler')}",
-            "--exporter",
-            f"{request.config.getoption('--exporter')}",
+            "--backend",
+            f"{request.config.getoption('--backend')}",
             "--db",
             f"{tmp_path}",
             "-j",
