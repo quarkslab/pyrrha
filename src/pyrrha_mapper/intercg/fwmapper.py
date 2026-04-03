@@ -97,7 +97,7 @@ class InterImageCGMapper(FileSystemImportsMapper):
     def load_binary(
         root_directory: Path,
         file_path: Path,
-        disass: Backend = Backend.IDA,
+        backend: Backend = Backend.IDA,
     ) -> tuple[Binary, dict[Symbol, list[str]] | None] | str:
         """Load all the binaries located in the filesystem as Binary objects.
 
@@ -109,14 +109,14 @@ class InterImageCGMapper(FileSystemImportsMapper):
         FileSystem object in place.
         """
         try:
-            if disass == Backend.IDA:
+            if backend == Backend.IDA:
                 ida_parser: BinaryParser = IDAParser(root_directory, file_path)
                 return ida_parser.binary, ida_parser.call_graph
-            elif disass ==  Backend.GHIDRA:
+            elif backend ==  Backend.GHIDRA:
                 ghidra_parser = GhidraParser(root_directory, file_path)
                 return ghidra_parser.binary, ghidra_parser.call_graph
             else:
-                return f" disassembler {disass} is not supported"
+                return f" disassembler {backend} is not supported"
         except (FileNotFoundError, FsMapperError, SyntaxError) as e:
             return f"[binary mapping] {file_path.name}: ERROR: Loading error: {e}"
 
