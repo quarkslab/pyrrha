@@ -14,73 +14,123 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-FROM docker.io/library/debian:testing-slim
-SHELL ["/bin/bash", "-c"]
-
 # ============= How to generate the required data ===========================
-# paths can be changed from commandline if needed
-# idapro.hexlic: license file, downloaded from your account on hex-rays website
-# ida-pro_91.run: executable file, downloaded from your account on hex-rays website
-# ida.reg: history file, to be generated manually. Keep in memory that the licence has alredy been accepted.
-#      1. Build this docker with an empty ida.reg and launch it.
-#      2. Launch idat and accept the license.
-#      3. In another terminal, get the id of the current ida docker with `docker ps`
-#      4. Run `docker cp ID:/root/.idapro/ida.reg ./` where ID is the id get at the 
-#         previous step, you know have a correct ida.reg.
-#      5. Rebuild your image with the correct ida.reg
+# All sensitive files are passed exclusively via --mount=type=secret so they
+# never appear in any image layer or in `docker history`.
+#
+# Required files (place them next to this Dockerfile):
+#   idapro.hexlic : license file, downloaded from your account on hex-rays website
+#   ida-pro_91.run: executable installer, downloaded from your account on hex-rays website
+#
+# Build command:
+#   docker build \
+#     --secret id=ida_installer,src=ida-pro_91.run \
+#     -t pyrrha-ida .
+#
+# ida.reg is generated automatically during the build (see stage 1).
+#
+# Run command (licence is mounted at runtime, never stored in the image):
+#   docker run --rm \
+#     --mount type=secret,id=ida_license,src=idapro.hexlic \
+#     pyrrha-ida
+#
+# IDA locates the licence via the HEXRAYS_LICENSE env var which is set to the
+# secret path below.
 # ===========================================================================
 
 # ======================== IDA Installation =================================
+# Contains build-only packages and the installer; none of this reaches the
+# final image.
+FROM docker.io/library/debian:testing-slim AS ida-install
 
 ARG IDA_VERSION=91
-ARG IDA_INSTALLER=ida-pro_${IDA_VERSION}.run
-ENV IDA_INSTALL_DIR=/opt/ida_${IDA_VERSION}
+ARG IDA_INSTALL_DIR=/opt/ida_${IDA_VERSION}
 
+# Build-time dependencies:
+#   - libxcb-xinerama0  : required by the .run installer's Qt bootstrap
+#   - xvfb              : provides a virtual framebuffer so that idat can run
+#                         headlessly long enough to accept the licence and write
+#                         ida.reg on first launch
+#   - remaining libs    : runtime deps that are also needed at install time
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends \
-    ca-certificates \
-    ccache \
-    cmake \
-    g++ \
-    gcc \
-    git \
-    libpython3-dev \
-    libqt5gui5 \
     libfontconfig1 \
     libmagic1 \
+    libqt5gui5 \
     libsecret-1-0 \
-    make \
-    ninja-build \
+    libxcb-xinerama0 \
     python3-minimal \
-    python3-pip \
-    python3-venv \
     python-is-python3 \
-    unzip \
-    xcb-proto \
-    wget \
-    zlib1g-dev \
-    && mkdir -p $IDA_INSTALL_DIR ~/.local/share/applications/
-
-RUN --mount=type=bind,src=${IDA_INSTALLER},target=${IDA_INSTALLER} DEBIAN_FRONTEND=noninteractive apt-get install --yes --reinstall libxcb-xinerama0 && \
-    ./${IDA_INSTALLER} --mode unattended --prefix ${IDA_INSTALL_DIR}
-
-ENV PATH=${IDA_INSTALL_DIR}:${PATH}
-
-# ======================== Plugin Installation ==============================
-
-ARG QUOKKA_VERSION=v0.6.1
-ARG QUOKKA_URL=https://github.com/quarkslab/quokka/releases/download/${QUOKKA_VERSION}/${IDA_VERSION}-quokka_plugin0064.so
-ARG BINEXPORT_URL=https://github.com/google/binexport/releases/download/v12-20240417-ghidra_11.0.3/BinExport-Linux.zip
-RUN if [[ ${IDA_VERSION} -eq 84 ]]; then \
-    wget ${QUOKKA_URL} -O ${IDA_INSTALL_DIR}/plugins/quokka64.so \
-    && wget ${BINEXPORT_URL} -O binexport.zip \
-    && unzip -j binexport.zip ida/binexport12_ida.so ida/binexport12_ida64.so -d ${IDA_INSTALL_DIR}/plugins/ \
-    && rm -f binexport.zip ; \
-    else wget ${QUOKKA_URL} -O ${IDA_INSTALL_DIR}/plugins/quokka.so ; fi \
-    && apt-get purge --yes wget \
+    xvfb \
+    && mkdir -p "${IDA_INSTALL_DIR}" ~/.local/share/applications/ \
     && rm -rf /var/lib/apt/lists/*
 
-RUN useradd --create-home -u 1000 -m user && chown -R user:user $IDA_INSTALL_DIR
+# Run the installer in a secret-mount RUN so the .run binary is never
+# committed to any layer. The licence is intentionally NOT copied here;
+# it will be mounted at runtime only (see run command above).
+RUN --mount=type=secret,id=ida_installer,target=/tmp/ida_installer.run \
+    chmod +x /tmp/ida_installer.run && \
+    DEBIAN_FRONTEND=noninteractive /tmp/ida_installer.run \
+    --mode unattended \
+    --prefix "${IDA_INSTALL_DIR}"
+
+# Generate ida.reg by launching idat once inside a virtual framebuffer.
+# The -A flag auto-accepts the EULA; idat exits after startup with no project.
+# ida.reg is written to root's home by default.
+RUN Xvfb :99 -screen 0 1024x768x24 & \
+    sleep 2 && \
+    DISPLAY=:99 "${IDA_INSTALL_DIR}/idat" -A && \
+    sleep 5 && \
+    kill %1 || true
+
+# ======================== IDA Runtime image =================================
+# Only the IDA tree, the licence, ida.reg, and the runtime shared libraries are
+# present here. No installer, no xvfb, no build tooling.
+FROM docker.io/library/debian:testing-slim
+
+ARG IDA_VERSION=91
+
+# Exported so that qbinary/idascript and other tools spawned inside the
+# container can locate the IDA installation without extra configuration.
+ENV IDA_INSTALL_DIR=/opt/ida_${IDA_VERSION}
+ENV PATH=${IDA_INSTALL_DIR}:${PATH}
+# IDA looks for the licence at the path provided by this variable.
+# At runtime, mount the licence as a secret at that exact path:
+#   docker run --mount type=secret,id=ida_license,src=idapro.hexlic,...
+ENV HEXRAYS_LICENSE=/run/secrets/ida_license
+# IDADIR is required by ida_domain to locate the IDA installation at runtime.
+ENV IDADIR=${IDA_INSTALL_DIR}
+
+# Runtime-only shared libraries required by IDA and its Qt layer.
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends \
+    libfontconfig1 \
+    libmagic1 \
+    libqt5gui5 \
+    libsecret-1-0 \
+    python3-minimal \
+    python-is-python3 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy only the installed IDA tree from the build stage.
+COPY --from=ida-install ${IDA_INSTALL_DIR} ${IDA_INSTALL_DIR}
+
+# User creation
+RUN useradd --create-home -u 1000 -m user && \
+    chown -R user:user "${IDA_INSTALL_DIR}"
+
 USER user
-RUN $IDA_INSTALL_DIR/idapyswitch -a
 WORKDIR /home/user
+
+# Copy ida.reg (generated in stage 1) into the user's IDA config directory.
+COPY --from=ida-install /root/.idapro/ida.reg /home/user/.idapro/ida.reg
+
+# virtualenv (automatically launch at runtime)
+ENV VIRTUAL_ENV=/home/user/.venv
+ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
+RUN python -m venv "${VIRTUAL_ENV}" && \
+    echo "source ${VIRTUAL_ENV}/bin/activate" >> /home/user/.bashrc
+
+RUN "${IDA_INSTALL_DIR}/idapyswitch" -a
+
+CMD ["/bin/bash"]

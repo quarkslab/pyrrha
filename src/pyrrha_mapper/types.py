@@ -18,20 +18,14 @@
 from enum import Enum, auto
 
 
-class Disassembler(Enum):
-    """Represent a SRE (Software Reverse Engineering tool, a disassembler)."""
+class Backend(Enum):
+    """Represent the backend used for Pyrrha."""
 
     IDA = auto()  # doc: IDA Pro disassembler
     GHIDRA = auto()  # doc: GHIDRA disassembler
     BINARY_NINJA = auto()  # doc: Binary Ninja disassembler
-
-
-class Exporter(Enum):
-    """Represent export file formats used in some of the mappers."""
-
-    BINEXPORT = auto()  # doc: Use Binexport as exporter
-    NONE = auto()  # doc: Use no exporter and interact directly with disassembler
-    QUOKKA = auto()  # doc: Use Quokka as exporter
+    QUOKKA_IDA = auto()  # doc: Use Quokka as exporter of IDA
+    QUOKKA_GHIDRA = auto()  # doc: Use Quokka as exporter of Ghidra
 
 
 class ResolveDuplicateOption(Enum):
