@@ -98,6 +98,10 @@ class BaseTestFsMapper(ABC):
         db_path: Path
 
         @property
+        def project_path(self) -> Path:  # noqa: D102
+            return self.db_path.with_suffix(".srctrlprj")
+
+        @property
         def export_path(self) -> Path:  # noqa: D102
             return self.db_path.with_suffix(".json")
 
