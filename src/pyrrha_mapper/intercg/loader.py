@@ -531,6 +531,7 @@ class GhidraParser(BinaryParser):
         self._ghidra_cached_func = None
         self._ghidra_load_base: int = 0
         self._ghidra_monitor = None
+        self._ghidra_exported_parser_addrs: set[int] = set()
 
         full_path = root_directory / file_path
         self._ghidra_project_dir = Path(tempfile.mkdtemp(prefix=f"ghidra_{os.getpid()}_"))
@@ -563,7 +564,13 @@ class GhidraParser(BinaryParser):
         program = flat_api.getCurrentProgram()
 
         self._ghidra_program = program
+        # Derive load base from the program itself, not from LIEF's image_base,
+        # so that _to_ghidra_address / _to_parser_addr are always consistent.
         self._ghidra_load_base = program.getImageBase().getOffset()
+        # Build the exported-address set once so _func_type can check it cheaply.
+        self._ghidra_exported_parser_addrs: set[int] = {
+            lief_addr - self._binary.image_base for lief_addr in self._binary.exported_funcs_by_addr
+        }
         self._ghidra_func_manager = program.getFunctionManager()
         self._ghidra_symbol_table = program.getSymbolTable()
         self._ghidra_ext_manager = program.getExternalManager()
@@ -605,14 +612,34 @@ class GhidraParser(BinaryParser):
         return ghidra_offset - self._ghidra_load_base
 
     def _get_ghidra_func(self, parser_addr: int):
-        """:return: the Ghidra Function at *parser_addr*, with a single-entry cache."""
+        """:return: the Ghidra Function at *parser_addr*, with a single-entry cache.
+
+        Falls back to ``getFunctionContaining`` when ``getFunctionAt`` returns
+        ``None``, which handles the ARM THUMB case where the parser address
+        may be offset by one from the real entry point stored by Ghidra.
+        """
         if (
             self._ghidra_cached_func is not None
             and self._to_parser_addr(self._ghidra_cached_func.getEntryPoint().getOffset())
             == parser_addr
         ):
             return self._ghidra_cached_func
-        return self._ghidra_func_manager.getFunctionAt(self._to_ghidra_address(parser_addr))
+
+        ghidra_addr = self._to_ghidra_address(parser_addr)
+        func = self._ghidra_func_manager.getFunctionAt(ghidra_addr)
+        if func is None:
+            # getFunctionContaining handles mid-function addresses and the ARM
+            # THUMB ±1 offset; only accept the result when the entry point
+            # matches exactly (after rounding) to avoid false positives.
+            func = self._ghidra_func_manager.getFunctionContaining(ghidra_addr)
+            if func is not None:
+                entry_parser_addr = self._to_parser_addr(func.getEntryPoint().getOffset())
+                if abs(entry_parser_addr - parser_addr) > 1:
+                    func = None
+
+        if func is not None:
+            self._ghidra_cached_func = func
+        return func
 
     # ------------------------------------------------------------------
     # BinaryParser interface
@@ -620,13 +647,26 @@ class GhidraParser(BinaryParser):
 
     def _is_func_start(self, addr: int) -> bool:
         """:return: True if *addr* (parser space) is a known Ghidra function entry."""
-        return self._ghidra_func_manager.getFunctionAt(self._to_ghidra_address(addr)) is not None
+        return self._get_ghidra_func(addr) is not None
 
     def _iter_func_addr(self) -> Iterator[int]:
-        """Yield parser-space entry-point addresses of every Ghidra function."""
+        """Yield parser-space entry-point addresses of every non-external Ghidra function.
+
+        ``getFunctions(True)`` skips functions that live in Ghidra's external
+        program space (imported stubs resolved to library addresses).  Those are
+        handled separately by the LIEF import tracking in ``BinaryParser``.
+        """
+        seen_addrs: set[int] = set()
         for func in self._ghidra_func_manager.getFunctions(True):
+            # Skip external-space functions — they are not mapped in the binary.
+            if func.isExternal():
+                continue
             self._ghidra_cached_func = func
-            yield self._to_parser_addr(func.getEntryPoint().getOffset())
+            parser_addr = self._to_parser_addr(func.getEntryPoint().getOffset())
+            if parser_addr in seen_addrs:
+                continue
+            seen_addrs.add(parser_addr)
+            yield parser_addr
 
     def _func_mangled_name(self, addr: int) -> str:
         """:return: the raw name of the function at *addr*, or ``sub_<ADDR>``."""
@@ -662,6 +702,8 @@ class GhidraParser(BinaryParser):
         seen: set[str] = set()
         result: list[int] = []
         for callee in func.getCalledFunctions(self._ghidra_monitor):
+            if callee.isExternal():
+                continue
             name = callee.getName()
             if name in seen:
                 continue
@@ -678,6 +720,8 @@ class GhidraParser(BinaryParser):
         seen: set[str] = set()
         result: list[int] = []
         for caller in func.getCallingFunctions(self._ghidra_monitor):
+            if caller.isExternal():
+                continue
             name = caller.getName()
             if name in seen:
                 continue
@@ -691,6 +735,12 @@ class GhidraParser(BinaryParser):
         Thunk stubs that resolve to external functions are classified as
         ``IMPORTED`` so the trampoline resolution in ``BinaryParser`` correctly
         forwards all callers to the imported symbol name.
+
+        Exception: if the thunk is itself exported (i.e. it appears in the
+        binary's export table), it must be kept as ``THUNK`` so that
+        ``BinaryParser`` adds it to the call graph rather than silently
+        dropping it.  ``IMPORTED`` is reserved for non-exported stubs whose
+        only purpose is to forward calls to an external symbol.
         """
         func = self._get_ghidra_func(addr)
         if func is None:
@@ -700,10 +750,13 @@ class GhidraParser(BinaryParser):
             return FuncType.IMPORTED
 
         if func.isThunk():
-            # Resolve thunk chain; classify as IMPORTED if it ends at an external
+            # Resolve thunk chain; classify as IMPORTED only when the thunk is
+            # not exported — exported thunks must remain visible in the call
+            # graph so BinaryParser does not drop them.
             thunked = func.getThunkedFunction(True)
             if thunked is not None and thunked.isExternal():
-                return FuncType.IMPORTED
+                if addr not in self._ghidra_exported_parser_addrs:
+                    return FuncType.IMPORTED
             return FuncType.THUNK
 
         # Heuristic: function in a namespace matching a known external library
