@@ -1,14 +1,3 @@
-#========================== STEPS USED IN WORKFLOWS ====================================
-.step_install_pyrrha_test: &step_install_pyrrha_test
-  - echo -e "\e[95m===== Install Pyrrha with test extension"
-  - pip install '.[test]'
-
-.step_run_tests: &step_run_tests
-  - echo -e "\e[95m===== Tests"
-  - coverage run --source=${TEST_COVERAGE_SOURCE} -m pytest  --junitxml=report.xml -vvv -x ${TEST_SUP_OPTIONS} ${TEST_PATH}
-  - coverage xml
-  - coverage report
-
 #========================== OBJECTS TESTS ====================================
 
 test_data_structures: 
