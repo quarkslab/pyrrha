@@ -92,4 +92,6 @@ test_fs-cg:
     matrix:
       - BACKEND: "ida"
         VERSION: [91, 93]
+      - BACKEND: "ghidra"
+        VERSION: ["12.0.4"]
 
