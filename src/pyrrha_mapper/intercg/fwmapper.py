@@ -37,7 +37,14 @@ from pyrrha_mapper.fs import FileSystemImportsMapper
 from pyrrha_mapper.intercg.loader import BinaryParser, GhidraParser, IDAParser
 from pyrrha_mapper.types import Backend, ResolveDuplicateOption
 
-IGNORE_LIST = ["__gmon_start__"]
+IGNORE_LIST = [
+    "__gmon_start__",
+    "_ITM_deregisterTMCloneTable",
+    "_ITM_registerTMCloneTable",
+    "__TMC_END__",
+    "deregister_tm_clones",
+    "register_tm_clones",
+]
 
 NUMBAT_UI_BIN = "NumbatUi"
 
@@ -112,7 +119,7 @@ class InterImageCGMapper(FileSystemImportsMapper):
             if backend == Backend.IDA:
                 ida_parser: BinaryParser = IDAParser(root_directory, file_path)
                 return ida_parser.binary, ida_parser.call_graph
-            elif backend ==  Backend.GHIDRA:
+            elif backend == Backend.GHIDRA:
                 ghidra_parser = GhidraParser(root_directory, file_path)
                 return ghidra_parser.binary, ghidra_parser.call_graph
             else:
