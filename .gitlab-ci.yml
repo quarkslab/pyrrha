@@ -3,14 +3,6 @@
   - echo -e "\e[95m===== Install Pyrrha with test extension"
   - pip install '.[test]'
 
-
-.step_gen_artifacts: &step_gen_artifacts
-  - echo -e "\e[95m===== Generate artifacts"
-  - mkdir -p ${ARTIFACTS} 
-  - cp -r tests ${ARTIFACTS}
-  - (cd ${ARTIFACTS} && pyrrha $MAPPER --db ${DB} --debug tests/test_fw ${MAPPER_OPTIONS})
-  - ls ${ARTIFACTS}
-
 .step_run_tests: &step_run_tests
   - echo -e "\e[95m===== Tests"
   - coverage run --source=${TEST_COVERAGE_SOURCE} -m pytest  --junitxml=report.xml -vvv -x ${TEST_SUP_OPTIONS} ${TEST_PATH}
@@ -22,9 +14,13 @@
 test_data_structures: 
   stage: test
   before_script: 
-    - *step_install_pyrrha_test
+    - echo -e "\e[95m===== Install Pyrrha with test extension"
+    - pip install '.[test]'
   script:
-    - *step_run_tests
+    - echo -e "\e[95m===== Tests"
+    - coverage run --source=${TEST_COVERAGE_SOURCE} -m pytest  --junitxml=report.xml -vvv -x ${TEST_SUP_OPTIONS} ${TEST_PATH}
+    - coverage xml
+    - coverage report
   image: python:latest
   variables:
     TEST_COVERAGE_SOURCE: pyrrha_mapper.common.objects
@@ -38,44 +34,25 @@ test_data_structures:
         path: coverage.xml
 
 #========================== MAPPERS TESTS ====================================
-.run_pyrrha_test_artifacts:
-  stage: test
-  before_script: 
-    - *step_install_pyrrha_test
-  script:
-    - *step_gen_artifacts
-    - *step_run_tests
-  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+test_fs: 
+  extends:
+  - test_data_structures
   artifacts:
     name: db_$CI_JOB_NAME_SLUG
-    when: always
     paths:
-      - ${ARTIFACTS}/${DB}.srctrldb
-      - ${ARTIFACTS}/${DB}.srctrlprj
-    reports:
-      junit: report.xml
-      coverage_report:
-        coverage_format: cobertura
-        path: coverage.xml
-  variables:
-    ARTIFACTS: tmp/artifacts
-    
-test_fs: 
-  extends: 
-    - .run_pyrrha_test_artifacts
-  image: python:latest
+      - test_artifacts/
+    when: always
   variables:
     DB: fs
     MAPPER: fs
     TEST_COVERAGE_SOURCE: pyrrha_mapper.common.filesystem_mapper,pyrrha_mapper.fs
     TEST_PATH: tests/test_cli.py::TestFSMapper
+    PYTEST_ARTIFACTS_DIR: test_artifacts
     
 
 test_fs-cg:
   extends: 
-    - .run_pyrrha_test_artifacts
-  before_script: 
-    - !reference [.run_pyrrha_test_artifacts, before_script]
+    - test_fs
   image: 
     name: $CONTAINER_PATH/${BACKEND}:${VERSION}
     docker:
