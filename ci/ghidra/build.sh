@@ -64,7 +64,7 @@ readonly DOCKER
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly DOCKERFILE="${SCRIPT_DIR}/Dockerfile"
-readonly IMAGE_NAME_DEFAULT="pyrrha-ghidra"
+readonly IMAGE_NAME_DEFAULT="ghidra"
 
 # Default Ghidra release — update these when a new version is published.
 readonly DEFAULT_VERSION="12.0.4"
