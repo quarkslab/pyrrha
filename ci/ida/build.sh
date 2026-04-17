@@ -58,7 +58,7 @@ readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly DOCKERFILE="${SCRIPT_DIR}/Dockerfile"
 readonly DOCKERFILE_FINAL="${SCRIPT_DIR}/Dockerfile.final"
 readonly DEFAULT_LICENSE="${SCRIPT_DIR}/idapro.hexlic"
-readonly IMAGE_NAME_DEFAULT="pyrrha-ida"
+readonly IMAGE_NAME_DEFAULT="ida"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
