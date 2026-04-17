@@ -1,6 +1,8 @@
 build_image:
   stage: build
-  image: docker:test_cli
+  image: docker:cli
+  services:
+    - docker:dind
   parallel:
     matrix:
       - BACKEND: "ida"
