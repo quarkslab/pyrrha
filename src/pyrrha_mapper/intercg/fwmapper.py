@@ -16,6 +16,7 @@
 """InterCGMapper implementation."""
 
 import logging
+import re
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -37,14 +38,70 @@ from pyrrha_mapper.fs import FileSystemImportsMapper
 from pyrrha_mapper.intercg.loader import BinaryParser, GhidraParser, IDAParser
 from pyrrha_mapper.types import Backend, ResolveDuplicateOption
 
-IGNORE_LIST = [
-    "__gmon_start__",
-    "_ITM_deregisterTMCloneTable",
-    "_ITM_registerTMCloneTable",
-    "__TMC_END__",
-    "deregister_tm_clones",
-    "register_tm_clones",
-]
+IGNORE_LIST: frozenset[str] = frozenset(
+    [
+        # Linker-injected bookkeeping stubs
+        "__gmon_start__",
+        "_ITM_deregisterTMCloneTable",
+        "_ITM_registerTMCloneTable",
+        "__TMC_END__",
+        "deregister_tm_clones",
+        "register_tm_clones",
+        # ITM runtime helpers
+        "_ITM_RU1",
+        "_ITM_addUserCommitAction",
+        "_ITM_memcpyRnWt",
+        "_ITM_memcpyRtWn",
+        # C++ operators (Ghidra partial-demangle form)
+        "operator new",
+        "operator new[]",
+        "operator delete",
+        "operator delete[]",
+        "new[]",
+        "operator==",
+        "operator!=",
+        "operator<",
+        "operator>",
+        "operator<=",
+        "operator>=",
+        "operator=",
+        "operator+",
+        "operator-",
+        "operator*",
+        "operator/",
+        "operator[]",
+        "operator()",
+        "operator<<",
+        "operator>>",
+        "operator+=",
+        "operator-=",
+        # GCC exception helpers — never valid cross-binary callees
+        "__throw_bad_alloc",
+        "__throw_bad_array_new_length",
+        "__throw_bad_cast",
+        "__throw_bad_function_call",
+        "__throw_future_error",
+        "__throw_invalid_argument",
+        "__throw_length_error",
+        "__throw_logic_error",
+        "__throw_out_of_range",
+        "__throw_out_of_range_fmt",
+        "__throw_overflow_error",
+        "__throw_range_error",
+        "__throw_regex_error",
+        "__throw_runtime_error",
+        "__throw_system_error",
+        "__throw_underflow_error",
+        # C++ ABI internal
+        "__do_upcast",
+    ]
+)
+
+# Tool-generated synthetic names (FUN_<HEX>, _INIT_<N>, _FINI_<N>) that can
+# never be resolved as cross-binary callees.
+_GHIDRA_SYNTHETIC_NAME_RE: re.Pattern[str] = re.compile(
+    r"^(?:FUN_[0-9A-Fa-f]+|_INIT_\d+|_FINI_\d+)$"
+)
 
 NUMBAT_UI_BIN = "NumbatUi"
 
@@ -161,6 +218,60 @@ class InterImageCGMapper(FileSystemImportsMapper):
         else:
             logging.warning(f"{log_prefix}: impossible to parse the following result {res.args}")
 
+    @staticmethod
+    def _merge_parser_functions_into_cached_binary(
+        parser_bin: Binary, cached_bin: Binary, log_prefix: str = ""
+    ) -> None:
+        """Merge disassembler-discovered functions from *parser_bin* into *cached_bin*.
+
+        The .fs.json cache only contains LIEF-visible data.  After a cache
+        reload the disassembler is re-run to rebuild the call graph, but the
+        resulting ``Binary`` object (``parser_bin``) is discarded — only the
+        cached binary (``cached_bin``) stays in ``self.fs``.  This means that
+        any function the disassembler registered that was not already present in
+        the LIEF binary (e.g. internal functions discovered via ``add_function``
+        during ``_combine_program_analysis_binary``) will be absent from
+        ``cached_bin``.  The CG mapping loop then hits
+        ``not binary.function_exists(f_symb.name)`` for every such function and
+        silently drops the associated call edges.
+
+        This helper bridges the gap by:
+
+        1. Registering internal functions present in ``parser_bin`` but absent
+           from ``cached_bin``.  These functions have no DB id (they were never
+           recorded in Numbat), which is correct — only exported symbols are
+           recorded.
+        2. Registering exported functions present in ``parser_bin`` but absent
+           from ``cached_bin``.  This handles symbols the disassembler promoted
+           to exports that LIEF did not see.  No DB id is assigned.
+
+        The operation is intentionally conservative: it never removes existing
+        functions from ``cached_bin`` and never overwrites a symbol that already
+        has an id.
+
+        :param parser_bin: freshly-parsed Binary produced by the disassembler.
+        :param cached_bin: Binary loaded from the .fs.json cache (has DB ids).
+        :param log_prefix: prefix for log messages.
+        """
+        # Step 1 — register internal functions discovered only by the disassembler.
+        for func_name, func_symb in parser_bin.internal_functions.items():
+            if not cached_bin.function_exists(func_name):
+                cached_bin.add_function(func_symb, func_name=func_name)
+                logging.debug(
+                    f"{log_prefix}: merged internal function '{func_name}' from parser into cache"
+                )
+
+        # Step 2 — ensure the cached binary's exported function set is a
+        # superset of the parser's.  Symbols exported by the disassembler but
+        # absent from the cached binary are added so function_exists() succeeds.
+        # No DB id is assigned — these symbols were not recorded in Numbat.
+        for func_name, func_symb in parser_bin.exported_functions.items():
+            if not cached_bin.exported_function_exists(func_name):
+                cached_bin.add_exported_symbol(func_symb, symbol_name=func_name)
+                logging.debug(
+                    f"{log_prefix}: merged exported function '{func_name}' from parser into cache"
+                )
+
     def map_binaries_main(self, threads: int, progress: Progress) -> None:
         """Parse and map binaries of a given directory.
 
@@ -180,9 +291,39 @@ class InterImageCGMapper(FileSystemImportsMapper):
             binaries_map = progress.add_task(
                 "[red]Binaries recording", total=len(list(self.fs.iter_binaries()))
             )
+            # The .fs.json cache only serialises LIEF-visible data.  The
+            # disassembler call graph is transient and internal functions
+            # discovered by the disassembler (absent from LIEF's symbol table)
+            # are not persisted either.  We must therefore:
+            #   1. Re-run the disassembler for each binary to rebuild
+            #      unresolved_callgraph and recover internal functions.
+            #   2. Merge those internal functions into the cached Binary
+            #      BEFORE calling record_binary_in_db, so that Numbat receives
+            #      DB ids for them.  Without ids, _record_call_ref silently
+            #      drops every call whose caller is an internal function.
             for binary in self.fs.iter_binaries():
                 log_prefix = f"[bin mapping] {binary.name}"
-                # Create the node entry in numbat and create the custom command
+                if binary.real_path is not None:
+                    res = self.load_binary(file_path=binary.real_path, **self.load_binary_args())
+                    if isinstance(res, str):
+                        logging.error(f"{log_prefix}: CG reload failed: {res}")
+                    elif self._correct_map_result(res):
+                        parser_bin, call_graph = res
+                        # Merge disassembler functions before recording in DB
+                        # even when call_graph is empty — the binary may still
+                        # expose internal functions needed as call targets.
+                        self._merge_parser_functions_into_cached_binary(
+                            parser_bin, binary, log_prefix
+                        )
+                        if call_graph is not None:
+                            self.unresolved_callgraph[binary.path] = call_graph
+                    else:
+                        logging.warning(f"{log_prefix}: unexpected result during CG reload")
+                else:
+                    logging.warning(f"{log_prefix}: no real_path set, skipping CG reload")
+
+                # Record in DB after the merge so internal functions discovered
+                # by the disassembler are included and receive DB ids.
                 self.record_binary_in_db(binary, log_prefix)
                 if binary.id is not None:
                     self.node_ids[binary.id] = binary
@@ -213,14 +354,12 @@ class InterImageCGMapper(FileSystemImportsMapper):
         # Step1: Load FileSystem object and enrich it if needed
         self.map_binaries_main(threads, progress)
         self.map_symlinks_main(progress)
-        self.dry_run_mode = True  # (do not record lib imports in numbat db)
+        self.dry_run_mode = True  # do not record lib imports in numbat db
         self.map_lib_imports_main(progress, resolution_strategy)
         if self.db_interface is not None:
             self.dry_run_mode = False
 
-        self.progress = progress  # need to be able to hide it further down in calls+
-
-        # Dict of:     exported-funs -> [binaries]
+        self.progress = progress
         self.exports_to_bins = self.make_export_to_binaries_map()
 
         # Iterate again all binaries to create call edges (all numbat_id are created)
@@ -234,16 +373,26 @@ class InterImageCGMapper(FileSystemImportsMapper):
             count_res = {True: 0, False: 0}
             if binary.path in self.unresolved_callgraph:
                 for f_symb, targets in self.unresolved_callgraph[binary.path].items():
-                    if targets and not binary.function_exists(f_symb.name):
+                    if not binary.function_exists(f_symb.name):
+                        if targets:
+                            logging.error(
+                                f"function {f_symb.name} ({hex(f_symb.addr) if f_symb.addr is not None else None}) not in binary: {binary.name}"
+                            )
+                        continue
+
+                    try:
+                        caller = binary.get_function_by_name(f_symb.name)
+                    except KeyError:
                         logging.error(
-                            f"function {f_symb.name} ({hex(f_symb.addr) if f_symb.addr is not None else None}) not in binary: {binary.name}"
+                            f"{log_prefix}: caller {f_symb.name} not found in binary {binary.name}"
                         )
                         continue
+
                     for target in targets:
                         try:
                             res = self._record_one_call(
                                 binary,
-                                f_symb,
+                                caller,
                                 target,
                                 resolution_strategy,
                                 unindex_symbols,
@@ -293,8 +442,8 @@ class InterImageCGMapper(FileSystemImportsMapper):
         assert self.db_interface is not None
         if src.id is None or dst.id is None:
             logging.error(
-                f"{log_prefix}: Cannot record call ref between {src.name} and "
-                f"{dst.name}, missing ids ({src.name}: {src.id}, {dst.name}: {dst.id})"
+                f"{log_prefix}: Cannot record call ref between '{src.name}' and "
+                f"'{dst.name}', missing ids ({src.name}: {src.id}, {dst.name}: {dst.id})"
             )
             return False
         self.db_interface.record_ref_call(src.id, dst.id)
@@ -360,20 +509,31 @@ class InterImageCGMapper(FileSystemImportsMapper):
 
         :return: True if target function was found
         """
-        # local call
+        # Ghidra emits template arguments in callee names (e.g. "_M_insert<bool>");
+        # strip them so lookups match the base-name key in exported_functions.
+        if "<" in callee:
+            callee = callee[: callee.index("<")]
+
+        # The disassembler may emit versioned symbol names (e.g. "getenv@@GLIBC_2.4").
+        # All export/import keys are stored without the version suffix, so strip it.
+        if "@@" in callee:
+            callee = callee[: callee.index("@@")]
+
         if binary.function_exists(callee):
             callee_symb = binary.get_function_by_name(callee)
             binary.add_call(caller, callee_symb)
-            return self._record_call_ref(caller, callee_symb)
+            return self._record_call_ref(caller, callee_symb, f"{log_prefix}: local call")
 
-        if callee in IGNORE_LIST:
+        if callee in IGNORE_LIST or _GHIDRA_SYNTHETIC_NAME_RE.match(callee):
             return False
 
         # already solved import
         if binary.imported_symbol_exists(callee, is_resolved=True):
             callee_symb = binary.get_imported_symbol(callee)
             binary.add_call(caller, callee_symb)
-            return self._record_call_ref(caller, callee_symb)
+            return self._record_call_ref(
+                caller, callee_symb, f"{log_prefix}: already solved import"
+            )
 
         # solve import from listed imported libraries
         tmp = self.resolve_symbol_import(binary, callee, resolver, log_prefix)
@@ -383,7 +543,9 @@ class InterImageCGMapper(FileSystemImportsMapper):
                 binary.add_imported_library(target_bin)
             binary.add_imported_symbol(target_symb)
             binary.add_call(caller, target_symb)
-            return self._record_call_ref(caller, target_symb)
+            return self._record_call_ref(
+                caller, target_symb, f"{log_prefix}: import in listed imported lib"
+            )
 
         # Get binaries exporting this symbol
         served_by: list[Binary] = self.exports_to_bins[callee]
@@ -409,10 +571,12 @@ class InterImageCGMapper(FileSystemImportsMapper):
             callee_symb = served_by[0].get_exported_symbol(callee)
             binary.add_imported_symbol(callee_symb)
             binary.add_call(caller, callee_symb)
-            return self._record_call_ref(caller, callee_symb)
+            return self._record_call_ref(caller, callee_symb, log_prefix)
         else:  # still not resolved
-            self._record_unindexed_call(caller, callee)
+            self._record_unindexed_call(caller, callee, log_prefix)
             if binary.path.suffix != ".ko":
                 unindex_symbols.add(callee)
-            logging.debug(f"{log_prefix}: no match found for edge {caller.name} -> {callee}")
+                logging.warning(f"{log_prefix}: no match found for edge {caller.name} -> {callee}")
+            else:
+                logging.debug(f"{log_prefix}: no match found for edge {caller.name} -> {callee}")
             return False

@@ -126,7 +126,7 @@ class FileSystemMapper(ABC):
         if binary.id is None:
             logging.error(f"{log_prefix}: Record of binary failed.")
             return binary
-        # dict demangled_name -> id to check if a demangled name has already been recorded
+
         recorded_symb: dict[str, int] = dict()
         for symbol in set(binary.iter_exported_symbols()):
             if symbol.demangled_name in recorded_symb:
@@ -135,6 +135,11 @@ class FileSystemMapper(ABC):
                     "common node for these symbols"
                 )
                 symbol.id = recorded_symb[symbol.demangled_name]
+                # Also propagate the id to any other symbol registered under
+                # the same mangled name (e.g. secondary demangled-key entries).
+                for other in binary.exported_functions.values():
+                    if other.name == symbol.name and other.id is None:
+                        other.id = symbol.id
                 continue
             if symbol.is_func:
                 symbol.id = self.db_interface.record_method(
@@ -159,6 +164,11 @@ class FileSystemMapper(ABC):
                 try:
                     self.db_interface.record_public_access(symbol.id)
                     recorded_symb[symbol.demangled_name] = symbol.id
+                    # Propagate id to all symbols sharing the same mangled name
+                    # (covers secondary demangled-key registrations).
+                    for other in binary.exported_functions.values():
+                        if other.name == symbol.name and other.id is None:
+                            other.id = symbol.id
                 except DBException as e:
                     raise PyrrhaError(
                         f"{log_prefix}: Cannot register access to symbol {symbol.demangled_name}: "
@@ -166,6 +176,16 @@ class FileSystemMapper(ABC):
                     ) from e
 
         for symbol in set(binary.iter_not_exported_functions()):
+            # Skip if this demangled name was already recorded as an exported
+            # symbol — same demangled name means same DB node, and calling
+            # record_private_access on it would violate the UNIQUE constraint.
+            if symbol.demangled_name in recorded_symb:
+                logging.debug(
+                    f"{log_prefix}: demangled name {symbol.demangled_name} already recorded "
+                    "as exported, skipping internal registration"
+                )
+                symbol.id = recorded_symb[symbol.demangled_name]
+                continue
             symbol.id = self.db_interface.record_method(
                 symbol.demangled_name,
                 parent_id=binary.id,
@@ -176,6 +196,7 @@ class FileSystemMapper(ABC):
             else:
                 try:
                     self.db_interface.record_private_access(symbol.id)
+                    recorded_symb[symbol.demangled_name] = symbol.id
                 except DBException as e:
                     raise PyrrhaError(
                         f"{log_prefix}: Cannot register access to symbol"
@@ -183,7 +204,7 @@ class FileSystemMapper(ABC):
                     ) from e
 
         return binary
-    
+
     def record_symlink_in_db(self, sym: Symlink, log_prefix: str = "") -> Symlink:
         """Record into DB the symlink and its link to its target.
 
