@@ -102,18 +102,18 @@ class Binary(FileSystemComponent):
     )  # warning only symbols which are not functions
     exported_functions: dict[str, Symbol] = Field(default_factory=dict)
 
-    # Fields for call graph representation
-    # functions is both: internal functions + exported functions
+    # Call graph fields
     internal_functions: dict[str, Symbol] = Field(default_factory=dict)
     calls: dict[str, list[Symbol]] = Field(default_factory=dict)
 
-    # ELF specific fields
+    # ELF-specific fields
     version_requirement: dict[str, list[str]] = Field(
         default_factory=dict
     )  # dict(symbol_name, list(requirements))
 
-    # Runtime-only field: virtual address at which the binary is loaded.
+    # Runtime-only (excluded from serialisation)
     image_base: int = Field(default=0, exclude=True)
+    is_relocatable: bool = Field(default=False, exclude=True)
 
     @field_validator("internal_functions", "exported_functions", mode="after")
     @classmethod
@@ -176,6 +176,9 @@ class Binary(FileSystemComponent):
         if symbol.is_func:
             self.exported_functions[symbol_name] = symbol
             self.exported_symbols.pop(symbol_name, None)
+            # Remove from internal_functions if it was previously registered
+            # there (e.g. LIEF yields the same symbol via .symtab then .dynsym).
+            self.internal_functions.pop(symbol_name, None)
         else:
             self.exported_symbols[symbol_name] = symbol
             self.exported_functions.pop(symbol_name, None)
@@ -423,8 +426,7 @@ class FileSystem(BaseModel):
             f"bins={len(self.binaries)}, symlinks={len(self.symlinks)})"
         )
 
-    # ------------------------------ Overload Pydantic methods -------------------------
-    # Always export by aliases, set always excluded attributes
+    # Pydantic overrides: always export by aliases, exclude runtime-only fields.
     @field_serializer(
         "binaries", mode="plain", when_used="always", return_type=dict[str | Path, dict]
     )
@@ -526,9 +528,7 @@ class FileSystem(BaseModel):
                         raise ValueError(f"Imported lib '{lib_path}' not listed in binaries")
                     res[bin_path].add_imported_library(res[lib_path_obj])
 
-        # optmimize version by replacing every iteration of the same symbol (same id)
-        # by one object
-        # 1. generate dict of symbols by ids
+        # Deduplicate: replace repeated Symbol instances with the same id by one object.
         symbols_by_ids: dict[int, Symbol] = {
             s.id: s for bin in res.values() for s in bin.iter_exported_symbols() if s.id is not None
         }

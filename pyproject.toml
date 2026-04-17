@@ -25,11 +25,10 @@ authors = [
 ]
 readme = "README.md"
 description = "A mapper collection for firmware analysis"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { text = "Apache License 2.0" }
 classifiers = [
     'Development Status :: 4 - Beta',
-    'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12',
     'Programming Language :: Python :: 3.13',
@@ -77,7 +76,7 @@ test = ['pytest', 'pytest-cov']
 typechecking = ['mypy']
 
 [tool.setuptools.dynamic]
-version = {attr = "pyrrha_mapper.__version__"} 
+version = {attr = "pyrrha_mapper.__version__"}
 
 [tool.mypy]
 plugins = ['pydantic.mypy']
@@ -107,5 +106,3 @@ convention = "numpy"
 [tool.ruff.format]
 line-ending = "auto"
 docstring-code-format = true
-
-

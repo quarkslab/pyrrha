@@ -72,7 +72,6 @@ class FileSystemImportsMapper(FileSystemMapper):
         raise: FsMapperError if cannot load it
         :return: bin object and additionnal info if needed or a string in case of error
         """
-        # compute absolute path but from root_directory base
         base = Path(root_directory.anchor)
         rel_path = base.joinpath(file_path.relative_to(root_directory))
 
@@ -88,6 +87,7 @@ class FileSystemImportsMapper(FileSystemMapper):
                 return f"Lief cannot parse {file_path}"
 
             bin_obj.image_base = parsing_res.imagebase
+            bin_obj.is_relocatable = parsing_res.header.file_type == lief.ELF.Header.FILE_TYPE.REL
             # parse imported libs
             for lib in parsing_res.libraries:
                 bin_obj.add_imported_library_name(str(lib))
@@ -97,27 +97,50 @@ class FileSystemImportsMapper(FileSystemMapper):
             # store exported symbols
             s: lief.ELF.Symbol
             is_kernel_module = bin_obj.path.suffix == ".ko"
+            seen_symbol_names: set[str] = set()
             for s in parsing_res.symbols:
+                sym_name = str(s.name)
                 if s.imported:
-                    bin_obj.add_imported_symbol_name(str(s.name))
+                    bin_obj.add_imported_symbol_name(sym_name)
                 elif s.exported or is_kernel_module and s.name:
                     is_func = s.is_function or s.type == lief.ELF.Symbol.TYPE.GNU_IFUNC
                     if not is_func and is_kernel_module:
                         continue
-                    bin_obj.add_exported_symbol(
-                        Symbol(
-                            name=str(s.name),
-                            is_func=is_func,
-                            demangled_name=s.demangled_name,
-                            addr=s.value,
-                        )
+                    # LIEF may yield the same symbol name from both .symtab
+                    # and .dynsym; only register the first occurrence to avoid
+                    # duplicate DB entries (UNIQUE constraint on node_id).
+                    if sym_name in seen_symbol_names:
+                        continue
+                    seen_symbol_names.add(sym_name)
+                    # Use the mangled name as demangled_name when LIEF's
+                    # demangled_name is identical to the mangled name (i.e.
+                    # demangling was not available or not needed).
+                    lief_demangled = str(s.demangled_name)
+                    demangled = lief_demangled if lief_demangled != sym_name else sym_name
+                    sym = Symbol(
+                        name=sym_name,
+                        is_func=is_func,
+                        demangled_name=demangled,
+                        addr=s.value,
                     )
+                    # Register under the mangled name as primary key.
+                    # Also register under the demangled name if it differs,
+                    # so that call-graph resolution can match short callee
+                    # strings against exported_functions keys.
+                    bin_obj.add_exported_symbol(sym)
+                    if demangled != sym_name:
+                        bin_obj.add_exported_symbol(sym, symbol_name=demangled)
                 elif s.is_function:
+                    # Skip symbols already registered as exported functions to
+                    # avoid duplicate DB entries.
+                    if sym_name in seen_symbol_names:
+                        continue
+                    seen_symbol_names.add(sym_name)
                     bin_obj.add_function(
                         Symbol(
-                            name=str(s.name),
+                            name=sym_name,
                             is_func=s.is_function,
-                            demangled_name=s.demangled_name,
+                            demangled_name=str(s.demangled_name),
                             addr=s.value,
                         )
                     )
