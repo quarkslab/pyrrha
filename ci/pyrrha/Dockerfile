@@ -36,11 +36,11 @@ ARG GHIDRA_IMAGE=pyrrha-ghidra:latest
 
 ARG DISASS_IMAGE=ghidra
 ARG DISASS_IMAGE_VERSION=latest
-ARG DISASS_IMAGE_USER=user
 
-FROM ${DISASS_IMAGE}:{DISASS_IMAGE_VERSION}
+FROM ${DISASS_IMAGE}:${DISASS_IMAGE_VERSION}
 SHELL ["/bin/bash", "-c"]
 
+ENV DISASS_IMAGE_USER=user
 ENV PYRRHA_INSTALL_DIR=/tmp/pyrrha_install
 ENV PYRRHA_WORKING_DIR=/tmp/pyrrha
 
@@ -49,9 +49,9 @@ WORKDIR ${PYRRHA_INSTALL_DIR}
 
 RUN python3 -m pip install --no-cache-dir -U pip
 
-COPY --chown=${DISASS_IMAGE_USER}:${DISASS_IMAGE_USER} ../../src src/
-COPY --chown=${DISASS_IMAGE_USER}:${DISASS_IMAGE_USER}user:user ../../pyproject.toml ./
-COPY --chown=${DISASS_IMAGE_USER}:${DISASS_IMAGE_USER}user:user ../../README.md ./
+COPY --chown=${DISASS_IMAGE_USER}:${DISASS_IMAGE_USER} src src/
+COPY --chown=${DISASS_IMAGE_USER}:${DISASS_IMAGE_USER} pyproject.toml ./
+COPY --chown=${DISASS_IMAGE_USER}:${DISASS_IMAGE_USER} README.md ./
 
 
 # Overwrite the PyPI install from the base image with the local working copy.
