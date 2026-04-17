@@ -45,10 +45,10 @@ RUN wget --no-verbose "${GHIDRA_URL}" -O /tmp/ghidra.zip && \
     /opt/ghidra_${GHIDRA_VERSION}_PUBLIC/licenses
 
 # ======================== Ghidra Installation and Runtime Image =======================
-# eclipse-temurin:21-jre-jammy is the current maintained replacement for the
-# deprecated openjdk:21-jdk-slim. The JRE is sufficient for running Ghidra
-# headless — the full JDK is not required at runtime.
-FROM eclipse-temurin:21-jre-jammy
+# eclipse-temurin:21-jdk-jammy is the current maintained replacement for the
+# deprecated openjdk:21-jdk-slim. The full JDK is required as Ghidra's
+# launcher validates the Java installation and rejects JRE-only setups.
+FROM eclipse-temurin:21-jdk-jammy
 
 ARG GHIDRA_VERSION=12.0.4
 
@@ -63,17 +63,26 @@ COPY --from=ghidra-download /opt/ghidra_${GHIDRA_VERSION}_PUBLIC ${GHIDRA_INSTAL
 
 # Install the minimal runtime dependencies for Ghidra headless + pyghidra and
 # for building/installing the pyrrha-mapper Python package.
+# Python 3.11 is installed via the deadsnakes PPA as Ubuntu 22.04 (Jammy)
+# ships 3.10 by default.
 # All apt artefacts are removed in the same RUN layer to keep layer size down.
 RUN apt-get update && \
     apt-get install --yes --no-install-recommends \
+    software-properties-common \
+    && add-apt-repository ppa:deadsnakes/ppa && \
+    apt-get update && \
+    apt-get install --yes --no-install-recommends \
     libfreetype6 \
     libmagic1 \
-    python3-minimal \
+    python3.11 \
+    python3.11-venv \
     python3-pip \
-    python3-venv \
-    python-is-python3 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+
+# Make python3.11 the default python3 and python.
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
+    update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
 
 # User creation
 RUN useradd --create-home -u 1000 -m user && \
@@ -87,7 +96,7 @@ WORKDIR /home/user
 ENV VIRTUAL_ENV=/home/user/.venv
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 
-RUN python -m venv "${VIRTUAL_ENV}" && \
+RUN python3.11 -m venv "${VIRTUAL_ENV}" && \
     pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir pyrrha-mapper && \
     echo "source ${VIRTUAL_ENV}/bin/activate" >> /home/user/.bashrc
