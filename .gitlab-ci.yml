@@ -1,8 +1,8 @@
 build_image:
   stage: build
-  image: docker:cli
-  services:
-    - docker:dind
+  image: docker:29-dind
+  tags:
+    - dind
   parallel:
     matrix:
       - BACKEND: "ida"
@@ -13,17 +13,32 @@ build_image:
         LATEST: "12.0.4"
   variables:
     DOCKER_IMAGE_NAME: $CI_REGISTRY_IMAGE/pyrrha-$BACKEND
+    DOCKER_HOST: unix:///var/run/docker.sock
+    DOCKER_TLS_CERTDIR: ""
   before_script:
-    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+    - echo "$CA_CERT" > /usr/local/share/ca-certificates/local-ca.pem
+    - update-ca-certificates
+    - |
+      dockerd-entrypoint.sh --host=unix:///var/run/docker.sock &
+      for i in $(seq 1 30); do
+        if docker info >/dev/null 2>&1; then
+          echo "Docker daemon is ready"
+          break
+        fi
+        echo "Waiting for docker daemon... ($i/30)"
+        sleep 2
+      done
+    - echo "$CI_REGISTRY_PASSWORD" | docker login --username "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY" 
   script:
-    - docker build --pull -t "$DOCKER_IMAGE_NAME:$VERSION" ci/pyrrha/Dockerfile --build-arg DISASS_IMAGE=$CI_REGISTRY_IMAGE/ci/${BACKEND} --build-arg DISASS_IMAGE_VERSION=$VERSION
+    - docker build --pull -t "$DOCKER_IMAGE_NAME:$VERSION" -f ci/pyrrha/Dockerfile --build-arg DISASS_IMAGE=$CI_REGISTRY_IMAGE/ci/${BACKEND} --build-arg DISASS_IMAGE_VERSION=$VERSION .
     - docker push "$DOCKER_IMAGE_NAME:$VERSION"
     - |
       if [[ "$VERSION" == "$LATEST" ]]; then
         docker tag "$DOCKER_IMAGE_NAME:$VERSION" "$DOCKER_IMAGE_NAME:latest"
         docker push "$DOCKER_IMAGE_NAME:latest"
       fi
-
+  after_script:
+    - docker logout $CI_REGISTRY
 
 #========================== OBJECTS TESTS ====================================
 
@@ -70,7 +85,7 @@ test_fs-cg:
   extends: 
     - test_fs
   image: 
-    name: $CONTAINER_PATH/${BACKEND}:${VERSION}
+    name: $CI_REGISTRY_IMAGE/ci/${BACKEND}:${VERSION}
     docker:
       user: user
   variables:
