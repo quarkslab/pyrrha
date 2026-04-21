@@ -3,11 +3,15 @@ build_image:
   image: docker:29-dind
   tags:
     - dind
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
   parallel:
     matrix:
       - BACKEND: "ida"
         VERSION: [91, 93]
-        LATEST: 93 
+        LATEST: 93
       - BACKEND: "ghidra"
         VERSION: ["12.0.4"]
         LATEST: "12.0.4"
@@ -28,14 +32,61 @@ build_image:
         echo "Waiting for docker daemon... ($i/30)"
         sleep 2
       done
-    - echo "$CI_REGISTRY_PASSWORD" | docker login --username "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY" 
+    - echo "$CI_REGISTRY_PASSWORD" | docker login --username "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
   script:
-    - docker build --pull -t "$DOCKER_IMAGE_NAME:$VERSION" -f ci/pyrrha/Dockerfile --build-arg DISASS_IMAGE=$CI_REGISTRY_IMAGE/ci/${BACKEND} --build-arg DISASS_IMAGE_VERSION=$VERSION .
-    - docker push "$DOCKER_IMAGE_NAME:$VERSION"
+    # Resolve the pyrrha version component from the ref that triggered the pipeline.
+    #   - tag v1.2.3  -> "1.2.3"
+    #   - main branch -> "main"
+    #   - dev branch  -> "dev"
+    - |
+      if [[ -n "$CI_COMMIT_TAG" && "$CI_COMMIT_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        PYRRHA_VERSION="${CI_COMMIT_TAG#v}"
+        REF_KIND="tag"
+      elif [[ "$CI_COMMIT_BRANCH" == "main" ]]; then
+        PYRRHA_VERSION="main"
+        REF_KIND="main"
+      elif [[ "$CI_COMMIT_BRANCH" == "dev" ]]; then
+        PYRRHA_VERSION="dev"
+        REF_KIND="dev"
+      else
+        echo "Unexpected ref (branch=$CI_COMMIT_BRANCH, tag=$CI_COMMIT_TAG) — aborting."
+        exit 1
+      fi
+      echo "Resolved PYRRHA_VERSION=$PYRRHA_VERSION (REF_KIND=$REF_KIND)"
+
+    # Primary image tag: <backend-version>-<pyrrha-version>
+    - PRIMARY_TAG="${VERSION}-${PYRRHA_VERSION}"
+    - echo "Building $DOCKER_IMAGE_NAME:$PRIMARY_TAG"
+    - docker build --pull
+        -t "$DOCKER_IMAGE_NAME:$PRIMARY_TAG"
+        -f ci/pyrrha/Dockerfile
+        --build-arg DISASS_IMAGE=$CI_REGISTRY_IMAGE/ci/${BACKEND}
+        --build-arg DISASS_IMAGE_VERSION=$VERSION
+        .
+    - docker push "$DOCKER_IMAGE_NAME:$PRIMARY_TAG"
+
+    # Additional floating tags, only for the LATEST backend version of this matrix row.
+    #   - main  -> `latest` and `<latest-backend>`
+    #   - dev   -> `latest-dev`
+    #   - tag   -> `stable`
     - |
       if [[ "$VERSION" == "$LATEST" ]]; then
-        docker tag "$DOCKER_IMAGE_NAME:$VERSION" "$DOCKER_IMAGE_NAME:latest"
-        docker push "$DOCKER_IMAGE_NAME:latest"
+        case "$REF_KIND" in
+          main)
+            for t in "latest" "$VERSION"; do
+              docker tag "$DOCKER_IMAGE_NAME:$PRIMARY_TAG" "$DOCKER_IMAGE_NAME:$t"
+              docker push "$DOCKER_IMAGE_NAME:$t"
+            done
+            ;;
+          dev)
+            docker tag "$DOCKER_IMAGE_NAME:$PRIMARY_TAG" "$DOCKER_IMAGE_NAME:latest-dev"
+            docker push "$DOCKER_IMAGE_NAME:latest-dev"
+            ;;
+          tag)
+            docker tag "$DOCKER_IMAGE_NAME:$PRIMARY_TAG" "$DOCKER_IMAGE_NAME:stable"
+            docker push "$DOCKER_IMAGE_NAME:stable"
+            ;;
+        esac
       fi
   after_script:
     - docker logout $CI_REGISTRY
