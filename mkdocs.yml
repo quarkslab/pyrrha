@@ -5,10 +5,14 @@ site_author: "Quarkslab"
 repo_url: "https://github.com/quarkslab/pyrrha"
 repo_name: "quarkslab/pyrrha"
 watch: [ mkdocs.yml, README.md, CHANGELOG.md, src/pyrrha_mapper ]
-copyright: Copyright &copy; 2023-2025 Quarkslab
+copyright: Copyright &copy; 2023-2026 Quarkslab
 
 theme:
-  name: "material"
+  name: "materialx"
+  admonition:
+    code:
+      icon: octicons/file-code-24
+      color: rgba(158, 158, 158, 0.7)
   palette:
     # Palette toggle for light mode
     - media: "(prefers-color-scheme: light)"
@@ -30,6 +34,7 @@ theme:
   features:
     - content.code.annotate
     - content.code.copy
+    - content.tabs.link
     - footer
 
 nav:
@@ -42,7 +47,6 @@ nav:
       - Exe-Decomp: mappers/exe-decomp.md
   - Contributing:
       - Mapper Development: contributing/dev_mapper.md
-  - Disassembler Integration: disassembler.md
   - Changelog: changelog.md
   - License: license.md
 

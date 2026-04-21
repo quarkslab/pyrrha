@@ -33,12 +33,11 @@ path to function.
 
 ## Installation
 
-The installation is done in three parts:
+The installation is done in two parts:
 
-1. Install mapper external dependencies: IDA dissassembler (with the decompilation option for the `exe-decomp` mapper) and [`Quokka` IDA plugin](https://github.com/quarkslab/quokka/releases).
 1. Install `Pyrrha` itself.
 1. Install [`NumbatUI`](https://github.com/quarkslab/NumbatUI) (or [`Sourcetrail`](https://github.com/CoatiSoftware/Sourcetrail)) to be able to visualize Pyrrha's results. 
-
+1. _(Optional)_ Install Ghidra or IDA if you want to use `fs-cg` or `exe-decomp` mappers.
 > [!NOTE]
 > A quick start installation is available on [Pyrrha documentation](https://quarkslab.github.io/pyrrha/#installation).
 
@@ -46,11 +45,11 @@ The installation is done in three parts:
 ## Usage
 
 The usage workflow is composed of two steps which allow you to separate DB creation and result visualization.
+ <!-- # --8<-- [end:usage] -->
 
 1. Run Pyrrha to obtain NumbatUI compatible files (`*.srctrlprj` for the project file and `*.srctrldb` for the DB file). With the python package, you can just launch the command `pyrrha`.
 2. Visualize your results with Sourcetrail/NumbatUI. 
 
- <!-- # --8<-- [end:usage] -->
 > [!NOTE]
 > The detailed documentation of each mapper is available in the [documentation](https://quarkslab.github.io/pyrrha/mappers/mappers/).
 
