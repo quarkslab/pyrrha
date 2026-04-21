@@ -32,8 +32,8 @@
 # The installer is passed via bind-mount (no size limit, never committed to any
 # layer). It must be located next to this script as ida-pro_<VER>.run.
 # The licence file (idapro.hexlic) is NEVER baked into any image layer.
-# Pass it at runtime via a Docker secret:
-#   docker run --mount type=secret,id=ida_license,src=idapro.hexlic <name>:<VER>
+# Pass it at runtime via a Docker bind:
+#   docker run --mount type=bind,dsr=/home/user/.idapro/ida_license.hexlic,src=idapro.hexlic,ro <name>:<VER>
 
 set -euo pipefail
 
