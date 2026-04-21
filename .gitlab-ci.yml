@@ -1,3 +1,9 @@
+stages:
+  - test
+  - build
+  - notify
+
+#======================== BUILD DOCKER IMAGE AND PUSH TO REGISTRY ======================
 build_image:
   stage: build
   image: docker:29-dind
@@ -153,4 +159,44 @@ test_fs-cg:
         VERSION: [91, 93]
       - BACKEND: "ghidra"
         VERSION: ["12.0.4"]
+
+#========================== TRIGGER INTERNAL DOC UPDATE ================================
+.trigger_docs_base:
+  stage: notify
+  trigger:
+    project: firmware-re/cartography/pyrrha-docs-internal
+    branch: main
+    # strategy: depend  # flip on to surface downstream failure on pyrrha
+                        # CI. Off by default — a broken docs build shouldn't
+                        # block pyrrha.
+  variables:
+    UPSTREAM_PIPELINE_URL: $CI_PIPELINE_URL
+
+trigger_docs_main:
+  extends: .trigger_docs_base
+  variables:
+    UPSTREAM_REF: "main"
+    UPSTREAM_SHA: $CI_COMMIT_SHA
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: on_success
+
+trigger_docs_dev:
+  extends: .trigger_docs_base
+  variables:
+    UPSTREAM_REF: "dev"
+    UPSTREAM_SHA: $CI_COMMIT_SHA
+  rules:
+    - if: $CI_COMMIT_BRANCH == "dev"
+      when: on_success
+
+trigger_docs_tag:
+  extends: .trigger_docs_base
+  variables:
+    UPSTREAM_REF: $CI_COMMIT_TAG
+    UPSTREAM_TAG: $CI_COMMIT_TAG
+    UPSTREAM_SHA: $CI_COMMIT_SHA
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+/
+      when: on_success
 
