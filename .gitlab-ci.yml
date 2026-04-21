@@ -164,7 +164,7 @@ test_fs-cg:
 .trigger_docs_base:
   stage: notify
   trigger:
-    project: firmware-re/cartography/pyrrha-docs-internal
+    project: firmware-re/cartography/pyrrha-internal-documentation
     branch: main
     # strategy: depend  # flip on to surface downstream failure on pyrrha
                         # CI. Off by default — a broken docs build shouldn't
