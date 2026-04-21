@@ -33,11 +33,9 @@
 #
 # Run command (licence is mounted at runtime, never stored in the image):
 #   docker run --rm \
-#     --mount type=secret,id=ida_license,src=idapro.hexlic \
+#     --mount type=bind,dsr=/home/user/.idapro/ida_license.hexlic,src=idapro.hexlic,ro \
 #     pyrrha-ida
 #
-# IDA locates the licence via the HEXRAYS_LICENSE env var which is set to the
-# secret path below.
 # ===========================================================================
 
 # ======================== IDA Installation =================================
