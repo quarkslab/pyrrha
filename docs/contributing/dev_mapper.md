@@ -6,7 +6,7 @@ First develop your mapper. We are using `numbat` to manipulate the db used by so
 Then, add the required dependencies into `pyproject.toml`.
 
 ## Integration into the main program
-Once the mapper is ready, it should be integrated into `pyrrha` CLI by adding the corresponding subcommand in the `src/pyrrha_mapper/__main__.py`. The CLI system is handled with [click](https://click.palletsprojects.com)
+Once the mapper is ready, it should be integrated into `pyrrha` CLI by adding the corresponding subcommand in the `src/pyrrha_mapper/__main__.py`. The CLI system is handled with [click](https://click.palletsprojects.com).
 
 The subcommand corresponds to a function implementing the main of your mapper and some decorators to declare the subcommand name, its options and its arguments.
 
@@ -100,7 +100,7 @@ Finally, you should add a page relative to your mapper inside the documentation.
 1. Write your documentation in a markdown file that should be place into the `docs/mappers` folder.
 
     !!! tip
-        We are using `material` theme of the `mkdocs` doc system. It provides a lot of nice features to improve your documentation like this note block. Do not hesitate to take a look at their [documentation](https://squidfunk.github.io/mkdocs-material/reference/)!
+        We are using `materialx` theme of the `mkdocs` doc system. It provides a lot of nice features to improve your documentation like this note block. Do not hesitate to take a look at their [documentation](https://jaywhj.github.io/mkdocs-materialx/)!
 
 2. Add your mapper in mapper lists (in `README.md` and in `docs/mappers/mappers.md`).
 3. Complete the `nav` section in the `mkdocs.yml` file to add your file in the site navigation system.
