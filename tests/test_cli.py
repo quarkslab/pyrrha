@@ -83,13 +83,22 @@ class BaseTestFsMapper(ABC):
     FW_TEST_BIN_PATHS = {
         FW_TEST_LD,
         Path("/lib/libc.so.6"),
-        Path("/lib/libcrypto.so.1.1"),
+        # Path("/lib/libcrypto.so.1.1"),
+        Path("/lib/libcrypto.so.FOR_SONAME_TESTING"),
         Path("/lib/libdl.so.2"),
         Path("/lib/libpthread.so.0"),
         Path("/lib/libssl.so.1.1"),
         Path("/bin/openssl"),
     }
     FW_TEST_SYMLINKS_PATHS = {Path("/lib/libssl.so")}
+
+    FW_TEST_SONAMES = {
+        "ld-linux.so.3" : "ld-linux.so.3",
+        "libcrypto.so.FOR_SONAME_TESTING": "libcrypto.so.1.1",
+        "libdl.so.2": "libdl.so.2",
+        "libpthread.so.0": "libpthread.so.0",
+        "libssl.so.1.1": "libssl.so.1.1"
+    }
 
     # =============================== INTERNAL STUFFS ==================================
 
@@ -259,6 +268,16 @@ class TestFSMapper(BaseTestFsMapper):
             assert isinstance(_bin.get_imported_symbol(name), Symbol), (
                 "Some imported symbols have not been resolved"
             )
+
+    @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
+    @pytest.mark.parametrize(
+        "bin_path", BaseTestFsMapper.FW_TEST_BIN_PATHS, ids=BaseTestFsMapper._path_id
+    )
+    def test_sonames(self, bin_path: Path, export_dump: FileSystem) -> None:
+        """Imported symbols correspond to a symbol object."""
+        _bin = export_dump.get_binary_by_path(bin_path)
+        if _bin.path.name in BaseTestFsMapper.FW_TEST_SONAMES.keys():
+            assert BaseTestFsMapper.FW_TEST_SONAMES[_bin.path.name] == _bin.soname, "Some sonames are not matching"
 
 
 class TestFsCgMapper(BaseTestFsMapper):
