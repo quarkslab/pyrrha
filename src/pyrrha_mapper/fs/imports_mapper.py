@@ -88,6 +88,13 @@ class FileSystemImportsMapper(FileSystemMapper):
 
             bin_obj.image_base = parsing_res.imagebase
             bin_obj.is_relocatable = parsing_res.header.file_type == lief.ELF.Header.FILE_TYPE.REL
+            # Extract the ELF SONAME if present (shared libraries only).
+            # This allows resolving imports that reference the SONAME rather
+            # than the actual filename (e.g. libpthread.so.0 vs libpthread-2.11.1.so).
+            for dyn_entry in parsing_res.dynamic_entries:
+                if dyn_entry.tag == lief.ELF.DynamicEntry.TAG.SONAME:
+                    bin_obj.soname = str(dyn_entry.name)
+                    break
             # parse imported libs
             for lib in parsing_res.libraries:
                 bin_obj.add_imported_library_name(str(lib))
@@ -315,6 +322,16 @@ class FileSystemImportsMapper(FileSystemMapper):
             if dest is None:
                 return self._PartialLibImport(initial_import=sym_obj)
             return self._SolvedLibImport(initial_import=sym_obj, final_import=dest)
+        elif self.fs.soname_exists(lib_name):
+            # The imported name matches the SONAME of a binary whose filename
+            # differs (e.g. libpthread.so.0 is the SONAME of libpthread-2.11.1.so).
+            matching_binaries = self.fs.get_binaries_by_soname(lib_name)
+            lib_obj = self._select_fs_component(
+                strategy, matching_binaries, log_prefix, lib_name
+            )
+            if lib_obj is None:
+                return self._FailedLibImport()
+            return self._SolvedLibImport(initial_import=lib_obj, final_import=lib_obj)
         else:
             return self._FailedLibImport()
 
@@ -335,6 +352,7 @@ class FileSystemImportsMapper(FileSystemMapper):
         targeted Binary object in the case of a Symlink)
         """
         log_prefix = f"[lib imports] {binary.path}"
+
         for lib_name in binary.imported_library_names:
             res = self._resolve_lib_import(lib_name, resolution_strategy, log_prefix)
             match res:
@@ -343,7 +361,14 @@ class FileSystemImportsMapper(FileSystemMapper):
                     # resolution, the final target of the symlink is considered to be
                     # imported and not the symlink itself
                     self.record_import_in_db(binary.id, res.initial_import.id, log_prefix)
-                    binary.add_imported_library(res.final_import)
+                
+                    if lib_name != res.final_import.name:
+                        # SONAME case: store the resolved binary under the
+                        # original import name (the SONAME) rather than the
+                        # binary's filename, to avoid a spurious extra entry.
+                        binary.imported_libraries[lib_name] = res.final_import
+                    else:
+                        binary.add_imported_library(res.final_import)
                 case self._PartialLibImport():
                     self.record_import_in_db(binary.id, res.initial_import.id, log_prefix)
                     logging.warning(

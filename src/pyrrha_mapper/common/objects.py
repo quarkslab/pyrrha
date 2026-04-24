@@ -107,6 +107,7 @@ class Binary(FileSystemComponent):
     calls: dict[str, list[Symbol]] = Field(default_factory=dict)
 
     # ELF-specific fields
+    soname: str | None = Field(default=None)  # ELF DT_SONAME (e.g. "libpthread.so.0")
     version_requirement: dict[str, list[str]] = Field(
         default_factory=dict
     )  # dict(symbol_name, list(requirements))
@@ -419,6 +420,7 @@ class FileSystem(BaseModel):
     symlinks: dict[Path, Symlink] = Field(default_factory=dict)
     _binary_names: dict[str, list[Binary]] = PrivateAttr(default_factory=dict, init=False)
     _symlink_names: dict[str, list[Symlink]] = PrivateAttr(default_factory=dict, init=False)
+    _soname_to_binaries: dict[str, list[Binary]] = PrivateAttr(default_factory=dict, init=False)
 
     def __repr__(self):  # noqa: D105
         return (
@@ -446,6 +448,7 @@ class FileSystem(BaseModel):
                     "id": True,
                     "path": True,
                     "name": True,
+                    "soname": True,
                     "imported_symbols": True,
                     "exported_symbols": True,
                     "exported_functions": True,
@@ -526,7 +529,11 @@ class FileSystem(BaseModel):
                         ) from e
                     if lib_path_obj not in res:
                         raise ValueError(f"Imported lib '{lib_path}' not listed in binaries")
-                    res[bin_path].add_imported_library(res[lib_path_obj])
+                    # Store under the original import name (the dict key) rather
+                    # than the binary's filename so SONAME keys survive
+                    # serialization round-trips (e.g. "libc.so.6" stays as-is
+                    # instead of being replaced by "libc-2.11.1.so").
+                    res[bin_path].imported_libraries[name] = res[lib_path_obj]
 
         # Deduplicate: replace repeated Symbol instances with the same id by one object.
         symbols_by_ids: dict[int, Symbol] = {
@@ -674,6 +681,15 @@ class FileSystem(BaseModel):
             names_dict[fs_object.name].append(fs_object)  # type: ignore
         else:
             names_dict[fs_object.name] = [fs_object]  # type: ignore
+        # Index binaries by their ELF SONAME so that imports referencing the
+        # SONAME (e.g. "libpthread.so.0") can be resolved even when no symlink
+        # with that name exists in the firmware filesystem.
+        if isinstance(fs_object, Binary) and fs_object.soname:
+            soname = fs_object.soname
+            if soname in self._soname_to_binaries:
+                self._soname_to_binaries[soname].append(fs_object)
+            else:
+                self._soname_to_binaries[soname] = [fs_object]
 
     def _set_object_realpath(self, obj: FileSystemComponent) -> None:
         obj.real_path = Path(self.root_dir) / ("." + str(obj.path))
@@ -711,6 +727,14 @@ class FileSystem(BaseModel):
     def symlink_name_exists(self, name: str) -> bool:
         """return: true if the given name is stored in the current FS instance."""
         return name in self._symlink_names
+
+    def soname_exists(self, soname: str) -> bool:
+        """return: true if the given SONAME is stored in the current FS instance."""
+        return soname in self._soname_to_binaries
+
+    def get_binaries_by_soname(self, soname: str) -> list[Binary]:
+        """:return: the binaries with the given SONAME."""
+        return self._soname_to_binaries[soname]
 
     def get_binaries_by_name(self, name: str) -> list[Binary]:
         """:return: the binaries with the given path."""
