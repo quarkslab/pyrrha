@@ -5,8 +5,7 @@
 This mapper is not a firmware mapper but an executable mapper. It will map its call graph and its decompiled code with cross-references within the source code. In order
 the mapper will:
 
-* Export the executable (Quokka) to extract its call graph
-* Decompile all functions (with Hex-Rays) to dump the whole decompiled code
+* Decompile all functions (with Hex-Rays or Ghidra) to dump the whole decompiled code
 * Index all functions with the associated decompilation
 * Apply cross-references between functions
 
