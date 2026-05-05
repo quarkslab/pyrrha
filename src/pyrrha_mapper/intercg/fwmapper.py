@@ -35,7 +35,7 @@ from pyrrha_mapper.common import (
 )
 from pyrrha_mapper.exceptions import FsMapperError
 from pyrrha_mapper.fs import FileSystemImportsMapper
-from pyrrha_mapper.intercg.loader import BinaryParser, GhidraParser, IDAParser
+from pyrrha_mapper.intercg.loader import BinaryParser, GhidraBinaryParser, IDABinaryParser
 from pyrrha_mapper.types import Backend, ResolveDuplicateOption
 
 IGNORE_LIST: frozenset[str] = frozenset(
@@ -174,10 +174,10 @@ class InterImageCGMapper(FileSystemImportsMapper):
         """
         try:
             if backend == Backend.IDA:
-                ida_parser: BinaryParser = IDAParser(root_directory, file_path)
+                ida_parser: BinaryParser = IDABinaryParser(root_directory, file_path)
                 return ida_parser.binary, ida_parser.call_graph
             elif backend == Backend.GHIDRA:
-                ghidra_parser = GhidraParser(root_directory, file_path)
+                ghidra_parser = GhidraBinaryParser(root_directory, file_path)
                 return ghidra_parser.binary, ghidra_parser.call_graph
             else:
                 return f" disassembler {backend} is not supported"
@@ -199,8 +199,6 @@ class InterImageCGMapper(FileSystemImportsMapper):
             self.unresolved_callgraph[bin_object.path] = additional_res
         if bin_object.id is not None:
             self.node_ids[bin_object.id] = bin_object
-            if additional_res is not None:
-                self._record_custom_command(bin_object, f"[bin mapping] {bin_object.name}")
 
     def _treat_bin_parsing_result(self, path: Path, res: Any):
         """Handle load_binary res, map it or display error."""
@@ -327,7 +325,6 @@ class InterImageCGMapper(FileSystemImportsMapper):
                 self.record_binary_in_db(binary, log_prefix)
                 if binary.id is not None:
                     self.node_ids[binary.id] = binary
-                    self._record_custom_command(binary, log_prefix)
 
                 progress.update(binaries_map, advance=1)
         else:
@@ -360,7 +357,7 @@ class InterImageCGMapper(FileSystemImportsMapper):
             self.dry_run_mode = False
 
         self.progress = progress
-        self.exports_to_bins = self.make_export_to_binaries_map()
+        self.exports_to_bins = self._make_export_to_binaries_map()
 
         # Iterate again all binaries to create call edges (all numbat_id are created)
         cg_map = progress.add_task(
@@ -375,8 +372,9 @@ class InterImageCGMapper(FileSystemImportsMapper):
                 for f_symb, targets in self.unresolved_callgraph[binary.path].items():
                     if not binary.function_exists(f_symb.name):
                         if targets:
+                            addr_log = {hex(f_symb.addr) if f_symb.addr is not None else None}
                             logging.error(
-                                f"function {f_symb.name} ({hex(f_symb.addr) if f_symb.addr is not None else None}) not in binary: {binary.name}"
+                                f"function {f_symb.name} ({addr_log}) not in binary: {binary.name}"
                             )
                         continue
 
@@ -416,20 +414,6 @@ class InterImageCGMapper(FileSystemImportsMapper):
 
         # return the filesystem object
         return self.fs
-
-    def _record_custom_command(self, binary: Binary, log_prefix: str = "") -> None:
-        """Add a custom command to call numbat-ui on the underlying Sourcetrail.
-
-        :param binary: binary on which to apply the custom command
-        """
-        if self.dry_run_mode:
-            return None
-        assert self.db_interface is not None
-        cmd = [NUMBAT_UI_BIN, str(binary.real_path) + ".srctrlprj"]
-        if binary.id is None:
-            logging.warning(f"{log_prefix}: cannot record command as binary has no id")
-        else:
-            self.db_interface.set_custom_command(binary.id, cmd, f"Open in {NUMBAT_UI_BIN}")
 
     def _record_call_ref(self, src: Symbol, dst: Symbol, log_prefix: str = "") -> bool:
         """Add call reference between two symbols in DB.
@@ -471,7 +455,7 @@ class InterImageCGMapper(FileSystemImportsMapper):
             return None
         self.db_interface.record_ref_call(src.id, tgt_id)
 
-    def make_export_to_binaries_map(self) -> dict[str, list[Binary]]:
+    def _make_export_to_binaries_map(self) -> dict[str, list[Binary]]:
         """Compute dict mapping: exported-funs -> binaries (exporting the function).
 
         Indeed multiple binaries can export the same symbol !
