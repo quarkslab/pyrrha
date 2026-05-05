@@ -96,7 +96,7 @@ def backend_option(f):
         "-b",
         "--backend",
         required=False,
-        type=click.Choice(Backend, case_sensitive=False),
+        type=click.Choice([Backend.IDA, Backend.GHIDRA], case_sensitive=False),
         default=Backend.IDA,
         show_default=True,
         help="Backend to use.",
