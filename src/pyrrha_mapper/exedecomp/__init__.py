@@ -15,6 +15,6 @@
 #  limitations under the License.
 """Module for the decomp mapper."""
 
-from .binmapper import map_binary
+from .decomp_mapper import GhidraDecompilMapper, IdaDecompilMapper
 
-__all__ = ["map_binary"]
+__all__ = ["GhidraDecompilMapper", "IdaDecompilMapper"]
