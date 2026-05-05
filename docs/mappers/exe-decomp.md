@@ -1,4 +1,4 @@
-# `exe-decomp`: Executable Decompilation mapper
+# `decomp`: Executable Decompilation mapper
 
 ## Introduction
 
@@ -13,16 +13,16 @@ the mapper will:
 ## Usage
 
 ```commandline
-Usage: pyrrha exe-decomp [OPTIONS] EXECUTABLE
+Usage: pyrrha decomp [OPTIONS] EXECUTABLE
 
-  Map a single executable call graph into a numbatui-compatible database.It also index the decompiled code
-  along with all call cross-references.
+  Map a single executable call graph into a NumbatUI-compatible database. Also indexes the decompiled code along with
+  all call cross-references.
 
 Options:
-  -d, --debug                  Set log level to DEBUG
-  --db PATH                    NumbatUI DB file path (.srctrldb).  [default: pyrrha.srctrldb]
-  --disassembler DISASSEMBLER  Disassembler to use for disassembly.  [default: Disassembler.AUTO]
-  -h, --help                   Show this message and exit.
+  -d, --debug                 Set log level to DEBUG.
+  --db PATH                   NumbatUI DB file path (.srctrldb).  [default: decomp.srctrldb]
+  -b, --backend [ida|ghidra]  Backend to use.  [default: Backend.IDA]
+  -h, --help                  Show this message and exit.                  Show this message and exit.
 ```
 
 !!! note 
