@@ -24,7 +24,7 @@ import click
 import coloredlogs  # type: ignore # no typing used in this library
 from numbat import SourcetrailDB
 
-from pyrrha_mapper import exedecomp, fs, intercg
+from pyrrha_mapper import fs, intercg, exedecomp
 from pyrrha_mapper.common import FileSystem
 from pyrrha_mapper.types import Backend, ResolveDuplicateOption
 
@@ -301,7 +301,7 @@ def fs_call_graph_mapper(
 
 
 @pyrrha.command(
-    "exe-decomp",
+    "decomp",
     cls=MapperCommand,
     short_help="Map an executable call graph with its decompiled code.",
     help=(
@@ -321,18 +321,22 @@ def fs_exe_decompiled_mapper(
     executable: Path,
 ):
     """Map a single executable with decompiled code."""
-    if db.name == "exe-decomp.srctrldb":
+    if db.name == "decomp.srctrldb":
         db = Path(str(executable) + ".srctrldb")
 
     setup_logs(debug, db)
     db_instance = setup_db(db)
 
-    if backend not in (Backend.IDA,):
-        click.echo(f"Backend {backend.name} not yet supported")
-        return 1
+    match backend:
+        case Backend.IDA:
+            mapper = exedecomp.IdaDecompilMapper(db_instance, executable)
+        case Backend.GHIDRA:
+            mapper = exedecomp.GhidraDecompilMapper(db_instance, executable)
+        case _:
+            click.echo(f"Backend {backend.name} not yet supported")
+            return 1
 
-    # todo: add backend changes
-    if exedecomp.map_binary(db_instance, executable):
+    if mapper.map():
         logging.info("success.")
     else:
         logging.error("failure.")
