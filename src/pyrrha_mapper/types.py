@@ -15,7 +15,7 @@
 #  limitations under the License.
 """Types shared in multiple mappers."""
 
-from enum import Enum, auto
+from enum import Enum, StrEnum, auto
 
 
 class Backend(Enum):
@@ -34,3 +34,12 @@ class ResolveDuplicateOption(Enum):
     IGNORE = 1  # doc: The mapper will let the conflict as unresolved.
     ARBITRARY = 2  # doc: The mapper will choose a default one.
     INTERACTIVE = 3  # doc: The user can interactively solve the conflict.
+
+
+class FuncType(StrEnum):
+    """Represent the type of a function."""
+
+    IMPORTED = "imported"
+    LIBRARY = "library"
+    NORMAL = "normal"
+    THUNK = "thunk"
