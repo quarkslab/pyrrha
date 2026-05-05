@@ -21,9 +21,6 @@ import logging
 from collections.abc import Iterator
 from pathlib import Path
 
-from ida_domain.database import Database, IdaCommandOptions
-from ida_domain.functions import FunctionFlags
-
 from pyrrha_mapper.backend import Backend
 from pyrrha_mapper.types import FuncType
 
@@ -38,6 +35,7 @@ class IDA(Backend):
         decompilation: bool = False,
         image_base: int = 0,
     ) -> None:
+        from ida_domain.database import Database, IdaCommandOptions
         self.decompilation_activated = decompilation
         self.image_base = image_base
         self._bin_path = bin_path
@@ -66,6 +64,7 @@ class IDA(Backend):
     @property
     def func_addrs(self) -> Iterator[int]:
         """Yield the parser-space entry-point address of every known function."""
+        from ida_domain.functions import FunctionFlags
         for func in self._ida_db.functions.get_all():
             if FunctionFlags.TAIL in self._ida_db.functions.get_flags(func):
                 continue
@@ -111,6 +110,7 @@ class IDA(Backend):
         :param addr: function entry-point address.
         :return: list of callee entry-point addresses.
         """
+        from ida_domain.functions import FunctionFlags
         func = self._get_ida_func(addr)
         result: list[int] = []
         for callee in self._ida_db.functions.get_callees(func) if func is not None else []:
@@ -142,6 +142,7 @@ class IDA(Backend):
         5. ``FUNC_LIB`` → ``LIBRARY``.
         6. Default → ``NORMAL``.
         """
+        from ida_domain.functions import FunctionFlags
         func = self._get_ida_func(addr)
         if func is None:
             return FuncType.NORMAL
@@ -205,6 +206,7 @@ class IDA(Backend):
 
         :return: iterator of ``func_t`` objects with ``FUNC_TAIL`` excluded.
         """
+        from ida_domain.functions import FunctionFlags
         for func in self._ida_db.functions.get_all():
             if FunctionFlags.TAIL in self._ida_db.functions.get_flags(func):
                 continue
