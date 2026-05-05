@@ -44,7 +44,7 @@ nav:
       - mappers/mappers.md
       - Filesystem (Overview): mappers/fs.md
       - Filesystem (CallGraph): mappers/fs-cg.md
-      - Exe-Decomp: mappers/exe-decomp.md
+      - Decompilation Graph: mappers/exe-decomp.md
   - Contributing:
       - Mapper Development: contributing/dev_mapper.md
   - Changelog: changelog.md

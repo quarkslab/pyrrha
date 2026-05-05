@@ -37,7 +37,7 @@ The installation is done in two parts:
 
 1. Install `Pyrrha` itself.
 1. Install [`NumbatUI`](https://github.com/quarkslab/NumbatUI) (or [`Sourcetrail`](https://github.com/CoatiSoftware/Sourcetrail)) to be able to visualize Pyrrha's results. 
-1. _(Optional)_ Install Ghidra or IDA if you want to use `fs-cg` or `exe-decomp` mappers.
+1. _(Optional)_ Install Ghidra or IDA if you want to use `fs-cg` or `decomp` mappers.
 > [!NOTE]
 > A quick start installation is available on [Pyrrha documentation](https://quarkslab.github.io/pyrrha/#installation).
 
