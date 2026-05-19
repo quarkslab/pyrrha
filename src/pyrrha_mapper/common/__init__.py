@@ -15,14 +15,11 @@
 #  limitations under the License.
 """Common objects and functions that can be used for any mapper."""
 
-from .filesystem_mapper import FileSystemMapper, hide_progress
 from .objects import Binary, FileSystem, Symbol, Symlink
 
 __all__ = [
-    "FileSystemMapper",
     "Binary",
     "FileSystem",
-    "hide_progress",
     "Symbol",
     "Symlink",
 ]
