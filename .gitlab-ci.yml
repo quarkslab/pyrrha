@@ -127,7 +127,7 @@ test_data_structures:
     - coverage report
   image: python:latest
   variables:
-    TEST_COVERAGE_SOURCE: pyrrha_mapper.common.objects
+    TEST_COVERAGE_SOURCE: pyrrha_mapper.mappers.objects
     TEST_PATH: tests/test_filesystem_objects.py
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:
@@ -149,7 +149,7 @@ test_fs:
   variables:
     DB: fs
     MAPPER: fs
-    TEST_COVERAGE_SOURCE: pyrrha_mapper.common.filesystem_mapper,pyrrha_mapper.fs
+    TEST_COVERAGE_SOURCE: pyrrha_mapper.mappers.imports_mapper
     TEST_PATH: tests/test_cli.py::TestFSMapper
     PYTEST_ARTIFACTS_DIR: test_artifacts
     
@@ -165,7 +165,7 @@ test_fs-cg:
     DB: ${BACKEND}_${VERSION}
     MAPPER: fs-cg
     MAPPER_OPTIONS: '--backend ${BACKEND}'
-    TEST_COVERAGE_SOURCE: pyrrha_mapper.common.filesystem_mapper,pyrrha_mapper.intercg
+    TEST_COVERAGE_SOURCE: pyrrha_mapper.mappers.intercg_bin_loader,pyrrha_mapper.mappers.intercg_mapper
     TEST_PATH: tests/test_cli.py::TestFsCgMapper
     TEST_SUP_OPTIONS: ${MAPPER_OPTIONS}
     HEXRAYS_LICENSE: "${IDA_LICENSE}"
