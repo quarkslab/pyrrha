@@ -22,8 +22,8 @@ from typing import NamedTuple, Self
 
 import pytest
 
-from pyrrha_mapper.common import Binary, FileSystem, Symbol, Symlink
-from pyrrha_mapper.common.objects import TargetType
+from pyrrha_mapper import Binary, FileSystem, Symbol, Symlink
+from pyrrha_mapper.mappers.objects import TargetType
 
 
 class SerializedFS(NamedTuple):
