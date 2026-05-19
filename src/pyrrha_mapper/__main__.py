@@ -24,8 +24,13 @@ import click
 import coloredlogs  # type: ignore # no typing used in this library
 from numbat import SourcetrailDB
 
-from pyrrha_mapper import fs, intercg, exedecomp
-from pyrrha_mapper.common import FileSystem
+from pyrrha_mapper.mappers import (
+    FileSystem,
+    FileSystemImportsMapper,
+    GhidraDecompilMapper,
+    IdaDecompilMapper,
+    InterImageCGMapper,
+)
 from pyrrha_mapper.types import Backend, ResolveDuplicateOption
 
 # -------------------------------------------------------------------------------
@@ -244,7 +249,7 @@ def fs_mapper(
     db_instance = setup_db(db)
     root_directory = root_directory.absolute()
 
-    filesystem = fs.FileSystemImportsMapper(root_directory, db_instance).map(
+    filesystem = FileSystemImportsMapper(root_directory, db_instance).map(
         jobs, resolve_duplicates
     )
 
@@ -290,7 +295,7 @@ def fs_call_graph_mapper(
     root_directory = root_directory.absolute()
 
     try:
-        intercg_mapper = intercg.InterImageCGMapper(root_directory, db_instance, backend)
+        intercg_mapper = InterImageCGMapper(root_directory, db_instance, backend)
         fs_object: FileSystem = intercg_mapper.map(jobs, resolve_duplicates)
         fs_object.write(db_instance.path.with_suffix(intercg_mapper.FS_EXT))
     except RuntimeError:
@@ -329,9 +334,9 @@ def fs_exe_decompiled_mapper(
 
     match backend:
         case Backend.IDA:
-            mapper = exedecomp.IdaDecompilMapper(db_instance, executable)
+            mapper = IdaDecompilMapper(db_instance, executable)
         case Backend.GHIDRA:
-            mapper = exedecomp.GhidraDecompilMapper(db_instance, executable)
+            mapper = GhidraDecompilMapper(db_instance, executable)
         case _:
             click.echo(f"Backend {backend.name} not yet supported")
             return 1

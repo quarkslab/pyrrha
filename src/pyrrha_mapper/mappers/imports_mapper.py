@@ -37,8 +37,8 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 
-from pyrrha_mapper.common import Binary, FileSystem, Symbol, Symlink
 from pyrrha_mapper.exceptions import PyrrhaError
+from pyrrha_mapper.mappers import Binary, FileSystem, Symbol, Symlink
 from pyrrha_mapper.types import ResolveDuplicateOption
 
 lief.logging.disable()

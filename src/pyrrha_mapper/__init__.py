@@ -16,8 +16,8 @@
 
 """Pyrrha is a mapper collection for firmware analysis."""
 
-from pyrrha_mapper.common import Binary, FileSystem, FileSystemMapper, Symbol, Symlink
+from pyrrha_mapper.mappers import Binary, FileSystem, Symbol, Symlink
 
 __version__ = "1.0.1"
 
-__all__ = ["Binary", "FileSystem", "FileSystemMapper", "Symbol", "Symlink"]
+__all__ = ["Binary", "FileSystem", "Symbol", "Symlink"]
