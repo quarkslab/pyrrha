@@ -38,8 +38,9 @@ from rich.progress import (
 )
 
 from pyrrha_mapper.exceptions import PyrrhaError
-from pyrrha_mapper.mappers import Binary, FileSystem, Symbol, Symlink
 from pyrrha_mapper.types import ResolveDuplicateOption
+
+from .objects import Binary, FileSystem, Symbol, Symlink
 
 lief.logging.disable()
 

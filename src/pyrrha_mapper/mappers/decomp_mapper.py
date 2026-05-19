@@ -31,8 +31,9 @@ from rich.progress import (
 )
 
 from pyrrha_mapper.backend import IDA, Backend, Ghidra
-from pyrrha_mapper.mappers import Binary, Symbol
 from pyrrha_mapper.types import FuncType
+
+from .objects import Binary, Symbol
 
 
 class Location(NamedTuple):

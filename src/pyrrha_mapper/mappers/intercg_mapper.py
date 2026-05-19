@@ -26,22 +26,23 @@ from numbat import SourcetrailDB
 from rich.progress import Progress
 
 from pyrrha_mapper.exceptions import FsMapperError
-
-# local imports
-from pyrrha_mapper.mappers import (
-    Binary,
-    FileSystem,
-    FileSystemImportsMapper,
-    Symbol,
-    Symlink,
-    hide_progress,
-)
 from pyrrha_mapper.mappers.intercg_bin_loader import (
     BinaryParser,
     GhidraBinaryParser,
     IDABinaryParser,
 )
 from pyrrha_mapper.types import Backend, ResolveDuplicateOption
+
+from .imports_mapper import (
+    FileSystemImportsMapper,
+    hide_progress,
+)
+from .objects import (
+    Binary,
+    FileSystem,
+    Symbol,
+    Symlink,
+)
 
 IGNORE_LIST: frozenset[str] = frozenset(
     [
