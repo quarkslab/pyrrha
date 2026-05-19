@@ -22,8 +22,10 @@ from typing import NamedTuple
 
 from pyrrha_mapper.backend import IDA, Backend, Ghidra
 from pyrrha_mapper.exceptions import FsMapperError
-from pyrrha_mapper.mappers import Binary, FileSystemImportsMapper, Symbol
 from pyrrha_mapper.types import FuncType
+
+from .imports_mapper import FileSystemImportsMapper
+from .objects import Binary, Symbol
 
 
 class FuncData(NamedTuple):
