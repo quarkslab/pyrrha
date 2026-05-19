@@ -26,7 +26,6 @@ from multiprocessing import Queue, get_context
 from pathlib import Path
 from typing import Any, overload
 
-import lief
 from numbat import SourcetrailDB
 from numbat.exceptions import DBException
 from rich.progress import (
@@ -41,8 +40,6 @@ from pyrrha_mapper.exceptions import PyrrhaError
 from pyrrha_mapper.types import ResolveDuplicateOption
 
 from .objects import Binary, FileSystem, Symbol, Symlink
-
-lief.logging.disable()
 
 
 @contextmanager
@@ -63,7 +60,6 @@ def hide_progress(progress: Progress):
         progress.start()
 
 
-
 class FileSystemImportsMapper:
     """Filesystem mapper based on Lief, which computes imports and exports.
 
@@ -81,6 +77,10 @@ class FileSystemImportsMapper:
     """
 
     def __init__(self, root_directory: Path | str, db: SourcetrailDB | None):
+        import lief
+
+        lief.logging.disable()
+
         self.root_directory = Path(root_directory).resolve().absolute()
         self.db_interface = db
         self.fs = FileSystem(root_dir=self.root_directory)
@@ -101,8 +101,12 @@ class FileSystemImportsMapper:
         :param p: the path of the file to analyzed
         :return: True is the path point on a file
         """
+        import lief
+
+        lief.logging.disable()
+
         return p.is_file() and not p.is_symlink() and (lief.is_elf(str(p)) or lief.is_pe(str(p)))
-    
+
     @property
     def dry_run_mode(self) -> bool:
         """Returns whether a Sourcetrail DB as been provided or not.
@@ -250,7 +254,6 @@ class FileSystemImportsMapper:
         else:
             self.record_import_in_db(sym.id, sym.target.id)
         return sym
-    
 
     # =============================== Utils ===============================
 
@@ -353,6 +356,9 @@ class FileSystemImportsMapper:
         raise: FsMapperError if cannot load it
         :return: bin object and additionnal info if needed or a string in case of error
         """
+        import lief
+
+        lief.logging.disable()
         base = Path(root_directory.anchor)
         rel_path = base.joinpath(file_path.relative_to(root_directory))
 
@@ -500,7 +506,7 @@ class FileSystemImportsMapper:
         if not self.dry_run_mode:
             self.record_binary_in_db(bin_object, f"[binary mapping] {bin_object.name}")
 
-    #=============================== Symlinks ==================================
+    # =============================== Symlinks ==================================
 
     def map_symlink(self, path: Path) -> None:
         """Given a symlink, resolve it and create the associated objects if needed.
