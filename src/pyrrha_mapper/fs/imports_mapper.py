@@ -19,27 +19,71 @@ import logging
 import queue
 from abc import ABC
 from collections.abc import Callable
+from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial
 from multiprocessing import Queue, get_context
 from pathlib import Path
-from typing import Any
+from typing import Any, overload
 
 import lief
 from numbat import SourcetrailDB
-from rich.progress import Progress
+from numbat.exceptions import DBException
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    TextColumn,
+    TimeElapsedColumn,
+)
 
-from pyrrha_mapper.common import Binary, FileSystem, FileSystemMapper, Symbol, Symlink
+from pyrrha_mapper.common import Binary, FileSystem, Symbol, Symlink
+from pyrrha_mapper.exceptions import PyrrhaError
 from pyrrha_mapper.types import ResolveDuplicateOption
 
 lief.logging.disable()
 
 
-class FileSystemImportsMapper(FileSystemMapper):
-    """Filesystem mapper based on Lief, which computes imports and exports."""
+@contextmanager
+def hide_progress(progress: Progress):
+    """Context Manager which temporally hide a `rich` progress bar.
+
+    Code from https://github.com/Textualize/rich/issues/1535#issuecomment-1745297594
+    """
+    transient = progress.live.transient  # save the old value
+    progress.live.transient = True
+    progress.stop()
+    progress.live.transient = transient  # restore the old value
+    try:
+        yield
+    finally:
+        # make space for the progress to use so it doesn't overwrite any previous lines
+        print("\n" * (len(progress.tasks) - 2))
+        progress.start()
+
+
+
+class FileSystemImportsMapper:
+    """Filesystem mapper based on Lief, which computes imports and exports.
+
+    It maps a filesystem in the following order:
+    - binaries
+    - symlinks
+    - lib imports
+    - symbol_imports.
+    To change the behavior of these mapping you can reimplement the
+    map_* corresponding method.
+
+    Init params
+    :param root_directory: directory containing the filesystem to map
+    :param db: interface to the DB
+    """
 
     def __init__(self, root_directory: Path | str, db: SourcetrailDB | None):
-        super(FileSystemImportsMapper, self).__init__(root_directory, db)
+        self.root_directory = Path(root_directory).resolve().absolute()
+        self.db_interface = db
+        self.fs = FileSystem(root_dir=self.root_directory)
+        self._dry_run = not bool(db)
 
         if not self.dry_run_mode and self.db_interface is not None:
             # Setup graph customisation in NumbatUI
@@ -57,6 +101,242 @@ class FileSystemImportsMapper(FileSystemMapper):
         :return: True is the path point on a file
         """
         return p.is_file() and not p.is_symlink() and (lief.is_elf(str(p)) or lief.is_pe(str(p)))
+    
+    @property
+    def dry_run_mode(self) -> bool:
+        """Returns whether a Sourcetrail DB as been provided or not.
+
+        If not, only produce the FileSystem object that can also
+        be used independently.
+        """
+        return self._dry_run
+
+    @dry_run_mode.setter
+    def dry_run_mode(self, value: bool) -> None:
+        """If True does not record in db."""
+        self._dry_run = value
+
+    # ===================== Records in DB (NumbatUI DB) ===============================
+
+    def record_import_in_db(
+        self, source_id: int | None, dest_id: int | None, log_prefix: str = ""
+    ) -> None:
+        """Record in DB the import of dest by source."""
+        if self.dry_run_mode:
+            return None
+        assert self.db_interface is not None
+        if source_id is None or dest_id is None:
+            logging.error(f"{log_prefix}: Cannot record import, src and/or dest are unknown")
+        else:
+            self.db_interface.record_ref_import(source_id, dest_id)
+
+    def record_binary_in_db(self, binary: Binary, log_prefix: str = "") -> Binary:
+        """Record the binary inside the DB as well as its internal symbols.
+
+        Update 'bin_obj.id' with the id of the created object in DB and does the same
+        thing for its symbol. It will record symbols using their demangled names.
+
+        :warning: do not record calls as well as any links between several binaries
+
+        :param binary: the Binary object to map
+        :return: the updated object
+        """
+        # If dry run do not store the binary in DB
+        if self.dry_run_mode:
+            return binary
+
+        assert self.db_interface is not None
+        binary.id = self.db_interface.record_class(
+            binary.name, prefix=f"{binary.path.parent}/", delimiter=":"
+        )
+        if binary.id is None:
+            logging.error(f"{log_prefix}: Record of binary failed.")
+            return binary
+
+        recorded_symb: dict[str, int] = dict()
+        for symbol in set(binary.iter_exported_symbols()):
+            if symbol.demangled_name in recorded_symb:
+                logging.debug(
+                    f"{log_prefix}: demangled name {symbol.demangled_name} already in db "
+                    "common node for these symbols"
+                )
+                symbol.id = recorded_symb[symbol.demangled_name]
+                # Also propagate the id to any other symbol registered under
+                # the same mangled name (e.g. secondary demangled-key entries).
+                for other in binary.exported_functions.values():
+                    if other.name == symbol.name and other.id is None:
+                        other.id = symbol.id
+                continue
+            if symbol.is_func:
+                symbol.id = self.db_interface.record_method(
+                    symbol.demangled_name,
+                    parent_id=binary.id,
+                    prefix=hex(symbol.addr) if symbol.addr is not None else "None",
+                )
+                if symbol.id is not None:
+                    self.db_interface.change_node_color(
+                        symbol.id, fill_color="#bee0af", border_color="#395f33"
+                    )
+            else:
+                symbol.id = self.db_interface.record_field(
+                    symbol.demangled_name,
+                    parent_id=binary.id,
+                    prefix=hex(symbol.addr) if symbol.addr is not None else "None",
+                )
+
+            if symbol.id is None:
+                logging.error(f"{log_prefix}: Record of symbol '{symbol.demangled_name}' failed.")
+            else:
+                try:
+                    self.db_interface.record_public_access(symbol.id)
+                    recorded_symb[symbol.demangled_name] = symbol.id
+                    # Propagate id to all symbols sharing the same mangled name
+                    # (covers secondary demangled-key registrations).
+                    for other in binary.exported_functions.values():
+                        if other.name == symbol.name and other.id is None:
+                            other.id = symbol.id
+                except DBException as e:
+                    raise PyrrhaError(
+                        f"{log_prefix}: Cannot register access to symbol {symbol.demangled_name}: "
+                        f"{e}"
+                    ) from e
+
+        for symbol in set(binary.iter_not_exported_functions()):
+            # Skip if this demangled name was already recorded as an exported
+            # symbol — same demangled name means same DB node, and calling
+            # record_private_access on it would violate the UNIQUE constraint.
+            if symbol.demangled_name in recorded_symb:
+                logging.debug(
+                    f"{log_prefix}: demangled name {symbol.demangled_name} already recorded "
+                    "as exported, skipping internal registration"
+                )
+                symbol.id = recorded_symb[symbol.demangled_name]
+                continue
+            symbol.id = self.db_interface.record_method(
+                symbol.demangled_name,
+                parent_id=binary.id,
+                prefix=hex(symbol.addr) if symbol.addr is not None else "None",
+            )
+            if symbol.id is None:
+                logging.error(f"{log_prefix}: Record of symbol '{symbol.demangled_name}' failed.")
+            else:
+                try:
+                    self.db_interface.record_private_access(symbol.id)
+                    recorded_symb[symbol.demangled_name] = symbol.id
+                except DBException as e:
+                    raise PyrrhaError(
+                        f"{log_prefix}: Cannot register access to symbol"
+                        f" {symbol.demangled_name}: {e}"
+                    ) from e
+
+        return binary
+
+    def record_symlink_in_db(self, sym: Symlink, log_prefix: str = "") -> Symlink:
+        """Record into DB the symlink and its link to its target.
+
+        Update 'sym.id' with the id of the created object.
+        :param sym: symlink object
+        :return: the updated object
+        """
+        if self.dry_run_mode:
+            return sym
+        assert self.db_interface is not None
+        sym.id = self.db_interface.record_typedef_node(
+            sym.name, prefix=f"{sym.path.parent}/", delimiter=":"
+        )
+        if sym.id is None:
+            logging.error(f"{log_prefix}: Record of symlink failed.")
+        else:
+            self.record_import_in_db(sym.id, sym.target.id)
+        return sym
+    
+
+    # =============================== Utils ===============================
+
+    @overload
+    @staticmethod
+    def _select_fs_component(
+        strategy: ResolveDuplicateOption,
+        matching_objects: list[Binary],
+        log_prefix: str,
+        target_name: str,
+        cache: set[Binary] | None = None,
+    ) -> Binary | None: ...
+
+    @overload
+    @staticmethod
+    def _select_fs_component(
+        strategy: ResolveDuplicateOption,
+        matching_objects: list[Symlink],
+        log_prefix: str,
+        target_name: str,
+        cache: set[Symlink] | None = None,
+    ) -> Symlink | None: ...
+
+    @staticmethod
+    def _select_fs_component(
+        strategy: ResolveDuplicateOption,
+        matching_objects: list[Binary] | list[Symlink],
+        log_prefix: str,
+        target_name: str,
+        cache: set[Binary] | set[Symlink] | None = None,
+    ) -> Binary | Symlink | None:
+        """Choice of one element of a given list according to the strategy.
+
+        Given a list of objects which match a target, select one or None among
+        the given list according the strategy given It also logs the choice made
+        (debug level). If requireds by the strategy, an interaction with the user could
+        be made.
+        :param strategy: the resolution strategy
+        :param matching_objects: a list of FileSystemComponents (NOT empty, not
+           check by the function)
+        :param log_prefix: Prefix used at the beginning of each log
+        :param target_name: Target name, used in logs (and user interaction)
+        :param resolve_cache: cache of previously selected choices for this target
+        :return: the selected FileSystemComponent | None if resolution strategy
+           is IGNORE
+        """
+        if len(matching_objects) > 1 and strategy is ResolveDuplicateOption.IGNORE:
+            logging.debug(
+                f"{log_prefix}: several matches for {target_name} but strategy is "
+                f"{ResolveDuplicateOption.IGNORE.name} so nothing selected"
+            )
+            return None
+        selected_index = None
+        selected_bin = None
+        if len(matching_objects) > 1 and strategy is ResolveDuplicateOption.INTERACTIVE:
+            for cache_entry in cache or {}:
+                if cache_entry in matching_objects:  # reuse already selected entry
+                    logging.debug(
+                        f"{log_prefix}: manually selected entry to disambiguate {target_name}"
+                    )
+                    selected_bin = cache_entry
+
+            while (
+                selected_bin is None
+                or selected_index is None
+                or selected_index < 0
+                or selected_index >= len(matching_objects)
+            ):
+                print(f"{log_prefix}: several matches for {target_name}, select one\n")
+                for i in range(len(matching_objects)):
+                    print(f"{i}: {matching_objects[i].path}")
+                try:
+                    selected_index = int(input())
+                except ValueError:
+                    print("Enter a valid number")
+        else:  # "arbitrary" option
+            selected_index = 0
+        if selected_bin is None:
+            selected_bin = matching_objects[selected_index]
+        return selected_bin
+
+    def commit(self) -> None:
+        """Commit changes in database."""
+        if not self.dry_run_mode and self.db_interface is not None:
+            self.db_interface.commit()
+
+    # ===================  Binary parsing ==============================
 
     def load_binary_args(self) -> dict[str, Any]:
         """Return dict of args for load_binary that are always the same for the wholde firmware.
@@ -219,6 +499,8 @@ class FileSystemImportsMapper(FileSystemMapper):
         if not self.dry_run_mode:
             self.record_binary_in_db(bin_object, f"[binary mapping] {bin_object.name}")
 
+    #=============================== Symlinks ==================================
+
     def map_symlink(self, path: Path) -> None:
         """Given a symlink, resolve it and create the associated objects if needed.
 
@@ -262,6 +544,8 @@ class FileSystemImportsMapper(FileSystemMapper):
             self.fs.add_symlink(symlink_obj)
         else:
             logging.warning(f"{log_prefix}: '{target}' does not correspond to a recorded binary")
+
+    # =============================== Imports ==================================
 
     @dataclass(frozen=True)
     class _LibImport(ABC):
@@ -326,9 +610,7 @@ class FileSystemImportsMapper(FileSystemMapper):
             # The imported name matches the SONAME of a binary whose filename
             # differs (e.g. libpthread.so.0 is the SONAME of libpthread-2.11.1.so).
             matching_binaries = self.fs.get_binaries_by_soname(lib_name)
-            lib_obj = self._select_fs_component(
-                strategy, matching_binaries, log_prefix, lib_name
-            )
+            lib_obj = self._select_fs_component(strategy, matching_binaries, log_prefix, lib_name)
             if lib_obj is None:
                 return self._FailedLibImport()
             return self._SolvedLibImport(initial_import=lib_obj, final_import=lib_obj)
@@ -361,7 +643,7 @@ class FileSystemImportsMapper(FileSystemMapper):
                     # resolution, the final target of the symlink is considered to be
                     # imported and not the symlink itself
                     self.record_import_in_db(binary.id, res.initial_import.id, log_prefix)
-                
+
                     if lib_name != res.final_import.name:
                         # SONAME case: store the resolved binary under the
                         # original import name (the SONAME) rather than the
@@ -574,6 +856,25 @@ import, drop case"
             self.map_symbol_imports(binary, resolution_strategy)
             progress.update(symbol_imports, advance=1)
         self.commit()
+
+    def map(
+        self,
+        threads: int,
+        resolution_strategy: ResolveDuplicateOption = ResolveDuplicateOption.IGNORE,
+    ) -> FileSystem:
+        """Wrap mapper_main with usefull elements for CLI rendering.
+
+        :param threads: number of threads to use
+        :param resolution_strategy: the chosen option for duplicate import resolution
+        :return: The FileSystem object filled
+        """
+        with Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            TimeElapsedColumn(),
+        ) as progress:
+            return self.mapper_main(threads, progress, resolution_strategy)
 
     def mapper_main(
         self,
