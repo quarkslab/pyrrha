@@ -13,8 +13,18 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-"""Module for the decomp mapper."""
-
+"""Module for the intercg mapper."""
 from .decomp_mapper import GhidraDecompilMapper, IdaDecompilMapper
+from .intercg_mapper import InterImageCGMapper
+from .imports_mapper import FileSystemImportsMapper, hide_progress
+from .objects import Binary, FileSystem, Symbol, Symlink
 
-__all__ = ["GhidraDecompilMapper", "IdaDecompilMapper"]
+__all__ = ["IdaDecompilMapper",
+           "GhidraDecompilMapper",
+           "InterImageCGMapper",
+           "FileSystemImportsMapper",
+           "hide_progress",
+           "Binary",
+           "FileSystem",
+           "Symbol",
+           "Symlink"]

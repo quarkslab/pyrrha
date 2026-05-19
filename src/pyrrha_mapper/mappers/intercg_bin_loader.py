@@ -21,9 +21,8 @@ from pathlib import Path
 from typing import NamedTuple
 
 from pyrrha_mapper.backend import IDA, Backend, Ghidra
-from pyrrha_mapper.common import Binary, Symbol
 from pyrrha_mapper.exceptions import FsMapperError
-from pyrrha_mapper.fs import FileSystemImportsMapper
+from pyrrha_mapper.mappers import Binary, FileSystemImportsMapper, Symbol
 from pyrrha_mapper.types import FuncType
 
 

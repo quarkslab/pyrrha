@@ -25,17 +25,22 @@ from typing import Any
 from numbat import SourcetrailDB
 from rich.progress import Progress
 
+from pyrrha_mapper.exceptions import FsMapperError
+
 # local imports
-from pyrrha_mapper.common import (
+from pyrrha_mapper.mappers import (
     Binary,
     FileSystem,
+    FileSystemImportsMapper,
     Symbol,
     Symlink,
     hide_progress,
 )
-from pyrrha_mapper.exceptions import FsMapperError
-from pyrrha_mapper.fs import FileSystemImportsMapper
-from pyrrha_mapper.intercg.loader import BinaryParser, GhidraBinaryParser, IDABinaryParser
+from pyrrha_mapper.mappers.intercg_bin_loader import (
+    BinaryParser,
+    GhidraBinaryParser,
+    IDABinaryParser,
+)
 from pyrrha_mapper.types import Backend, ResolveDuplicateOption
 
 IGNORE_LIST: frozenset[str] = frozenset(
