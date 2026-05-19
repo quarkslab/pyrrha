@@ -23,9 +23,9 @@ import pytest
 from click import Command
 from click.testing import CliRunner, Result
 
+from pyrrha_mapper import FileSystem, Symbol
 from pyrrha_mapper.__main__ import pyrrha
-from pyrrha_mapper.common import FileSystem, Symbol
-from pyrrha_mapper.intercg.fwmapper import InterImageCGMapper
+from pyrrha_mapper.mappers import InterImageCGMapper
 
 
 def check_click_result(res: Result) -> None:
