@@ -30,7 +30,7 @@ from pyrrha_mapper.mappers import InterImageCGMapper
 
 def check_click_result(res: Result) -> None:
     """Raise Assertion error if issue."""
-    assert res.exit_code == 0
+    assert res.exit_code == 0, res.output
     assert not res.exception, res.exception
     for log in res.stderr.splitlines():
         assert (

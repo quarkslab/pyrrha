@@ -30,7 +30,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--backend",
         action="store",
         help="backend",
-        choices={x.name.lower() for x in Backend},
+        choices={x.name.lower() for x in [Backend.IDA, Backend.GHIDRA]},
     )
 
 
