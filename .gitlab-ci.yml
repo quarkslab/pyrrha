@@ -1,6 +1,6 @@
 stages:
-  - test
   - build
+  - test
   - notify
 
 # Paths that should trigger test and build pipelines.
@@ -9,6 +9,8 @@ stages:
   - tests/**/*
   - src/**/*
   - pyproject.toml
+  - .gitlab-ci.yml
+  - ci/ghidra/*
 
 #======================== BUILD DOCKER IMAGE AND PUSH TO REGISTRY ======================
 build_image:
@@ -30,8 +32,15 @@ build_image:
         VERSION: [91, 93]
         LATEST: 93
       - BACKEND: "ghidra"
-        VERSION: ["12.0.4"]
-        LATEST: "12.0.4"
+        LATEST: "12.1"
+        VERSION: "12.0.4"
+        GHIDRA_SHA256: "c3b458661d69e26e203d739c0c82d143cc8a4a29d9e571f099c2cf4bda62a120"
+        DATE: "20260303"
+      - BACKEND: "ghidra"
+        LATEST: "12.1"
+        VERSION: "12.1"
+        GHIDRA_SHA256: "aa5cbcbbf48f41ca185fce900e19592f1ade4cd5994eb6e0ede468dac8a6f302"
+        DATE: "20260513"
   variables:
     DOCKER_IMAGE_NAME: $CI_REGISTRY_IMAGE/pyrrha-$BACKEND
     DOCKER_HOST: unix:///var/run/docker.sock
@@ -50,6 +59,7 @@ build_image:
         sleep 2
       done
     - echo "$CI_REGISTRY_PASSWORD" | docker login --username "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - apk add --no-cache bash
   script:
     # Resolve the pyrrha version component from the ref that triggered the pipeline.
     #   - tag v1.2.3  -> "1.2.3"
@@ -71,14 +81,24 @@ build_image:
       fi
       echo "Resolved PYRRHA_VERSION=$PYRRHA_VERSION (REF_KIND=$REF_KIND)"
 
+    - |
+      if [ "$BACKEND" = "ghidra" ]; then
+        ci/ghidra/build.sh --version "$VERSION" --date "$DATE" --sha256 "$GHIDRA_SHA256" --name "$CI_REGISTRY_IMAGE/ci/$BACKEND"
+      fi
+    - |
+      if [ "$BACKEND" = "ghidra" ]; then
+        docker push "$CI_REGISTRY_IMAGE/ci/$BACKEND:$VERSION"
+      fi
+
     # Primary image tag: <backend-version>-<pyrrha-version>
     - PRIMARY_TAG="${VERSION}-${PYRRHA_VERSION}"
     - echo "Building $DOCKER_IMAGE_NAME:$PRIMARY_TAG"
-    - docker build --pull
-        -t "$DOCKER_IMAGE_NAME:$PRIMARY_TAG"
-        -f ci/pyrrha/Dockerfile
-        --build-arg DISASS_IMAGE=$CI_REGISTRY_IMAGE/ci/${BACKEND}
-        --build-arg DISASS_IMAGE_VERSION=$VERSION
+    - |
+      docker build --pull \
+        -t "$DOCKER_IMAGE_NAME:$PRIMARY_TAG" \
+        -f ci/pyrrha/Dockerfile \
+        --build-arg DISASS_IMAGE=$CI_REGISTRY_IMAGE/ci/${BACKEND} \
+        --build-arg DISASS_IMAGE_VERSION=$VERSION \
         .
     - docker push "$DOCKER_IMAGE_NAME:$PRIMARY_TAG"
 
@@ -110,7 +130,7 @@ build_image:
 
 #========================== OBJECTS TESTS ====================================
 
-test_data_structures: 
+test_data_structures:
   stage: test
   # Only run tests when source, tests, or packaging metadata changed.
   # Inherited by test_fs and test_fs-cg via `extends`.
@@ -118,35 +138,6 @@ test_data_structures:
     - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
     - changes: *source_paths
   before_script:
-    - echo "=== Java diagnostics ==="
-    - java -version
-    - echo "JAVA_HOME=$JAVA_HOME"
-    - cat "${GHIDRA_INSTALL_DIR}/support/launch.properties"
-    - python3 -c "
-import os, jpype, subprocess
-print('JAVA_HOME:', os.environ.get('JAVA_HOME', '<unset>'))
-print('JPype default JVM:', jpype.getDefaultJVMPath())
-# Simulate exactly what pyghidra does
-launch_support = '${GHIDRA_INSTALL_DIR}/support/LaunchSupport.jar'
-ghidra_dir = '${GHIDRA_INSTALL_DIR}'
-cmd = f'java -cp \"{launch_support}\" LaunchSupport \"{ghidra_dir}\" -jdk_home -save'
-print('Running:', cmd)
-result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-print('stdout:', result.stdout)
-print('stderr:', result.stderr)
-print('returncode:', result.returncode)
-if result.returncode == 0:
-    java_home = result.stdout.strip()
-    print('LaunchSupport returned JAVA_HOME:', java_home)
-    os.environ['JAVA_HOME'] = java_home
-    print('JPype JVM path with that JAVA_HOME:', jpype.getDefaultJVMPath())
-    try:
-        jpype.startJVM(None, convertStrings=True, ignoreUnrecognized=True)
-        print('JVM started OK, java version:', jpype.java.lang.System.getProperty('java.version'))
-        jpype.shutdownJVM()
-    except Exception as e:
-        print('JVM start FAILED:', e)
-"
     - echo -e "\e[95m===== Install Pyrrha with test extension"
     - pip install '.[test]'
   script:
@@ -167,9 +158,9 @@ if result.returncode == 0:
         path: coverage.xml
 
 #========================== MAPPERS TESTS ====================================
-test_fs: 
+test_fs:
   extends:
-  - test_data_structures
+    - test_data_structures
   artifacts:
     name: db_$CI_JOB_NAME_SLUG
     paths:
@@ -181,15 +172,21 @@ test_fs:
     TEST_COVERAGE_SOURCE: pyrrha_mapper.mappers.imports_mapper
     TEST_PATH: tests/test_cli.py::TestFSMapper
     PYTEST_ARTIFACTS_DIR: test_artifacts
-    
 
 test_fs-cg:
-  extends: 
+  extends:
     - test_fs
-  image: 
-    name: $CI_REGISTRY_IMAGE/ci/${BACKEND}:${VERSION}
+  # Pull the image built in this pipeline when on main, dev, or a release tag
+  # (tagged as <version>-main, <version>-dev, or <version>-<semver>).
+  # For any other branch (e.g. feature branches) no image is built, so we
+  # fall back to `latest` which always tracks the last successful main build.
+  image:
+    name: $CI_REGISTRY_IMAGE/pyrrha-${BACKEND}:${DISASS_IMAGE_TAG}
     docker:
       user: user
+  before_script:
+    - echo -e "\e[95m===== Install Pyrrha with test extension"
+    - pip install '.[test]'
   variables:
     DB: ${BACKEND}_${VERSION}
     MAPPER: fs-cg
@@ -198,6 +195,33 @@ test_fs-cg:
     TEST_PATH: tests/test_cli.py::TestFsCgMapper
     TEST_SUP_OPTIONS: ${MAPPER_OPTIONS}
     HEXRAYS_LICENSE: "${IDA_LICENSE}"
+    # Default: fall back to latest (last successful main build).
+    # Overridden per-ref by the rules below.
+    DISASS_IMAGE_TAG: "latest"
+    # Point pyghidra at the JDK as proper job variables so they are present in
+    # the environment of EVERY process in the job — including the
+    # `coverage run -m pytest` process and any multiprocessing workers spawned
+    # by the mapper (which use the "spawn" start method and re-exec Python).
+    # Shell `export`s in before_script are not guaranteed to reach those
+    # re-exec'd children, but GitLab job variables always are.
+    # /opt/java/openjdk is the temurin JDK path, confirmed present in all
+    # ghidra images. pyghidra reads JAVA_HOME_OVERRIDE first (launcher.py:202),
+    # bypassing LaunchSupport entirely.
+    JAVA_HOME: /opt/java/openjdk
+    JAVA_HOME_OVERRIDE: /opt/java/openjdk
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
+      variables:
+        DISASS_IMAGE_TAG: "${VERSION}-${CI_COMMIT_TAG#v}"  # strip the leading v, e.g. 12.0.4-1.2.3
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes: *source_paths
+      variables:
+        DISASS_IMAGE_TAG: "${VERSION}-main"
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+      changes: *source_paths
+      variables:
+        DISASS_IMAGE_TAG: "${VERSION}-dev"
+    - changes: *source_paths   # any other branch: use latest
   parallel:
     matrix:
       - BACKEND: "ida"
@@ -212,7 +236,7 @@ test_fs-cg:
     project: firmware-re/cartography/pyrrha-internal-documentation
     branch: main
     # strategy: depend  # flip on to surface downstream failure on pyrrha
-                        # CI. Off by default — a broken docs build shouldn't
+                        # CI. Off for now — a broken docs build shouldn't
                         # block pyrrha.
   variables:
     UPSTREAM_PIPELINE_URL: $CI_PIPELINE_URL
