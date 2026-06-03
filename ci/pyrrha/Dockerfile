@@ -62,4 +62,4 @@ RUN pip install --no-cache-dir --force-reinstall . && \
 
 WORKDIR ${PYRRHA_WORKING_DIR}
 
-ENTRYPOINT ["pyrrha"]
+CMD ["pyrrha"]
