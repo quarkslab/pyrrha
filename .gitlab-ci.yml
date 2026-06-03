@@ -117,7 +117,36 @@ test_data_structures:
   rules:
     - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
     - changes: *source_paths
-  before_script: 
+  before_script:
+    - echo "=== Java diagnostics ==="
+    - java -version
+    - echo "JAVA_HOME=$JAVA_HOME"
+    - cat "${GHIDRA_INSTALL_DIR}/support/launch.properties"
+    - python3 -c "
+import os, jpype, subprocess
+print('JAVA_HOME:', os.environ.get('JAVA_HOME', '<unset>'))
+print('JPype default JVM:', jpype.getDefaultJVMPath())
+# Simulate exactly what pyghidra does
+launch_support = '${GHIDRA_INSTALL_DIR}/support/LaunchSupport.jar'
+ghidra_dir = '${GHIDRA_INSTALL_DIR}'
+cmd = f'java -cp \"{launch_support}\" LaunchSupport \"{ghidra_dir}\" -jdk_home -save'
+print('Running:', cmd)
+result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+print('stdout:', result.stdout)
+print('stderr:', result.stderr)
+print('returncode:', result.returncode)
+if result.returncode == 0:
+    java_home = result.stdout.strip()
+    print('LaunchSupport returned JAVA_HOME:', java_home)
+    os.environ['JAVA_HOME'] = java_home
+    print('JPype JVM path with that JAVA_HOME:', jpype.getDefaultJVMPath())
+    try:
+        jpype.startJVM(None, convertStrings=True, ignoreUnrecognized=True)
+        print('JVM started OK, java version:', jpype.java.lang.System.getProperty('java.version'))
+        jpype.shutdownJVM()
+    except Exception as e:
+        print('JVM start FAILED:', e)
+"
     - echo -e "\e[95m===== Install Pyrrha with test extension"
     - pip install '.[test]'
   script:
