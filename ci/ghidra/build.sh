@@ -121,6 +121,7 @@ ghidra_date="${DEFAULT_DATE}"
 ghidra_sha256="${DEFAULT_SHA256}"
 image_name="${IMAGE_NAME_DEFAULT}"
 version_overridden=false
+sha256_overridden=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -138,6 +139,7 @@ while [[ $# -gt 0 ]]; do
         -s|--sha256)
             [[ -n "${2:-}" ]] || die "--sha256 requires an argument."
             ghidra_sha256="$2"
+            sha256_overridden=true
             shift 2
             ;;
         -n|--name)
@@ -154,9 +156,9 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# If the user overrode --version but not --sha256, warn that the default
-# SHA-256 is almost certainly wrong for a different version.
-if [[ "${version_overridden}" == true && "${ghidra_sha256}" == "${DEFAULT_SHA256}" ]]; then
+# If the user overrode --version but not --sha256, the default SHA-256 is
+# almost certainly wrong for a different version.
+if [[ "${version_overridden}" == true && "${sha256_overridden}" == false ]]; then
     die "You overrode --version but not --sha256. " \
         "Please provide the correct SHA-256 for Ghidra ${ghidra_version} via --sha256."
 fi
@@ -187,4 +189,3 @@ ${DOCKER} tag "${image_tag}" "${image_name}:latest"
 echo "==> Successfully built ${image_tag}"
 echo "==> Also tagged as ${image_name}:latest"
 echo "==> Done."
-
