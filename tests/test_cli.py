@@ -33,11 +33,50 @@ def check_click_result(res: Result) -> None:
     assert res.exit_code == 0, res.output
     assert not res.exception, res.exception
     for log in res.stderr.splitlines():
-        assert (
-                "ERROR" not in log
-                and "WARNING" not in log
-                and "CRITICAL" not in log
-            ), f"Error log: {log}"
+        assert "ERROR" not in log and "WARNING" not in log and "CRITICAL" not in log, (
+            f"Error log: {log}"
+        )
+
+
+class _SubprocessResult(NamedTuple):
+    """Mimic the subset of click ``Result`` used by ``check_click_result``.
+
+    Backends that start a JVM (Ghidra via pyghidra/JPype) cannot be launched
+    reliably with ``CliRunner.invoke``: it runs the command *in-process*, and
+    starting the JVM inside the already-initialised pytest/coverage process
+    aborts JVM start-up (surfacing as
+    ``module '_jpype' has no attribute '_java_lang_Class'``).  Running pyrrha
+    in a fresh subprocess - exactly how it is used in production and in the
+    standalone CLI - avoids this entirely.
+    """
+
+    exit_code: int
+    output: str
+    stderr: str
+    exception: BaseException | None = None
+
+
+def run_pyrrha_subprocess(args: list) -> "_SubprocessResult":
+    """Run the pyrrha CLI in a separate process and adapt the result.
+
+    :param args: CLI arguments (without the leading ``pyrrha``).
+    :return: a ``Result``-compatible object accepted by ``check_click_result``.
+    """
+    import subprocess
+    import sys
+
+    completed = subprocess.run(
+        [sys.executable, "-m", "pyrrha_mapper", *map(str, args)],
+        capture_output=True,
+        text=True,
+    )
+    return _SubprocessResult(
+        exit_code=completed.returncode,
+        output=completed.stdout + completed.stderr,
+        stderr=completed.stderr,
+        exception=None,
+    )
+
 
 class TestCLI:
     """Tests to check that the CLI works and display correct messages."""
@@ -93,11 +132,11 @@ class BaseTestFsMapper(ABC):
     FW_TEST_SYMLINKS_PATHS = {Path("/lib/libssl.so")}
 
     FW_TEST_SONAMES = {
-        "ld-linux.so.3" : "ld-linux.so.3",
+        "ld-linux.so.3": "ld-linux.so.3",
         "libcrypto.so.FOR_SONAME_TESTING": "libcrypto.so.1.1",
         "libdl.so.2": "libdl.so.2",
         "libpthread.so.0": "libpthread.so.0",
-        "libssl.so.1.1": "libssl.so.1.1"
+        "libssl.so.1.1": "libssl.so.1.1",
     }
 
     # =============================== INTERNAL STUFFS ==================================
@@ -277,7 +316,9 @@ class TestFSMapper(BaseTestFsMapper):
         """Imported symbols correspond to a symbol object."""
         _bin = export_dump.get_binary_by_path(bin_path)
         if _bin.path.name in BaseTestFsMapper.FW_TEST_SONAMES.keys():
-            assert BaseTestFsMapper.FW_TEST_SONAMES[_bin.path.name] == _bin.soname, "Some sonames are not matching"
+            assert BaseTestFsMapper.FW_TEST_SONAMES[_bin.path.name] == _bin.soname, (
+                "Some sonames are not matching"
+            )
 
 
 class TestFsCgMapper(BaseTestFsMapper):
@@ -296,8 +337,11 @@ class TestFsCgMapper(BaseTestFsMapper):
 
     @pytest.fixture(scope="class")
     def pyrrha_exec(self, request, tmp_path_factory) -> BaseTestFsMapper.ExecResults:
-        """Run pyrrha whith the given thread number and the given db path."""
-        runner = CliRunner()
+        """Run pyrrha whith the given thread number and the given db path.
+
+        Uses a subprocess (not CliRunner) because the Ghidra backend starts a
+        JVM, which cannot be launched in-process inside pytest.
+        """
         tmp_path = (
             tmp_path_factory.mktemp("db", numbered=True)
             / f"{self.SUBCOMMAND}-{request.param}.srctrldb"
@@ -312,12 +356,15 @@ class TestFsCgMapper(BaseTestFsMapper):
             request.param,
             f"{self.FW_TEST_PATH}",
         ]
-        return self.ExecResults(res=runner.invoke(self.COMMAND, args), db_path=tmp_path)
+        return self.ExecResults(res=run_pyrrha_subprocess(args), db_path=tmp_path)
 
     @pytest.fixture(scope="class")
     def export_res(self, tmp_path_factory, request) -> BaseTestFsMapper.ExecResults:
-        """Run Pyrrha with export activated."""
-        runner = CliRunner()
+        """Run Pyrrha with export activated.
+
+        Uses a subprocess (not CliRunner) because the Ghidra backend starts a
+        JVM, which cannot be launched in-process inside pytest.
+        """
         tmp_path = (
             tmp_path_factory.mktemp("db", numbered=True)
             / f"{self.SUBCOMMAND}-{request.param}-export.srctrldb"
@@ -332,7 +379,7 @@ class TestFsCgMapper(BaseTestFsMapper):
             request.param,
             f"{self.FW_TEST_PATH}",
         ]
-        return self.ExecResults(res=runner.invoke(self.COMMAND, args), db_path=tmp_path)
+        return self.ExecResults(res=run_pyrrha_subprocess(args), db_path=tmp_path)
 
     # =================================== TESTS ========================================
 
