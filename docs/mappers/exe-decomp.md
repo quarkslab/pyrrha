@@ -21,8 +21,23 @@ Options:
   -d, --debug                 Set log level to DEBUG.
   --db PATH                   NumbatUI DB file path (.srctrldb).  [default: decomp.srctrldb]
   -b, --backend [ida|ghidra]  Backend to use.  [default: Backend.IDA]
-  -h, --help                  Show this message and exit.                  Show this message and exit.
+  -e, --export                Create a JSON export of the resulting decompilation mapping.
+  -h, --help                  Show this message and exit.
 ```
+
+## JSON export
+
+With the `-e/--export` option, the mapper writes a JSON file next to the database (`<db>.json`) describing the result of the run. It is loaded back into an `ExportedDecompilation` object exposed by Pyrrha, so results can be post-processed without re-running a disassembler:
+
+```python
+from pyrrha_mapper.mappers import ExportedDecompilation
+
+result = ExportedDecompilation.from_json_export("my_binary.json")
+for func in result.iter_functions():
+    print(hex(func.addr), func.name, func.type)
+```
+
+An `ExportedDecompilation` stores the analysed binary identity (`path`, `id`, `name`) and its functions, keyed by their parser-space entry-point address. Each function is an `ExportedFunction` carrying its `Symbol`, its `FuncType`, the addresses it calls and is called by, its decompiled `source`, and the in-source locations of its declaration and call sites (`ExportedLocation`).
 
 !!! note 
     This mapper create the Quokka export of the binary as well as a cache version of all the decompiled function of the analyzed binary.. If these files already exist, it loads them without regenerate them. Like that it also allowed to use `pyrrha` in systems without Quokka and/or IDA. 

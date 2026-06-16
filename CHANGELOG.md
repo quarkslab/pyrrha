@@ -1,3 +1,27 @@
+## Unreleased
+
+### Features
+- All mappers now share a single disassembler `--backend` value (`ida`/`ghidra`) implemented in one common place, replacing the previous per-mapper disassembler/exporter selection.
+- Remove the `qbinary`/Quokka dependency: `fs-cg` and `decomp` now interact directly with the disassemblers (IDA, Ghidra), so Pyrrha can run on systems without Quokka.
+- Add ELF SONAME support: binaries are indexed by their `DT_SONAME` so imports referencing a SONAME resolve even without a matching symlink.
+- `decomp` mapper: full rework around a class-based object integrated with the common backend layer.
+- `decomp` mapper: add a `-e/--export` option to dump the result as JSON, loadable through the new `ExportedDecompilation` object exposed by Pyrrha.
+- Expose `Binary` image base and relocatable information on the internal representation.
+- Improve the documentation (installation, quick summary, decomp mapper) and add unit tests for the `decomp` export model plus functional tests for the `decomp` mapper.
+
+### Fixes
+- `intercg` mapper: various fixes around addresses and demangled names, missing Ghidra thunks, extended ignore list, and argument renaming.
+- `fs-cg` mapper: avoid an infinite loop in trampoline resolution and add a real timeout to program loading.
+- `fs`/`fs-cg` mappers: pass `load_binary` arguments through a `partial` mechanism and improve multiprocessing error handling.
+- `decomp` mapper: fix the mapping run (`map` now reports success/failure, runs the decompilation and call-graph indexing phases, and records the binary node so functions get a valid parent).
+- `decomp` mapper: fix call-graph source cross-references (call-site locations are looked up by callee address and no longer raise on the first reference).
+- `decomp` mapper: fix command-line arguments and improve the decompilation script (correct `NamedTemporaryFile` usage, better IDA decompilation output).
+- `cli`: keep an existing suffix in the DB path and annotate the `decomp` mapper variable with its base type to fix a type-checking error.
+
+### Internal
+- Reorganize the repository into two submodules (`backend` and `mappers`) and rework the mappers so backend support lives in a single common place; remove unused modules and the `heimdallr`/disassembly-sync prototype.
+- CI: build and test IDA and Ghidra Docker images, export test artifacts, and trigger builds only on relevant changes.
+
 ## v1.0.1—Improve exe-decomp mapper
 
 ### Features
