@@ -31,6 +31,7 @@ from pyrrha_mapper.mappers import (
     IdaDecompilMapper,
     InterImageCGMapper,
 )
+from pyrrha_mapper.mappers.decomp_mapper import DecompilMapper
 from pyrrha_mapper.types import Backend, ResolveDuplicateOption
 
 # -------------------------------------------------------------------------------
@@ -338,6 +339,7 @@ def fs_exe_decompiled_mapper(
     setup_logs(debug, db)
     db_instance = setup_db(db)
 
+    mapper: DecompilMapper
     match backend:
         case Backend.IDA:
             mapper = IdaDecompilMapper(db_instance, executable)
