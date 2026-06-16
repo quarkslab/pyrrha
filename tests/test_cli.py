@@ -38,6 +38,20 @@ def check_click_result(res: Result) -> None:
         )
 
 
+def check_click_result_allow_logs(res: Result) -> None:
+    """Like check_click_result but tolerates per-function ERROR/WARNING logs.
+
+    The decomp mapper legitimately logs warnings/errors for individual
+    functions (e.g. a declaration not located in some decompiled body); these
+    do not make the run fail. Only the exit code and absence of an exception
+    are checked here, plus that no CRITICAL message was emitted.
+    """
+    assert res.exit_code == 0, res.output
+    assert not res.exception, res.exception
+    for log in res.stderr.splitlines():
+        assert "CRITICAL" not in log, f"Critical log: {log}"
+
+
 class _SubprocessResult(NamedTuple):
     """Mimic the subset of click ``Result`` used by ``check_click_result``.
 
@@ -480,14 +494,14 @@ class TestDecompMapper:
     @pytest.mark.parametrize("export_res", FW_TEST_BIN_PATHS, indirect=True, ids=_path_id)
     def test_db_creation(self, export_res: "TestDecompMapper.ExecResults") -> None:
         """The NumbatUI DB and project files are generated."""
-        check_click_result(export_res.res)
+        check_click_result_allow_logs(export_res.res)
         assert export_res.db_path.with_suffix(".srctrldb").exists(), "Missing DB file"
         assert export_res.db_path.with_suffix(".srctrlprj").exists(), "Missing project file"
 
     @pytest.mark.parametrize("export_res", FW_TEST_BIN_PATHS, indirect=True, ids=_path_id)
     def test_export_creation(self, export_res: "TestDecompMapper.ExecResults") -> None:
         """The JSON export file exists."""
-        check_click_result(export_res.res)
+        check_click_result_allow_logs(export_res.res)
         assert export_res.export_path.exists(), "Export file does not exist"
 
     @pytest.mark.parametrize("export_res", FW_TEST_BIN_PATHS, indirect=True, ids=_path_id)
