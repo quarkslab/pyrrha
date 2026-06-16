@@ -1551,6 +1551,8 @@
 <li><code>decomp</code> mapper: fix command-line arguments and improve the decompilation script (correct <code>NamedTemporaryFile</code> usage, better IDA decompilation output).</li>
 <li><code>decomp</code> mapper (IDA backend): use the <code>ida_domain</code> 0.5.0 pseudocode API (<code>get_pseudocode(func).to_text(...)</code>), fixing a <code>TypeError</code> that broke every IDA decompilation run.</li>
 <li><code>decomp</code> mapper: skip imported functions during source and call-graph indexing (they have no decompiled body), removing spurious per-function error/warning logs.</li>
+<li><code>decomp</code> mapper: write decompiled source via a portable temporary file, fixing a <code>TypeError</code> (<code>delete_on_close</code>) that aborted every run on Python 3.11.</li>
+<li><code>decomp</code> mapper: attach call-site locations to the call reference returned by <code>record_ref_call</code> instead of the callee symbol id.</li>
 <li><code>cli</code>: keep an existing suffix in the DB path and annotate the <code>decomp</code> mapper variable with its base type to fix a type-checking error.</li>
 </ul>
 <h3 id="internal">Internal</h3>
