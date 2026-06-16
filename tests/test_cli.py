@@ -25,7 +25,7 @@ from click.testing import CliRunner, Result
 
 from pyrrha_mapper import FileSystem, Symbol
 from pyrrha_mapper.__main__ import pyrrha
-from pyrrha_mapper.mappers import InterImageCGMapper
+from pyrrha_mapper.mappers import ExportedDecompilation, InterImageCGMapper
 
 
 def check_click_result(res: Result) -> None:
@@ -408,3 +408,106 @@ class TestFsCgMapper(BaseTestFsMapper):
                     assert target.name in _bin.imported_symbol_names
                     assert _bin.imported_symbol_exists(target.name)
                     assert isinstance(_bin.get_imported_symbol(target.name), Symbol)
+
+
+class TestDecompMapper:
+    """Functional tests for the decomp mapper. Tests are done from the CLI.
+
+    The decomp mapper runs on a single executable, so each binary of the test
+    firmware triggers its own ``decomp`` invocation. A subprocess (not
+    CliRunner) is used because the Ghidra backend starts a JVM, which cannot be
+    launched in-process inside pytest.
+    """
+
+    COMMAND: Command = pyrrha
+    SUBCOMMAND = "decomp"
+
+    FW_TEST_PATH = Path(__file__).parent / "test_fw"
+    # Same set of executables as the fs-cg functional tests.
+    FW_TEST_BIN_PATHS = BaseTestFsMapper.FW_TEST_BIN_PATHS
+
+    class ExecResults(NamedTuple):  # noqa: D106
+        res: Result
+        db_path: Path
+
+        @property
+        def export_path(self) -> Path:  # noqa: D102
+            return self.db_path.with_suffix(".json")
+
+    @staticmethod
+    def _path_id(val):
+        if isinstance(val, Path):
+            return str(val)
+        return val
+
+    def _host_path(self, bin_path: Path) -> Path:
+        """:return: the on-host path of a firmware-relative binary path."""
+        return self.FW_TEST_PATH / bin_path.relative_to(bin_path.anchor)
+
+    # =============================== FIXTURES =========================================
+
+    @pytest.fixture(scope="class")
+    def export_res(self, tmp_path_factory, request) -> "TestDecompMapper.ExecResults":
+        """Run the decomp mapper with export activated on a single executable."""
+        bin_path: Path = request.param
+        executable = self._host_path(bin_path)
+        tmp_path = (
+            tmp_path_factory.mktemp("db", numbered=True)
+            / f"{self.SUBCOMMAND}-{bin_path.name}.srctrldb"
+        )
+        args = [
+            self.SUBCOMMAND,
+            "--backend",
+            f"{request.config.getoption('--backend')}",
+            "--db",
+            f"{tmp_path}",
+            "--export",
+            f"{executable}",
+        ]
+        return self.ExecResults(res=run_pyrrha_subprocess(args), db_path=tmp_path)
+
+    @pytest.fixture(scope="class")
+    def export_dump(self, export_res: "TestDecompMapper.ExecResults") -> ExportedDecompilation:
+        """Load the JSON export into an ExportedDecompilation object."""
+        return ExportedDecompilation.from_json_export(export_res.export_path)
+
+    # =================================== TESTS ========================================
+
+    @pytest.mark.parametrize("export_res", FW_TEST_BIN_PATHS, indirect=True, ids=_path_id)
+    def test_db_creation(self, export_res: "TestDecompMapper.ExecResults") -> None:
+        """The NumbatUI DB and project files are generated."""
+        check_click_result(export_res.res)
+        assert export_res.db_path.with_suffix(".srctrldb").exists(), "Missing DB file"
+        assert export_res.db_path.with_suffix(".srctrlprj").exists(), "Missing project file"
+
+    @pytest.mark.parametrize("export_res", FW_TEST_BIN_PATHS, indirect=True, ids=_path_id)
+    def test_export_creation(self, export_res: "TestDecompMapper.ExecResults") -> None:
+        """The JSON export file exists."""
+        check_click_result(export_res.res)
+        assert export_res.export_path.exists(), "Export file does not exist"
+
+    @pytest.mark.parametrize("export_res", FW_TEST_BIN_PATHS, indirect=True, ids=_path_id)
+    def test_export_format(self, export_dump: ExportedDecompilation) -> None:
+        """The JSON export loads as an ExportedDecompilation object."""
+        assert isinstance(export_dump, ExportedDecompilation), "Export cannot be loaded correctly"
+
+    @pytest.mark.parametrize("export_res", FW_TEST_BIN_PATHS, indirect=True, ids=_path_id)
+    def test_functions_present(self, request, export_dump: ExportedDecompilation) -> None:
+        """The export records functions and binds them to the analysed binary."""
+        bin_path: Path = request.node.callspec.params["export_res"]
+        assert export_dump.path.name == bin_path.name
+        assert len(list(export_dump.iter_functions())) > 0, "No function recorded"
+
+    @pytest.mark.parametrize("export_res", FW_TEST_BIN_PATHS, indirect=True, ids=_path_id)
+    def test_function_addr_keys(self, export_dump: ExportedDecompilation) -> None:
+        """Every function is stored under its own (parser-space) address."""
+        for addr, func in export_dump.functions.items():
+            assert func.addr == addr, (
+                f"{func.name} stored under {addr:#x} but addr is {func.addr:#x}"
+            )
+
+    @pytest.mark.parametrize("export_res", FW_TEST_BIN_PATHS, indirect=True, ids=_path_id)
+    def test_decompiled_source(self, export_dump: ExportedDecompilation) -> None:
+        """At least one non-imported function carries decompiled source."""
+        with_source = [f for f in export_dump.iter_functions() if f.type != "imported" and f.source]
+        assert with_source, "No decompiled source recorded for any local function"
