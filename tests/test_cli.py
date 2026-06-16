@@ -176,22 +176,23 @@ class BaseTestFsMapper(ABC):
     # =============================== FIXTURES ========================================
 
     @pytest.fixture(scope="class")
-    def pyrrha_exec(self, request, tmp_path_factory) -> ExecResults:
+    @classmethod
+    def pyrrha_exec(cls, request, tmp_path_factory) -> ExecResults:
         """Run pyrrha whith the given thread number and the given db path."""
         runner = CliRunner()
         tmp_path = (
             tmp_path_factory.mktemp("db", numbered=True)
-            / f"{self.SUBCOMMAND}-{request.param}.srctrldb"
+            / f"{cls.SUBCOMMAND}-{request.param}.srctrldb"
         )
         args = [
-            self.SUBCOMMAND,
+            cls.SUBCOMMAND,
             "--db",
             f"{tmp_path}",
             "-j",
             request.param,
-            f"{self.FW_TEST_PATH}",
+            f"{cls.FW_TEST_PATH}",
         ]
-        return self.ExecResults(res=runner.invoke(self.COMMAND, args), db_path=tmp_path)
+        return cls.ExecResults(res=runner.invoke(cls.COMMAND, args), db_path=tmp_path)
 
     @abstractmethod
     @pytest.fixture(scope="class")
@@ -200,7 +201,8 @@ class BaseTestFsMapper(ABC):
         ...
 
     @pytest.fixture(scope="class")
-    def export_dump(self, export_res: ExecResults) -> FileSystem:
+    @classmethod
+    def export_dump(cls, export_res: ExecResults) -> FileSystem:
         """Load JSON export into a FileSystem object."""
         return FileSystem.from_json_export(export_res.export_path)
 
@@ -290,23 +292,24 @@ class TestFSMapper(BaseTestFsMapper):
     # =============================== FIXTURES ========================================
 
     @pytest.fixture(scope="class")
-    def export_res(self, tmp_path_factory, request) -> BaseTestFsMapper.ExecResults:
+    @classmethod
+    def export_res(cls, tmp_path_factory, request) -> BaseTestFsMapper.ExecResults:
         """Run Pyrrha with export activated."""
         runner = CliRunner()
         tmp_path = (
             tmp_path_factory.mktemp("db", numbered=True)
-            / f"{self.SUBCOMMAND}-{request.param}-export.srctrldb"
+            / f"{cls.SUBCOMMAND}-{request.param}-export.srctrldb"
         )
         args = [
-            self.SUBCOMMAND,
+            cls.SUBCOMMAND,
             "-e",
             "--db",
             f"{tmp_path}",
             "-j",
             request.param,
-            f"{self.FW_TEST_PATH}",
+            f"{cls.FW_TEST_PATH}",
         ]
-        return self.ExecResults(res=runner.invoke(self.COMMAND, args), db_path=tmp_path)
+        return cls.ExecResults(res=runner.invoke(cls.COMMAND, args), db_path=tmp_path)
 
     # =================================== TESTS ========================================
 
@@ -350,7 +353,8 @@ class TestFsCgMapper(BaseTestFsMapper):
     # =============================== FIXTURES =========================================
 
     @pytest.fixture(scope="class")
-    def pyrrha_exec(self, request, tmp_path_factory) -> BaseTestFsMapper.ExecResults:
+    @classmethod
+    def pyrrha_exec(cls, request, tmp_path_factory) -> BaseTestFsMapper.ExecResults:
         """Run pyrrha whith the given thread number and the given db path.
 
         Uses a subprocess (not CliRunner) because the Ghidra backend starts a
@@ -358,22 +362,23 @@ class TestFsCgMapper(BaseTestFsMapper):
         """
         tmp_path = (
             tmp_path_factory.mktemp("db", numbered=True)
-            / f"{self.SUBCOMMAND}-{request.param}.srctrldb"
+            / f"{cls.SUBCOMMAND}-{request.param}.srctrldb"
         )
         args = [
-            self.SUBCOMMAND,
+            cls.SUBCOMMAND,
             "--backend",
             f"{request.config.getoption('--backend')}",
             "--db",
             f"{tmp_path}",
             "-j",
             request.param,
-            f"{self.FW_TEST_PATH}",
+            f"{cls.FW_TEST_PATH}",
         ]
-        return self.ExecResults(res=run_pyrrha_subprocess(args), db_path=tmp_path)
+        return cls.ExecResults(res=run_pyrrha_subprocess(args), db_path=tmp_path)
 
     @pytest.fixture(scope="class")
-    def export_res(self, tmp_path_factory, request) -> BaseTestFsMapper.ExecResults:
+    @classmethod
+    def export_res(cls, tmp_path_factory, request) -> BaseTestFsMapper.ExecResults:
         """Run Pyrrha with export activated.
 
         Uses a subprocess (not CliRunner) because the Ghidra backend starts a
@@ -381,19 +386,19 @@ class TestFsCgMapper(BaseTestFsMapper):
         """
         tmp_path = (
             tmp_path_factory.mktemp("db", numbered=True)
-            / f"{self.SUBCOMMAND}-{request.param}-export.srctrldb"
+            / f"{cls.SUBCOMMAND}-{request.param}-export.srctrldb"
         )
         args = [
-            self.SUBCOMMAND,
+            cls.SUBCOMMAND,
             "--backend",
             f"{request.config.getoption('--backend')}",
             "--db",
             f"{tmp_path}",
             "-j",
             request.param,
-            f"{self.FW_TEST_PATH}",
+            f"{cls.FW_TEST_PATH}",
         ]
-        return self.ExecResults(res=run_pyrrha_subprocess(args), db_path=tmp_path)
+        return cls.ExecResults(res=run_pyrrha_subprocess(args), db_path=tmp_path)
 
     # =================================== TESTS ========================================
 
@@ -458,23 +463,25 @@ class TestDecompMapper:
             return str(val)
         return val
 
-    def _host_path(self, bin_path: Path) -> Path:
+    @classmethod
+    def _host_path(cls, bin_path: Path) -> Path:
         """:return: the on-host path of a firmware-relative binary path."""
-        return self.FW_TEST_PATH / bin_path.relative_to(bin_path.anchor)
+        return cls.FW_TEST_PATH / bin_path.relative_to(bin_path.anchor)
 
     # =============================== FIXTURES =========================================
 
     @pytest.fixture(scope="class")
-    def export_res(self, tmp_path_factory, request) -> "TestDecompMapper.ExecResults":
+    @classmethod
+    def export_res(cls, tmp_path_factory, request) -> "TestDecompMapper.ExecResults":
         """Run the decomp mapper with export activated on a single executable."""
         bin_path: Path = request.param
-        executable = self._host_path(bin_path)
+        executable = cls._host_path(bin_path)
         tmp_path = (
             tmp_path_factory.mktemp("db", numbered=True)
-            / f"{self.SUBCOMMAND}-{bin_path.name}.srctrldb"
+            / f"{cls.SUBCOMMAND}-{bin_path.name}.srctrldb"
         )
         args = [
-            self.SUBCOMMAND,
+            cls.SUBCOMMAND,
             "--backend",
             f"{request.config.getoption('--backend')}",
             "--db",
@@ -482,10 +489,11 @@ class TestDecompMapper:
             "--export",
             f"{executable}",
         ]
-        return self.ExecResults(res=run_pyrrha_subprocess(args), db_path=tmp_path)
+        return cls.ExecResults(res=run_pyrrha_subprocess(args), db_path=tmp_path)
 
     @pytest.fixture(scope="class")
-    def export_dump(self, export_res: "TestDecompMapper.ExecResults") -> ExportedDecompilation:
+    @classmethod
+    def export_dump(cls, export_res: "TestDecompMapper.ExecResults") -> ExportedDecompilation:
         """Load the JSON export into an ExportedDecompilation object."""
         return ExportedDecompilation.from_json_export(export_res.export_path)
 
