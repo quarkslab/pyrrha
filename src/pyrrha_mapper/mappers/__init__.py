@@ -15,12 +15,16 @@
 #  limitations under the License.
 """Module for the intercg mapper."""
 from .decomp_mapper import GhidraDecompilMapper, IdaDecompilMapper
+from .decomp_objects import ExportedDecompilation, ExportedFunction, ExportedLocation
 from .imports_mapper import FileSystemImportsMapper, hide_progress
 from .intercg_mapper import InterImageCGMapper
 from .objects import Binary, FileSystem, Symbol, Symlink
 
 __all__ = ["IdaDecompilMapper",
            "GhidraDecompilMapper",
+           "ExportedDecompilation",
+           "ExportedFunction",
+           "ExportedLocation",
            "InterImageCGMapper",
            "FileSystemImportsMapper",
            "hide_progress",
