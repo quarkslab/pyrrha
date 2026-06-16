@@ -157,6 +157,13 @@ test_data_structures:
         coverage_format: cobertura
         path: coverage.xml
 
+test_decomp_objects:
+  extends:
+    - test_data_structures
+  variables:
+    TEST_COVERAGE_SOURCE: pyrrha_mapper.mappers.decomp_objects
+    TEST_PATH: tests/test_decomp_objects.py
+
 #========================== MAPPERS TESTS ====================================
 test_fs:
   extends:
@@ -228,6 +235,17 @@ test_fs-cg:
         VERSION: [91, 93]
       - BACKEND: "ghidra"
         VERSION: ["12.0.4"]
+
+test_decomp:
+  extends:
+    - test_fs-cg
+  variables:
+    DB: decomp_${BACKEND}_${VERSION}
+    MAPPER: decomp
+    MAPPER_OPTIONS: '--backend ${BACKEND}'
+    TEST_COVERAGE_SOURCE: pyrrha_mapper.mappers.decomp_mapper,pyrrha_mapper.mappers.decomp_objects
+    TEST_PATH: tests/test_cli.py::TestDecompMapper
+    TEST_SUP_OPTIONS: ${MAPPER_OPTIONS}
 
 #========================== TRIGGER INTERNAL DOC UPDATE ================================
 .trigger_docs_base:
