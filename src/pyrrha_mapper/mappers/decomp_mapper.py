@@ -16,6 +16,7 @@
 """Decompilation code binary mapper."""
 
 import logging
+from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -60,7 +61,9 @@ class FuncData:
     source: str
     source_id: int | None = None
     declaration: Location | None = None
-    source_calls_loc: dict[int, list[Location]] = field(default_factory=dict)
+    # Keyed by callee (parser-space) address; defaultdict so call-site locations
+    # can be appended without pre-seeding each callee entry.
+    source_calls_loc: dict[int, list[Location]] = field(default_factory=lambda: defaultdict(list))
 
     @property
     def id(self) -> int | None:
@@ -106,6 +109,9 @@ class DecompilMapper(Backend):
         self.bin = Binary(path=bin_path)
         self.functions: dict[int, FuncData] = dict()
         self.source_ids: dict[int, int] = dict()
+        # Display binaries as a dedicated "Binaries" group in NumbatUI, mirroring
+        # the inter-image call graph mapper so both mappers share a graph shape.
+        self.db_interface.set_node_type("class", "Binaries", "binary")
 
     def record_function(self, func: FuncData, log_prefix) -> FuncData:
         """Record a function into the DB (do not record the associated source).
@@ -293,41 +299,54 @@ class DecompilMapper(Backend):
                 continue
             self.db_interface.record_ref_call(func.id, child.id)
 
-            if func.source == "" or func.source_calls_loc[addr] == [] or func.source_id is None:
+            # source_calls_loc is keyed by the *callee* address (see
+            # index_decompiled), so look up the locations for this child.
+            child_locations = func.source_calls_loc.get(child_addr, [])
+            if func.source == "" or child_locations == [] or func.source_id is None:
                 continue
-            for location in func.source_calls_loc[addr]:
+            for location in child_locations:
                 self.db_interface.record_reference_location(child.id, func.source_id, *location)
 
-    def map(self) -> None:
-        """Run the successive steps of the mapping."""
-        with Progress(
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
-                MofNCompleteColumn(),
-                TimeElapsedColumn(),
-            ) as progress:
+    def map(self) -> bool:
+        """Run the successive steps of the mapping.
 
+        :return: True if the binary node was recorded and indexing ran, else False.
+        """
+        # Record the binary as a class node so functions can be attached to it
+        # via parent_id. Without this id, record_function would orphan every
+        # function. Mirrors InterImageCGMapper.record_binary_in_db.
+        self.bin.id = self.db_interface.record_class(
+            self.bin.name, prefix=f"{self.bin.path.parent}/", delimiter=":"
+        )
+        if self.bin.id is None:
+            logging.error(f"[binary indexing] {self.bin.name}: record of binary failed")
+            return False
+
+        with Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            TimeElapsedColumn(),
+        ) as progress:
             func_addrs = list(self.func_addrs)
-            func_indexing = progress.add_task(
-                "[red]Function indexing", total=len(func_addrs)
-            )
+            func_indexing = progress.add_task("[red]Function indexing", total=len(func_addrs))
             for addr in func_addrs:
-                self.index_function(addr, f"[function indexing] {func_addrs:0x}")
+                self.index_function(addr, f"[function indexing] {addr:#x}")
                 progress.update(func_indexing, advance=1)
 
             decompilee_indexing = progress.add_task(
-                "[orange_red1]Source indexing", total=len(func_addrs)
+                "[orange_red1]Source indexing", total=len(self.functions)
             )
             for addr in self.functions.keys():
-                self.index_function(addr, f"[source indexing] {self.functions[addr].name}")
+                self.index_decompiled(addr, f"[source indexing] {self.functions[addr].name}")
                 progress.update(decompilee_indexing, advance=1)
 
-            cg_indexing = progress.add_task(
-                "[gold1]Call graph indexing", total=len(func_addrs)
-            )
+            cg_indexing = progress.add_task("[gold1]Call graph indexing", total=len(self.functions))
             for addr in self.functions.keys():
-                self.index_function(addr, f"[call graph indexing] {self.functions[addr].name}")
+                self.index_call_graph(addr, f"[call graph indexing] {self.functions[addr].name}")
                 progress.update(cg_indexing, advance=1)
+
+        return True
 
 
 class IdaDecompilMapper(DecompilMapper, IDA):
@@ -337,6 +356,6 @@ class IdaDecompilMapper(DecompilMapper, IDA):
 
 
 class GhidraDecompilMapper(DecompilMapper, Ghidra):
-    """Decompile Mapper backed by IDA Pro."""
+    """Decompile Mapper backed by Ghidra."""
 
     pass
