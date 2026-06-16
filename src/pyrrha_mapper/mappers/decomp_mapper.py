@@ -162,20 +162,27 @@ class DecompilMapper(Backend):
         :param log_prefix: string prepended to every log message.
         :return: updated func data object
         """
-        with NamedTemporaryFile(mode="wt", delete_on_close=True) as tmp:
+        # Write the source to a temporary file, hand its path to the DB, then
+        # remove it. delete=False (rather than NamedTemporaryFile auto-delete)
+        # is required because record_file reopens the path: on Windows an open
+        # NamedTemporaryFile cannot be reopened, and delete_on_close only
+        # exists on Python >= 3.12 while the project supports 3.11.
+        tmp = NamedTemporaryFile(mode="wt", delete=False)
+        try:
             tmp.write(func.source)
-            tmp.flush()
+            tmp.close()
             func.source_id = self.db_interface.record_file(Path(tmp.name), name=func.name)
             if func.source_id is None:
                 return func
             self.db_interface.record_file_language(func.source_id, "cpp")
-            tmp.close()
 
             logging.debug(f"{log_prefix}: add function {func.name} to file {func.source_id}")
             if func.id is not None and func.declaration is not None:
                 self.db_interface.record_symbol_location(func.id, func.source_id, *func.declaration)
             else:
                 logging.warning(f"{log_prefix}: declaration not found in source code")
+        finally:
+            Path(tmp.name).unlink(missing_ok=True)
 
         return func
 
