@@ -319,15 +319,20 @@ class DecompilMapper(Backend):
                     + "missing target id.",
                 )
                 continue
-            self.db_interface.record_ref_call(func.id, child.id)
+            ref_id = self.db_interface.record_ref_call(func.id, child.id)
 
             # source_calls_loc is keyed by the *callee* address (see
             # index_decompiled), so look up the locations for this child.
             child_locations = func.source_calls_loc.get(child_addr, [])
-            if func.source == "" or child_locations == [] or func.source_id is None:
+            if (
+                ref_id is None
+                or func.source == ""
+                or child_locations == []
+                or func.source_id is None
+            ):
                 continue
             for location in child_locations:
-                self.db_interface.record_reference_location(child.id, func.source_id, *location)
+                self.db_interface.record_reference_location(ref_id, func.source_id, *location)
 
     def map(self) -> bool:
         """Run the successive steps of the mapping.
