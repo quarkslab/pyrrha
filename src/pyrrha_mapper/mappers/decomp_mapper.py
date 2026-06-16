@@ -188,6 +188,12 @@ class DecompilMapper(Backend):
         """
         func = self.functions[addr]
 
+        # Imported functions have no decompiled body (source is set to "" in
+        # index_function), so there is nothing to locate or record. Skip them
+        # to avoid spurious "declaration not found" errors.
+        if func.type == FuncType.IMPORTED:
+            return
+
         # Build lookup tables for the callees of this function.
         # normalize_name strips leading/trailing underscores and dots so that
         # e.g. "__memcpy" and "memcpy" both match the same call-site token.
@@ -281,6 +287,10 @@ class DecompilMapper(Backend):
         :param log_prefix: string prepended to every log message.
         """
         func = self.functions[addr]
+        # Imported functions have no body and are not recorded in the DB, so
+        # they cannot be callers; skip them without warning.
+        if func.type == FuncType.IMPORTED:
+            return
         if func.id is None:
             logging.warning(f"{log_prefix}: {func.name}  is not a registered function, skip")
             return
@@ -293,9 +303,13 @@ class DecompilMapper(Backend):
                 continue
             child = self.functions[child_addr]
             if child.id is None:
-                logging.warning(
+                # Imported callees are never recorded in the DB (they have no
+                # body), so a missing id is expected rather than an error.
+                level = logging.DEBUG if child.type == FuncType.IMPORTED else logging.WARNING
+                logging.log(
+                    level,
                     f"{log_prefix}: cannot record call to {child.name} from {func.name} "
-                    + "missing target id."
+                    + "missing target id.",
                 )
                 continue
             self.db_interface.record_ref_call(func.id, child.id)
