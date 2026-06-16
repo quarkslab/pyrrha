@@ -572,6 +572,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#json-export" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JSON export
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -772,6 +783,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#json-export" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JSON export
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -809,8 +831,18 @@ the mapper will:</p>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>  -d, --debug                 Set log level to DEBUG.
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>  --db PATH                   NumbatUI DB file path (.srctrldb).  [default: decomp.srctrldb]
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>  -b, --backend [ida|ghidra]  Backend to use.  [default: Backend.IDA]
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  -h, --help                  Show this message and exit.                  Show this message and exit.
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  -e, --export                Create a JSON export of the resulting decompilation mapping.
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>  -h, --help                  Show this message and exit.
 </span></code></pre></div>
+<h2 id="json-export">JSON export</h2>
+<p>With the <code>-e/--export</code> option, the mapper writes a JSON file next to the database (<code>&lt;db&gt;.json</code>) describing the result of the run. It is loaded back into an <code>ExportedDecompilation</code> object exposed by Pyrrha, so results can be post-processed without re-running a disassembler:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pyrrha_mapper.mappers</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExportedDecompilation</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">result</span> <span class="o">=</span> <span class="n">ExportedDecompilation</span><span class="o">.</span><span class="n">from_json_export</span><span class="p">(</span><span class="s2">"my_binary.json"</span><span class="p">)</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">for</span> <span class="n">func</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">iter_functions</span><span class="p">():</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="nb">print</span><span class="p">(</span><span class="nb">hex</span><span class="p">(</span><span class="n">func</span><span class="o">.</span><span class="n">addr</span><span class="p">),</span> <span class="n">func</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">func</span><span class="o">.</span><span class="n">type</span><span class="p">)</span>
+</span></code></pre></div>
+<p>An <code>ExportedDecompilation</code> stores the analysed binary identity (<code>path</code>, <code>id</code>, <code>name</code>) and its functions, keyed by their parser-space entry-point address. Each function is an <code>ExportedFunction</code> carrying its <code>Symbol</code>, its <code>FuncType</code>, the addresses it calls and is called by, its decompiled <code>source</code>, and the in-source locations of its declaration and call sites (<code>ExportedLocation</code>).</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>This mapper create the Quokka export of the binary as well as a cache version of all the decompiled function of the analyzed binary.. If these files already exist, it loads them without regenerate them. Like that it also allowed to use <code>pyrrha</code> in systems without Quokka and/or IDA. </p>
