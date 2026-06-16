@@ -34,6 +34,7 @@ from rich.progress import (
 from pyrrha_mapper.backend import IDA, Backend, Ghidra
 from pyrrha_mapper.types import FuncType
 
+from .decomp_objects import ExportedDecompilation
 from .objects import Binary, Symbol
 
 
@@ -347,6 +348,14 @@ class DecompilMapper(Backend):
                 progress.update(cg_indexing, advance=1)
 
         return True
+
+    def to_export(self) -> ExportedDecompilation:
+        """Build a serialisable export of the current mapping result.
+
+        :return: an ExportedDecompilation projecting this mapper's binary and
+            functions into a JSON-serialisable model.
+        """
+        return ExportedDecompilation.from_mapper(self)
 
 
 class IdaDecompilMapper(DecompilMapper, IDA):

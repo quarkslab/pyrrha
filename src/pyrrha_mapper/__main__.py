@@ -249,9 +249,7 @@ def fs_mapper(
     db_instance = setup_db(db)
     root_directory = root_directory.absolute()
 
-    filesystem = FileSystemImportsMapper(root_directory, db_instance).map(
-        jobs, resolve_duplicates
-    )
+    filesystem = FileSystemImportsMapper(root_directory, db_instance).map(jobs, resolve_duplicates)
 
     if export:
         filesystem.write(db_instance.path.with_suffix(".json"))
@@ -315,6 +313,13 @@ def fs_call_graph_mapper(
     ),
 )
 @backend_option
+@click.option(
+    "-e",
+    "--export",
+    help="Create a JSON export of the resulting decompilation mapping.",
+    is_flag=True,
+    default=False,
+)
 @click.argument(
     "executable",
     type=click.Path(exists=False, file_okay=True, dir_okay=False, path_type=Path),
@@ -323,6 +328,7 @@ def fs_exe_decompiled_mapper(
     debug: bool,
     db: Path,
     backend: Backend,
+    export: bool,
     executable: Path,
 ):
     """Map a single executable with decompiled code."""
@@ -343,6 +349,10 @@ def fs_exe_decompiled_mapper(
 
     if mapper.map():
         logging.info("success.")
+        if export:
+            export_path = db_instance.path.with_suffix(".json")
+            mapper.to_export().write(export_path)
+            logging.info(f"write export into: {export_path}")
     else:
         logging.error("failure.")
 
