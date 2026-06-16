@@ -36,6 +36,7 @@ class IDA(Backend):
         image_base: int = 0,
     ) -> None:
         from ida_domain.database import Database, IdaCommandOptions
+
         self.decompilation_activated = decompilation
         self.image_base = image_base
         self._bin_path = bin_path
@@ -65,6 +66,7 @@ class IDA(Backend):
     def func_addrs(self) -> Iterator[int]:
         """Yield the parser-space entry-point address of every known function."""
         from ida_domain.functions import FunctionFlags
+
         for func in self._ida_db.functions.get_all():
             if FunctionFlags.TAIL in self._ida_db.functions.get_flags(func):
                 continue
@@ -111,6 +113,7 @@ class IDA(Backend):
         :return: list of callee entry-point addresses.
         """
         from ida_domain.functions import FunctionFlags
+
         func = self._get_ida_func(addr)
         result: list[int] = []
         for callee in self._ida_db.functions.get_callees(func) if func is not None else []:
@@ -143,6 +146,7 @@ class IDA(Backend):
         6. Default → ``NORMAL``.
         """
         from ida_domain.functions import FunctionFlags
+
         func = self._get_ida_func(addr)
         if func is None:
             return FuncType.NORMAL
@@ -166,19 +170,20 @@ class IDA(Backend):
 
     def func_decompiled(self, addr: int) -> str:
         """:return: decompilation result of the function"""
-        result: dict[int, str] = {}
+        from ida_domain.base import IdaDomainError
+
         func = self._get_ida_func(addr)
         if func is None:
             return ""
         try:
-            lines = self._ida_db.functions.get_pseudocode(func, remove_tags=True)
-        except RuntimeError as exc:
+            pseudocode = self._ida_db.functions.get_pseudocode(func)
+            lines = pseudocode.to_text(remove_tags=True)
+        except IdaDomainError as exc:
             logging.debug(
                 f"[IDA] skipping {func.start_ea:#x} "
                 f"({self._ida_db.functions.get_name(func)!r}): {exc}"
             )
             return ""
-        logging.info(f"[IDA] decompiled {len(result)} functions from {self._bin_path}")
         return "\n".join(lines)
 
     # ------------------------------------------------------------------
@@ -207,6 +212,7 @@ class IDA(Backend):
         :return: iterator of ``func_t`` objects with ``FUNC_TAIL`` excluded.
         """
         from ida_domain.functions import FunctionFlags
+
         for func in self._ida_db.functions.get_all():
             if FunctionFlags.TAIL in self._ida_db.functions.get_flags(func):
                 continue

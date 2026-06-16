@@ -16,6 +16,7 @@
 - `decomp` mapper: fix the mapping run (`map` now reports success/failure, runs the decompilation and call-graph indexing phases, and records the binary node so functions get a valid parent).
 - `decomp` mapper: fix call-graph source cross-references (call-site locations are looked up by callee address and no longer raise on the first reference).
 - `decomp` mapper: fix command-line arguments and improve the decompilation script (correct `NamedTemporaryFile` usage, better IDA decompilation output).
+- `decomp` mapper (IDA backend): use the `ida_domain` 0.5.0 pseudocode API (`get_pseudocode(func).to_text(...)`), fixing a `TypeError` that broke every IDA decompilation run.
 - `cli`: keep an existing suffix in the DB path and annotate the `decomp` mapper variable with its base type to fix a type-checking error.
 
 ### Internal
