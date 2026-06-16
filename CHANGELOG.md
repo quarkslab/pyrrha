@@ -20,7 +20,7 @@
 
 ### Internal
 - Reorganize the repository into two submodules (`backend` and `mappers`) and rework the mappers so backend support lives in a single common place; remove unused modules and the `heimdallr`/disassembly-sync prototype.
-- CI: build and test IDA and Ghidra Docker images, export test artifacts, and trigger builds only on relevant changes.
+- CI: build and test IDA and Ghidra Docker images, run the `decomp` export-model and functional tests, export test artifacts, and trigger builds only on relevant changes.
 
 ## v1.0.1—Improve exe-decomp mapper
 
