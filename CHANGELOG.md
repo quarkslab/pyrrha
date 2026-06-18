@@ -27,6 +27,7 @@
 - Reorganize the repository into two submodules (`backend` and `mappers`) and rework the mappers so backend support lives in a single common place; remove unused modules and the `heimdallr`/disassembly-sync prototype.
 - CI: build and test IDA and Ghidra Docker images, run the `decomp` export-model and functional tests, export test artifacts, and trigger builds only on relevant changes.
 - Add backend-free unit tests for the `decomp` mapper's recording, source-indexing and call-graph logic, raising its coverage without a disassembler.
+- Tests: make export-artifact collection best-effort so a read-only pre-existing destination (e.g. artifacts downloaded from another job) no longer fails the test at teardown.
 
 ## v1.0.1—Improve exe-decomp mapper
 

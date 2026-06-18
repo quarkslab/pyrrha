@@ -15,6 +15,7 @@
 #  limitations under the License.
 """Pytest configuration and shared fixtures."""
 
+import logging
 import os
 import shutil
 from pathlib import Path
@@ -56,7 +57,19 @@ def _collect_export_artifacts(request: pytest.FixtureRequest) -> None:
             export_res.db_path,
             export_res.project_path,
         ]:
-            if path.exists():
-                shutil.copy2(path, dest / path.name)
+            if not path.exists():
+                continue
+            target = dest / path.name
+            # Artifact collection is a best-effort convenience: it must never
+            # fail a test. The destination may already exist and be read-only
+            # (e.g. a job that downloads another job's artifacts into the same
+            # directory restores them read-only), so drop it first and ignore
+            # any copy error.
+            try:
+                if target.exists():
+                    target.unlink()
+                shutil.copy2(path, target)
+            except OSError as error:
+                logging.warning(f"could not collect artifact {path.name}: {error}")
 
     request.addfinalizer(_copy)
