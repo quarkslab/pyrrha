@@ -193,10 +193,10 @@ test_fs:
     PYTEST_ARTIFACTS_DIR: test_artifacts
 
 test_fs-cg_backend:
-  needs: [build_image, test_fs]
   extends:
     - test_fs
   stage: test-backend
+  needs: [build_image, test_fs]
   # Pull the image built in this pipeline when on main, dev, or a release tag
   # (tagged as <version>-main, <version>-dev, or <version>-<semver>).
   # For any other branch (e.g. feature branches) no image is built, so we
