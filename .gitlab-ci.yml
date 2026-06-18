@@ -1,7 +1,7 @@
 stages:
   - build
   - test
-  - test_backend
+  - test-backend
   - notify
 
 # Paths that should trigger test and build pipelines.
