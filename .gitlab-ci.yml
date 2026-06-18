@@ -191,8 +191,7 @@ test_fs:
 test_fs-cg_backend:
   extends:
     - test_fs
-  stage:
-    - test-backend
+  stage: test-backend
   # Pull the image built in this pipeline when on main, dev, or a release tag
   # (tagged as <version>-main, <version>-dev, or <version>-<semver>).
   # For any other branch (e.g. feature branches) no image is built, so we
