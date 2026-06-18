@@ -171,7 +171,14 @@ class DecompilMapper(Backend):
         try:
             tmp.write(func.source)
             tmp.close()
-            func.source_id = self.db_interface.record_file(Path(tmp.name), name=func.name)
+            # The file is recorded under a name that includes the function
+            # address: numbat derives the file node from this name, and two
+            # functions can share a mangled name (e.g. tool-generated or
+            # versioned symbols). A non-unique name reuses the existing file
+            # node id and then re-inserts a file row with it, raising a UNIQUE
+            # constraint error on file.id.
+            file_name = f"{func.name}@{func.addr:#x}"
+            func.source_id = self.db_interface.record_file(Path(tmp.name), name=file_name)
             if func.source_id is None:
                 return func
             self.db_interface.record_file_language(func.source_id, "cpp")

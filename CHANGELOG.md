@@ -20,6 +20,7 @@
 - `decomp` mapper: skip imported functions during source and call-graph indexing (they have no decompiled body), removing spurious per-function error/warning logs.
 - `decomp` mapper: write decompiled source via a portable temporary file, fixing a `TypeError` (`delete_on_close`) that aborted every run on Python 3.11.
 - `decomp` mapper: attach call-site locations to the call reference returned by `record_ref_call` instead of the callee symbol id.
+- `decomp` mapper: record each function's source file under a per-function unique name, fixing a `UNIQUE constraint failed: file.id` crash when two functions share a name.
 - `cli`: keep an existing suffix in the DB path and annotate the `decomp` mapper variable with its base type to fix a type-checking error.
 
 ### Internal
