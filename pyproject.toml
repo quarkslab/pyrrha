@@ -104,3 +104,20 @@ convention = "numpy"
 [tool.ruff.format]
 line-ending = "auto"
 docstring-code-format = true
+
+
+[tool.coverage.run]
+# parallel mode writes a uniquely suffixed data file (.coverage.<host>.<pid>)
+# per run, so the data files produced by the different CI jobs do not overwrite
+# each other and can be merged with `coverage combine` in the aggregation job.
+parallel = true
+
+[tool.coverage.paths]
+# Jobs run the installed wheel (…/site-packages/pyrrha_mapper), not the source
+# tree. `coverage combine` matches files by path, so map both locations to the
+# same logical path; without this the source tree and the installed package
+# would be treated as different files and would not merge.
+source = [
+    "src/pyrrha_mapper",
+    "*/site-packages/pyrrha_mapper",
+]
