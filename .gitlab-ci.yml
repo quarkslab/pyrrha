@@ -1,6 +1,7 @@
 stages:
   - build
   - test
+  - test_backend
   - notify
 
 # Paths that should trigger test and build pipelines.
@@ -164,7 +165,7 @@ test_decomp_objects:
     TEST_COVERAGE_SOURCE: pyrrha_mapper.mappers.decomp_objects
     TEST_PATH: tests/test_decomp_objects.py
 
-test_decomp_mapper:
+test_decomp:
   extends:
     - test_data_structures
   variables:
@@ -187,9 +188,11 @@ test_fs:
     TEST_PATH: tests/test_cli.py::TestFSMapper
     PYTEST_ARTIFACTS_DIR: test_artifacts
 
-test_fs-cg:
+test_fs-cg_backend:
   extends:
     - test_fs
+  stage:
+    - test-backend
   # Pull the image built in this pipeline when on main, dev, or a release tag
   # (tagged as <version>-main, <version>-dev, or <version>-<semver>).
   # For any other branch (e.g. feature branches) no image is built, so we
@@ -243,7 +246,7 @@ test_fs-cg:
       - BACKEND: "ghidra"
         VERSION: ["12.0.4"]
 
-test_decomp:
+test_decomp_backend:
   extends:
     - test_fs-cg
   variables:
