@@ -1560,6 +1560,7 @@
 <ul>
 <li>Reorganize the repository into two submodules (<code>backend</code> and <code>mappers</code>) and rework the mappers so backend support lives in a single common place; remove unused modules and the <code>heimdallr</code>/disassembly-sync prototype.</li>
 <li>CI: build and test IDA and Ghidra Docker images, run the <code>decomp</code> export-model and functional tests, export test artifacts, and trigger builds only on relevant changes.</li>
+<li>Add backend-free unit tests for the <code>decomp</code> mapper's recording, source-indexing and call-graph logic, raising its coverage without a disassembler.</li>
 </ul>
 <h2 id="v101improve-exe-decomp-mapper">v1.0.1—Improve exe-decomp mapper</h2>
 <h3 id="features_1">Features</h3>
