@@ -248,7 +248,7 @@ test_fs-cg_backend:
 
 test_decomp_backend:
   extends:
-    - test_fs-cg
+    - test_fs-cg_backend
   variables:
     DB: decomp_${BACKEND}_${VERSION}
     MAPPER: decomp
