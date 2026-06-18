@@ -164,6 +164,13 @@ test_decomp_objects:
     TEST_COVERAGE_SOURCE: pyrrha_mapper.mappers.decomp_objects
     TEST_PATH: tests/test_decomp_objects.py
 
+test_decomp_mapper:
+  extends:
+    - test_data_structures
+  variables:
+    TEST_COVERAGE_SOURCE: pyrrha_mapper.mappers.decomp_mapper
+    TEST_PATH: tests/test_decomp_mapper.py
+
 #========================== MAPPERS TESTS ====================================
 test_fs:
   extends:
