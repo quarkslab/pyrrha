@@ -28,6 +28,7 @@
 - CI: build and test IDA and Ghidra Docker images, run the `decomp` export-model and functional tests, export test artifacts, and trigger builds only on relevant changes.
 - Add backend-free unit tests for the `decomp` mapper's recording, source-indexing and call-graph logic, raising its coverage without a disassembler.
 - Tests: make export-artifact collection best-effort so a read-only pre-existing destination (e.g. artifacts downloaded from another job) no longer fails the test at teardown.
+- CI: run coverage in parallel mode and add a `coverage` job that combines the data files from every test job into a single global coverage report (the union of all lines exercised by the whole suite).
 
 ## v1.0.1—Improve exe-decomp mapper
 
