@@ -229,7 +229,7 @@ test_fs-cg_backend:
     DB: ${BACKEND}_${VERSION}
     MAPPER: fs-cg
     MAPPER_OPTIONS: '--backend ${BACKEND}'
-    TEST_COVERAGE_SOURCE: pyrrha_mapper.mappers.intercg_bin_loader,pyrrha_mapper.mappers.intercg_mapper
+    TEST_COVERAGE_SOURCE: pyrrha_mapper.mappers.intercg_bin_loader,pyrrha_mapper.mappers.intercg_mapper,pyrrha_mapper.backend
     TEST_PATH: tests/test_cli.py::TestFsCgMapper
     TEST_SUP_OPTIONS: ${MAPPER_OPTIONS}
     HEXRAYS_LICENSE: "${IDA_LICENSE}"
@@ -275,7 +275,7 @@ test_decomp_backend:
     DB: decomp_${BACKEND}_${VERSION}
     MAPPER: decomp
     MAPPER_OPTIONS: '--backend ${BACKEND}'
-    TEST_COVERAGE_SOURCE: pyrrha_mapper.mappers.decomp_mapper,pyrrha_mapper.mappers.decomp_objects
+    TEST_COVERAGE_SOURCE: pyrrha_mapper.mappers.decomp_mapper,pyrrha_mapper.mappers.decomp_objects,pyrrha_mapper.backend
     TEST_PATH: tests/test_cli.py::TestDecompMapper
     TEST_SUP_OPTIONS: ${MAPPER_OPTIONS}
 
