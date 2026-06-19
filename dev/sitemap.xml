@@ -2,47 +2,47 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
         <loc>https://quarkslab.github.io/pyrrha/dev/</loc>
-        <lastmod>2026-06-18</lastmod>
+        <lastmod>2026-06-19</lastmod>
         <changefreq>daily</changefreq>
     </url>
     <url>
         <loc>https://quarkslab.github.io/pyrrha/dev/changelog/</loc>
-        <lastmod>2026-06-18</lastmod>
+        <lastmod>2026-06-19</lastmod>
         <changefreq>daily</changefreq>
     </url>
     <url>
         <loc>https://quarkslab.github.io/pyrrha/dev/installation/</loc>
-        <lastmod>2026-06-18</lastmod>
+        <lastmod>2026-06-19</lastmod>
         <changefreq>daily</changefreq>
     </url>
     <url>
         <loc>https://quarkslab.github.io/pyrrha/dev/license/</loc>
-        <lastmod>2026-06-18</lastmod>
+        <lastmod>2026-06-19</lastmod>
         <changefreq>daily</changefreq>
     </url>
     <url>
         <loc>https://quarkslab.github.io/pyrrha/dev/contributing/dev_mapper/</loc>
-        <lastmod>2026-06-18</lastmod>
+        <lastmod>2026-06-19</lastmod>
         <changefreq>daily</changefreq>
     </url>
     <url>
         <loc>https://quarkslab.github.io/pyrrha/dev/mappers/exe-decomp/</loc>
-        <lastmod>2026-06-18</lastmod>
+        <lastmod>2026-06-19</lastmod>
         <changefreq>daily</changefreq>
     </url>
     <url>
         <loc>https://quarkslab.github.io/pyrrha/dev/mappers/fs-cg/</loc>
-        <lastmod>2026-06-18</lastmod>
+        <lastmod>2026-06-19</lastmod>
         <changefreq>daily</changefreq>
     </url>
     <url>
         <loc>https://quarkslab.github.io/pyrrha/dev/mappers/fs/</loc>
-        <lastmod>2026-06-18</lastmod>
+        <lastmod>2026-06-19</lastmod>
         <changefreq>daily</changefreq>
     </url>
     <url>
         <loc>https://quarkslab.github.io/pyrrha/dev/mappers/mappers/</loc>
-        <lastmod>2026-06-18</lastmod>
+        <lastmod>2026-06-19</lastmod>
         <changefreq>daily</changefreq>
     </url>
 </urlset>
