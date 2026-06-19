@@ -475,3 +475,157 @@ class TestToExport:
         assert export.id == mapper.bin.id
         assert set(export.functions.keys()) == {0x1000, 0x2000}
         assert export.get_function_by_name("foo") is not None
+
+
+# --------------------------------------------------------------------------- #
+#  __init__ / index_function / map_binary
+#
+#  The tests above inject FuncData directly and build the mapper with
+#  object.__new__, so the backend accessors, DecompilMapper.__init__ and the
+#  map() orchestration are never exercised. The driver below provides
+#  canned backend data so those paths run without a disassembler.
+# --------------------------------------------------------------------------- #
+
+
+class _DrivingMapper(DecompilMapper):
+    """DecompilMapper whose backend accessors return canned in-memory data.
+
+    A small fake "program" is described by ``_addrs`` (entry points) and
+    ``_data`` (per-address name/type/calls/source). This lets ``__init__``,
+    ``index_function`` and ``map_binary`` run end-to-end against a FakeDB.
+    """
+
+    def __init__(self, db: FakeDB, bin_path: Path, program: dict[int, dict]) -> None:
+        self._program = program
+        super().__init__(db, bin_path)
+
+    @property
+    def func_addrs(self):  # noqa: D102
+        return iter(sorted(self._program))
+
+    def func_children(self, addr):  # noqa: D102
+        return list(self._program[addr].get("calls", []))
+
+    def func_parents(self, addr):  # noqa: D102
+        return list(self._program[addr].get("callers", []))
+
+    def func_type(self, addr):  # noqa: D102
+        return self._program[addr]["type"]
+
+    def func_mangled_name(self, addr):  # noqa: D102
+        return self._program[addr]["name"]
+
+    def func_demangled_name(self, addr):  # noqa: D102
+        return self._program[addr].get("demangled", self._program[addr]["name"])
+
+    def func_decompiled(self, addr):  # noqa: D102
+        return self._program[addr].get("source", "")
+
+    def is_func_start(self, addr):  # noqa: D102
+        return addr in self._program
+
+    def close(self):  # noqa: D102
+        pass
+
+
+class TestInit:
+    """Tests for DecompilMapper.__init__."""
+
+    def test_sets_up_state_and_binary_group(self) -> None:
+        """__init__ wires the db, an empty function map and the Binaries group."""
+        db = FakeDB()
+        mapper = _DrivingMapper(db, Path("/bin/sample"), {})
+        assert mapper.db_interface is db
+        assert mapper.functions == {}
+        assert mapper.source_ids == {}
+        assert mapper.bin.path == Path("/bin/sample")
+        # A "Binaries" class node type is registered for NumbatUI grouping.
+        assert ("class", "Binaries", "binary") in db.node_types
+
+
+class TestIndexFunction:
+    """Tests for DecompilMapper.index_function (drives the backend accessors)."""
+
+    def test_indexes_normal_function(self) -> None:
+        """A normal function is added to the binary and recorded with its data."""
+        program = {
+            0x1000: {
+                "name": "foo",
+                "demangled": "foo",
+                "type": FuncType.NORMAL,
+                "calls": [0x2000],
+                "callers": [],
+                "source": "void foo(void){ bar(); }",
+            }
+        }
+        db = FakeDB()
+        mapper = _DrivingMapper(db, Path("/bin/sample"), program)
+        mapper.bin.id = 1
+        mapper.index_function(0x1000, "[idx]")
+        func = mapper.functions[0x1000]
+        assert func.name == "foo"
+        assert func.type == FuncType.NORMAL
+        assert func.calls == [0x2000]
+        assert func.source == "void foo(void){ bar(); }"
+        assert func.id is not None
+        assert mapper.bin.get_function_by_name("foo") is not None
+
+    def test_imported_function_has_empty_source(self) -> None:
+        """An imported function is indexed without querying decompiled source."""
+        program = {
+            0x3000: {
+                "name": "calloc",
+                "type": FuncType.IMPORTED,
+                "source": "SHOULD NOT BE READ",
+            }
+        }
+        db = FakeDB()
+        mapper = _DrivingMapper(db, Path("/bin/sample"), program)
+        mapper.bin.id = 1
+        mapper.index_function(0x3000, "[idx]")
+        assert mapper.functions[0x3000].source == ""
+
+
+class TestMapBinary:
+    """Tests for DecompilMapper.map() orchestration."""
+
+    def test_full_run_records_binary_functions_and_calls(self) -> None:
+        """map() records the binary node then indexes functions and calls."""
+        program = {
+            0x1000: {
+                "name": "foo",
+                "demangled": "foo",
+                "type": FuncType.NORMAL,
+                "calls": [0x2000],
+                "callers": [],
+                "source": "void foo(void)\n{\n    bar();\n}",
+            },
+            0x2000: {
+                "name": "bar",
+                "demangled": "bar",
+                "type": FuncType.NORMAL,
+                "calls": [],
+                "callers": [0x1000],
+                "source": "void bar(void)\n{\n}",
+            },
+        }
+        db = FakeDB()
+        mapper = _DrivingMapper(db, Path("/bin/sample"), program)
+        assert mapper.map() is True
+        # The binary was recorded as a class node.
+        assert db.classes and db.classes[0]["name"] == "sample"
+        # Both functions indexed and recorded.
+        assert set(mapper.functions) == {0x1000, 0x2000}
+        assert {f["name"] for f in db.functions} == {"foo", "bar"}
+        # The foo -> bar call was recorded.
+        assert db.ref_calls == [(mapper.functions[0x1000].id, mapper.functions[0x2000].id)]
+
+    def test_binary_record_failure_aborts(self) -> None:
+        """When the binary node cannot be recorded, map() returns False."""
+        db = FakeDB()
+        db.fail_record_class = True
+        mapper = _DrivingMapper(
+            db, Path("/bin/sample"), {0x1000: {"name": "foo", "type": FuncType.NORMAL}}
+        )
+        assert mapper.map() is False
+        assert mapper.functions == {}
