@@ -186,6 +186,43 @@ test_decomp:
     TEST_COVERAGE_SOURCE: pyrrha_mapper.mappers.decomp_mapper
     TEST_PATH: tests/test_decomp_mapper.py
 
+test_cli:
+  needs: [test_data_structures]
+  extends:
+    - test_data_structures
+  variables:
+    TEST_COVERAGE_SOURCE: pyrrha_mapper.__main__
+    TEST_PATH: tests/test_main.py
+
+#========================== MAPPERS UNIT TESTS (backend-free) =================
+# These jobs run the backend-free unit tests in the plain `test` stage (no
+# disassembler image). They measure the pure-logic portions of the mapper
+# modules and merge into the global `coverage` job alongside the backend jobs,
+# which cover the disassembler-driven paths of the same modules.
+test_imports_mapper:
+  needs: [test_data_structures]
+  extends:
+    - test_data_structures
+  variables:
+    TEST_COVERAGE_SOURCE: pyrrha_mapper.mappers.imports_mapper
+    TEST_PATH: tests/test_imports_mapper.py
+
+test_intercg_mapper:
+  needs: [test_data_structures]
+  extends:
+    - test_data_structures
+  variables:
+    TEST_COVERAGE_SOURCE: pyrrha_mapper.mappers.intercg_mapper
+    TEST_PATH: tests/test_intercg_mapper.py
+
+test_intercg_bin_loader:
+  needs: [test_data_structures]
+  extends:
+    - test_data_structures
+  variables:
+    TEST_COVERAGE_SOURCE: pyrrha_mapper.mappers.intercg_bin_loader
+    TEST_PATH: tests/test_intercg_bin_loader.py
+
 #========================== MAPPERS TESTS ====================================
 test_fs:
   needs: [test_data_structures]
@@ -293,6 +330,10 @@ coverage:
     - test_data_structures
     - test_decomp_objects
     - test_decomp
+    - test_cli
+    - test_imports_mapper
+    - test_intercg_mapper
+    - test_intercg_bin_loader
     - test_fs
     - test_fs-cg_backend
     - test_decomp_backend
