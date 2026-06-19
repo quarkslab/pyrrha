@@ -148,11 +148,13 @@ test_data_structures:
     - coverage run --source=${TEST_COVERAGE_SOURCE} -m pytest  --junitxml=report.xml -vvv -x ${TEST_SUP_OPTIONS} ${TEST_PATH}
     # parallel mode (see [tool.coverage.run] in pyproject.toml) writes suffixed
     # data files, so combine them before producing this job's own xml/report.
-    # The .coverage.* file is also saved as an artifact so the `coverage` job
-    # can merge every job's data into a single global report.
     - coverage combine
     - coverage xml
     - coverage report
+    # combine collapsed the suffixed files into a single .coverage; rename it to
+    # a per-job name so it survives as an artifact and the `coverage` job can
+    # merge every job's file (combine picks up all .coverage.* in its CWD).
+    - mv .coverage ".coverage.${CI_JOB_NAME_SLUG}"
   image: python:latest
   variables:
     TEST_COVERAGE_SOURCE: pyrrha_mapper.mappers.objects
@@ -161,7 +163,7 @@ test_data_structures:
   artifacts:
     when: always
     paths:
-      - .coverage.*
+      - .coverage.${CI_JOB_NAME_SLUG}
     reports:
       junit: report.xml
       coverage_report:
@@ -193,7 +195,7 @@ test_fs:
     name: db_$CI_JOB_NAME_SLUG
     paths:
       - test_artifacts/
-      - .coverage.*
+      - .coverage.${CI_JOB_NAME_SLUG}
     reports:
       junit: report.xml
       coverage_report:
