@@ -315,6 +315,11 @@ class FileSystemImportsMapper:
                         f"{log_prefix}: manually selected entry to disambiguate {target_name}"
                     )
                     selected_bin = cache_entry
+                    # Record the index too so the prompt loop below is skipped;
+                    # without it the loop guard stays unsatisfied and the user
+                    # is prompted despite the cache hit.
+                    selected_index = matching_objects.index(cache_entry)
+                    break
 
             while (
                 selected_bin is None
