@@ -24,3 +24,5 @@ data/
 *.BinExport
 *.quokka
 .gitlab-ci-local*
+.cache/
+site/
