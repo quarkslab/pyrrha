@@ -43,6 +43,7 @@ dependencies = [
     'lief>=0.17.0',
     'numbat>=0.2.6',
     'pydantic',
+    'rich-click',
     'rich',
     "ida_domain",
     "pyghidra"
