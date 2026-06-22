@@ -20,8 +20,8 @@ import logging
 import multiprocessing
 from pathlib import Path
 
-import click
 import coloredlogs  # type: ignore # no typing used in this library
+import rich_click as click
 from numbat import SourcetrailDB
 
 from pyrrha_mapper.mappers import (
@@ -46,20 +46,25 @@ def resolve_duplicates_options(f):
         "--ignore",
         "resolve_duplicates",
         flag_value=ResolveDuplicateOption.IGNORE,
-        help="When resolving duplicate imports, ignore them.",
+        help="Ignore them.",
         default=True,
     )
     @click.option(
         "--arbitrary",
         "resolve_duplicates",
         flag_value=ResolveDuplicateOption.ARBITRARY,
-        help="When resolving duplicate imports, select the first one available.",
+        help="Select the first one available.",
     )
     @click.option(
         "--interactive",
         "resolve_duplicates",
         flag_value=ResolveDuplicateOption.INTERACTIVE,
-        help="When resolving duplicate imports, user manually selects which one to use.",
+        help="User manually selects which one to use.",
+    )
+    @click.option_panel(
+        "Resolution",
+        help="When resolving duplicate imports:",
+        options=["--arbitrary", "--interactive", "--ignore"],
     )
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
@@ -133,7 +138,7 @@ def root_directory_argument(f):
 # -------------------------------------------------------------------------------
 
 
-class MapperCommand(click.Command):
+class MapperCommand(click.RichCommand):
     """Common class to add shared options for mapper.
 
     Code from: https://stackoverflow.com/a/53875557
@@ -143,7 +148,7 @@ class MapperCommand(click.Command):
         super().__init__(*args, **kwargs)
         self.params.insert(
             0,
-            click.core.Option(
+            click.Option(
                 ("--db",),
                 help=f"NumbatUI DB file path ({SourcetrailDB.SOURCETRAIL_DB_EXT}).",
                 type=click.Path(file_okay=True, dir_okay=True, path_type=Path),
@@ -153,7 +158,7 @@ class MapperCommand(click.Command):
         )
         self.params.insert(
             0,
-            click.core.Option(("-d", "--debug"), is_flag=True, help="Set log level to DEBUG."),
+            click.Option(("-d", "--debug"), is_flag=True, help="Set log level to DEBUG."),
         )
         self.no_args_is_help = True
 
@@ -235,6 +240,15 @@ def pyrrha():  # noqa: D103
     default=False,
 )
 @jobs_option(max_fraction=1.0)
+@click.option_panel(
+    "Mapper Options",
+    options=[
+        "-b",
+        "--db",
+        "-e",
+        "-j",
+    ],
+)
 @resolve_duplicates_options
 @root_directory_argument
 def fs_mapper(
@@ -269,6 +283,15 @@ def fs_mapper(
     ),
 )
 @jobs_option(max_fraction=0.7)
+@click.option_panel(
+    "Mapper Options",
+    options=[
+        "-b",
+        "--db",
+        "-e",
+        "-j",
+    ],
+)
 @resolve_duplicates_options
 @backend_option
 @root_directory_argument
@@ -314,6 +337,15 @@ def fs_call_graph_mapper(
     ),
 )
 @backend_option
+@click.option_panel(
+    "Mapper Options",
+    options=[
+        "-b",
+        "--db",
+        "-e",
+        "-j",
+    ],
+)
 @click.option(
     "-e",
     "--export",
