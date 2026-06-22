@@ -8,21 +8,27 @@
 ### Mapping with Pyrrha 
 First, create your db with `pyrrha`. The `ROOT_DIRECTORY` should contain the whole filesystem you want to map, it should be already extracted or mounted. `ROOT_DIRECTORY` will be considered by Pyrrha as the filesystem root for all the symlink resolutions. 
 
-```commandline
-Usage: Usage: pyrrha fs [OPTIONS] ROOT_DIRECTORY
-
-  Map a filesystem into a numbatui-compatible db. It maps ELF and PE files, their imports and their exports plus
-  the symlinks that points on these executable files.
-
-Options:
-  -d, --debug     Set log level to DEBUG
-  --db PATH       NumbatUI DB file path (.srctrldb).  [default: pyrrha.srctrldb]
-  -e, --json      Create a JSON export of the resulting mapping.
-  -j, --jobs INT  Number of parallel jobs created (threads).  [default: 1; 1<=x<=16]
-  --ignore        When resolving duplicate imports, ignore them
-  --arbitrary     When resolving duplicate imports, select the first one available
-  --interactive   When resolving duplicate imports, user manually select which one to use
-  -h, --help      Show this message and exit.
+```bash
+ Usage: pyrrha fs [OPTIONS] ROOT_DIRECTORY                                                                              
+                                                                                                                        
+ Map a filesystem into a NumbatUI-compatible db. It maps ELF and PE files, their imports/exports, plus the symlinks     
+ that point to these executable files.                                                                                  
+                                                                                                                        
+╭─ Mapper Options ─────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ --db          PATH            NumbatUI DB file path (.srctrldb). [default: fs.srctrldb]                              │
+│ --export  -e                  Create a JSON export of the resulting FileSystem mapping.                              │
+│ --jobs    -j  INT [1<=x<=16]  Number of parallel jobs. [default: 1]                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ Resolution ─────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ When resolving duplicate imports:                                                                                    │
+│ --arbitrary    Select the first one available.                                                                       │
+│ --interactive  User manually selects which one to use.                                                               │
+│ --ignore       Ignore them.                                                                                          │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ --debug  -d  Set log level to DEBUG.                                                                                 │
+│ --help   -h  Show this message and exit.                                                                             │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
 You can also export your Pyrrha results as a JSON file (option `-j`) to be able to postprocess them. For example, you can diff the results between two versions of the same system and list the binaries added/removed and which symbols has been added/removed (*cf* example script in `example`).
@@ -37,9 +43,9 @@ Open the resulting project with `numbatui`. You can now navigate on the resultin
 - ![](../img/symlinks.png) <center>_Symlinks pointing on `busybox`._</center>
 </div>
 
-Do not hesitate to take a look at [NumbatUI documentation](https://github.com/quarkslab/NumbatUI/blob/main/DOCUMENTATION.md#graph-view-1) to explore all the possibilities offered by Sourcetrail. [Custom Trails](https://github.com/quarkslab/NumbatUI/blob/main/DOCUMENTATION.md#custom-trail-dialog) could be really useful in a lot of cases.
+Do not hesitate to take a look at [NumbatUI documentation](https://quarkslab.github.io/NumbatUI/interface/) to explore all the possibilities offered by Sourcetrail. [Custom Trails](https://quarkslab.github.io/NumbatUI/interface/#custom-trail) could be really useful in a lot of cases.
 
-!!! note "Sourcetrail Representation"
+!!! info "Sourcetrail Representation"
     If you are visualizing results with Sourcetrail, the exported functions and symbols, and the symlinks are represented as follows:
     
     Binaries |    Exported functions    |     Exported symbols     | Symlinks

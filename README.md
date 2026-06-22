@@ -16,7 +16,12 @@
 </p>
 
 
-Pyrrha is a filesystem cartography and correlation software focusing on visualization. It currently focuses on the relationship between executable files but aims at enabling anyone to map and visualize any relationship types. It uses the open-source code source
+Pyrrha is a firmware cartography tool which provide three level of details: 
+- an overview of the import/export relationships between executables;
+-  a firmware-wide callgraph;
+- a complete map of a given decompiled binary.
+
+It uses the open-source code source
 explorer [NumbatUI](https://github.com/quarkslab/NumbatUI) to provide users with an easy way to navigate through and search for 
 path to function.
  <!-- # --8<-- [end:intro]-->
