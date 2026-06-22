@@ -11,6 +11,13 @@ the mapper will:
 
 ## Usage
 
+!!! tip
+    If your backend is not on  `PATH`, indicate its directory using the matching environment variable.
+    ```sh
+    export IDADIR=/opt/idapro 
+    export GHIDRA_INSTALL_DIR=/opt/ghidra_12.0.4_PUBLIC  
+    ```
+
 ```commandline
 Usage: pyrrha decomp [OPTIONS] EXECUTABLE
 
@@ -24,6 +31,9 @@ Options:
   -e, --export                Create a JSON export of the resulting decompilation mapping.
   -h, --help                  Show this message and exit.
 ```
+After firmware analysis, you can visualize and navigate into the results with `numbatui`. The user interface is described in depth in the [NumbatUI documentation](https://quarkslab.github.io/NumbatUI/interface/).
+
+Do not hesitate to take a look at  all the possibilities offered by NumbatUI, especially [Custom Trails](https://quarkslab.github.io/NumbatUI/interface/#custom-trail).
 
 ## JSON export
 
@@ -38,18 +48,3 @@ for func in result.iter_functions():
 ```
 
 An `ExportedDecompilation` stores the analysed binary identity (`path`, `id`, `name`) and its functions, keyed by their parser-space entry-point address. Each function is an `ExportedFunction` carrying its `Symbol`, its `FuncType`, the addresses it calls and is called by, its decompiled `source`, and the in-source locations of its declaration and call sites (`ExportedLocation`).
-
-!!! note 
-    This mapper create the Quokka export of the binary as well as a cache version of all the decompiled function of the analyzed binary.. If these files already exist, it loads them without regenerate them. Like that it also allowed to use `pyrrha` in systems without Quokka and/or IDA. 
-
-
-After firmware analysis, you can visualize and navigate into the results with `numbatui`. The user interface is described in depth in the [NumbatUI documentation](https://github.com/quarkslab/NumbatUI/blob/main/DOCUMENTATION.md#user-interface).
-    Do not hesitate to take a look at  all the possibilities offered by NumbatUI, especially [Custom Trails](https://github.com/quarkslab/NumbatUI/blob/main/DOCUMENTATION.md#custom-trail-dialog).
-
-<!-- ## JumpTo Disassembler Feature
-
-The mapper uses a NumbatUI feature to enable jumping from NumbatUI directly
-to the given function in a disassembler. This feature is useful if one need
-to perform more in-depth reverse-engineering of the given function. Such
-feature requires an IDA Pro plugin to be installed. It can be done by copying
-the ``numbatui_plugin.py`` in the IDA Pro plugin directory. -->

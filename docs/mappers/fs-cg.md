@@ -10,7 +10,7 @@ anyone can follow control-flow between programs.
 
 The main drawback is that computing a program call graph requires disassembly
 and is thus more computationaly intensive. That task is currently done using
-the [Quokka exporter](https://github.com/quarkslab/quokka).
+either IDA Pro or Ghidra.
 
 
 
@@ -21,27 +21,36 @@ The dump should be provided on the command line. The `ROOT_DIRECTORY` should con
 the whole filesystem to be indexed. 
 
 !!! tip
-    You can use the environement variable `IDAPATH` to indicate in which directory `ida` binary is.
+    If your backend is not on  `PATH`, indicate its directory using the matching environment variable.
+    ```sh
+    export IDADIR=/opt/idapro 
+    export GHIDRA_INSTALL_DIR=/opt/ghidra_12.0.4_PUBLIC  
+    ```
 
-```commandline
-Usage: pyrrha fs-cg [OPTIONS] ROOT_DIRECTORY
-
-  Map a the Inter-Image Call Graph of a whole filesystem into a NumbatUI db.It disassembles executables using a
-  disassembler and extract the call graph.It then results all call references across binaries.
-
-Options:
-  -d, --debug          Set log level to DEBUG
-  --db PATH            NumbatUI DB file path (.srctrldb).  [default: fs-cg.srctrldb]
-  -j, --jobs INT       Number of parallel jobs created (threads).  [default: 1; 1<=x<=11]
-  --ignore             When resolving duplicate imports, ignore them
-  --arbitrary          When resolving duplicate imports, select the first one available
-  --interactive        When resolving duplicate imports, user manually select which one to use=
-  -h, --help           Show this message and exit.
+```bash            
+ Usage: pyrrha fs-cg [OPTIONS] ROOT_DIRECTORY                                                                           
+                                                                                                                        
+ Map the inter-image call graph of a whole filesystem into a NumbatUI db. It disassembles executables, extracts the     
+ call graph, and resolves all call references across binaries.                                                          
+                                                                                                                        
+╭─ Mapper Options ─────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ --backend  -b  [ida|ghidra]    Backend to use. [default: 1]                                                          │
+│ --db           PATH            NumbatUI DB file path (.srctrldb). [default: fs-cg.srctrldb]                          │
+│ --jobs     -j  INT [1<=x<=11]  Number of parallel jobs. [default: 1]                                                 │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ Resolution ─────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ When resolving duplicate imports:                                                                                    │
+│ --arbitrary    Select the first one available.                                                                       │
+│ --interactive  User manually selects which one to use.                                                               │
+│ --ignore       Ignore them.                                                                                          │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ --debug  -d  Set log level to DEBUG.                                                                                 │
+│ --help   -h  Show this message and exit.                                                                             │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
-!!! note 
-    This mapper create the Quokka export of each binary nearby each executable file. If this file already exists, it loads it without regenerate it. Like that it also allowed to use `pyrrha` in systems without Quokka and/or IDA. 
 
+After firmware analysis, you can visualize and navigate into the results with `numbatui`. The user interface is described in depth in the [NumbatUI documentation](https://quarkslab.github.io/NumbatUI/interface/).
 
-After firmware analysis, you can visualize and navigate into the results with `numbatui`. The user interface is described in depth in the [NumbatUI documentation](https://github.com/quarkslab/NumbatUI/blob/main/DOCUMENTATION.md#user-interface).
-    Do not hesitate to take a look at  all the possibilities offered by NumbatUI, especially [Custom Trails](https://github.com/quarkslab/NumbatUI/blob/main/DOCUMENTATION.md#custom-trail-dialog).
+Do not hesitate to take a look at  all the possibilities offered by NumbatUI, especially [Custom Trails](https://quarkslab.github.io/NumbatUI/interface/#custom-trail).

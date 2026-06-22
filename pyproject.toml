@@ -46,7 +46,7 @@ dependencies = [
     'rich-click',
     'rich',
     "ida_domain",
-    "pyghidra"
+    "pyghidra",
 ]
 dynamic = ['version']
 
@@ -60,22 +60,13 @@ Changelog = "https://github.com/quarkslab/pyrrha/CHANGELOG.md"
 pyrrha = 'pyrrha_mapper.__main__:pyrrha'
 
 [project.optional-dependencies]
-doc = [
-    'black',
-    'mkdocs',
-    'mkdocs-autorefs',
-    'mkdocs-glightbox',
-    'mkdocs-materialx[imaging]',
-    'mkdocs-section-index',
-    'mike',
-    'pymdown-extensions'
-]
+doc = ['black', 'mike @ git+https://github.com/squidfunk/mike.git', 'pymdown-extensions', "zensical"]
 linting = ['ruff']
 test = ['pytest', 'pytest-cov']
 typechecking = ['mypy']
 
 [tool.setuptools.dynamic]
-version = {attr = "pyrrha_mapper.__version__"}
+version = { attr = "pyrrha_mapper.__version__" }
 
 [tool.mypy]
 plugins = ['pydantic.mypy']
@@ -96,7 +87,7 @@ indent-width = 4
 [tool.ruff.lint]
 select = ["D", "E", "F", "B", "Q", "I"]
 ignore = [
-  "D107", # missing docstring in __init__, we add docstrings to the class
+    "D107", # missing docstring in __init__, we add docstrings to the class
 ]
 
 [tool.ruff.lint.pydocstyle]
@@ -118,7 +109,4 @@ parallel = true
 # tree. `coverage combine` matches files by path, so map both locations to the
 # same logical path; without this the source tree and the installed package
 # would be treated as different files and would not merge.
-source = [
-    "src/pyrrha_mapper",
-    "*/site-packages/pyrrha_mapper",
-]
+source = ["src/pyrrha_mapper", "*/site-packages/pyrrha_mapper"]
