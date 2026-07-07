@@ -156,7 +156,7 @@ class IDA(Backend):
 
         if len(callees) == 0 and self._ida_db.imports.get_import_at(func.start_ea):
             return FuncType.IMPORTED
-        if len(func.name.split("@@")) == 2:
+        if func.name and len(func.name.split("@@")) == 2:
             return FuncType.IMPORTED
         if FunctionFlags.THUNK in flags:
             if len(callees) == 1:
