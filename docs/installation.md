@@ -11,7 +11,7 @@ The installation is done in three parts:
 ## Pyrrha Installation
 
 !!! note ""
-    === ":fontawesome-brands-python: Python Package"
+    <!-- === ":fontawesome-brands-python: Python Package" -->
         **Pyrrha** relies on a backend (IDA or Ghidra) to generate its results, except for the light mapper `fs`. This installation is not covered here, we consider the following prerequisites:
 
         - Python **≥ 3.10**.
@@ -28,7 +28,7 @@ The installation is done in three parts:
         # Do not forget to activate your virtualenv
         pip install 'pyrrha @ git+https://github.com/quarkslab/pyrrha'
         ```
-    === ":fontawesome-brands-docker: Docker Image"
+    <!-- === ":fontawesome-brands-docker: Docker Image"
         **Pyrrha** can be used with a docker. It provides **Pyrrha** with a backend (**Ghidra**), but you still need to install NumbatUI on your system as described in the [**NumbatUI** Installation](#numbatui-installation) section.
 
         The docker image is directly available from our [Github registry](https://github.com/orgs/quarkslab/packages/container/package/pyrrha).
@@ -39,7 +39,7 @@ The installation is done in three parts:
         docker run  --rm -t -v $PWD:/tmp/pyrrha ghcr.io/quarkslab/pyrrha:latest MAPPER [OPTIONS] ROOT_DIRECTORY
         ```
 
-        
+         -->
 
 
 ## Visualizer Installation
@@ -79,11 +79,11 @@ The installation is done in three parts:
 
 ## Documentation
 
-If you want to build the documentation, you need to install Pyrrha with the `[doc]` dependencies and then serve the documentation on a local server with `mkdocs`.
+If you want to build the documentation, you need to install Pyrrha with the `[doc]` dependencies and then serve the documentation on a local server with `zensical`.
 
 ```bash
 pip install 'pyrrha-mapper[doc]'
 
 # serve doc locally
-mkdocs serve
+zensical serve
 ```
