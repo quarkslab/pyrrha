@@ -18,6 +18,7 @@ jobs:
       - name: Install Dependencies
         run: |
           pip install '.[doc]'
+          pip install git+https://github.com/squidfunk/mike.git
       - name: Setup Docs Deploy
         run: |
           git config --global user.name "Docs Deploy"

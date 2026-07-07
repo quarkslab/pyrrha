@@ -60,7 +60,7 @@ Changelog = "https://github.com/quarkslab/pyrrha/CHANGELOG.md"
 pyrrha = 'pyrrha_mapper.__main__:pyrrha'
 
 [project.optional-dependencies]
-doc = ['black', 'mike @ git+https://github.com/squidfunk/mike.git', 'pymdown-extensions', "zensical"]
+doc = ['black', 'pymdown-extensions', "zensical"]
 linting = ['ruff']
 test = ['pytest', 'pytest-cov']
 typechecking = ['mypy']
