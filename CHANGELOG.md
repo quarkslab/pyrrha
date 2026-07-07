@@ -7,7 +7,10 @@
 - `decomp` mapper: full rework around a class-based object integrated with the common backend layer.
 - `decomp` mapper: add a `-e/--export` option to dump the result as JSON, loadable through the new `ExportedDecompilation` object exposed by Pyrrha.
 - Expose `Binary` image base and relocatable information on the internal representation.
-- Improve the documentation (installation, quick summary, decomp mapper) and add unit tests for the `decomp` export model plus functional tests for the `decomp` mapper.
+- `cli`: revamp the console output rendering.
+- Improve the documentation (installation, quick summary, decomp mapper) and migrate the documentation build from MkDocs to Zensical.
+- Add unit tests for the `decomp` export model plus functional tests for the `decomp` mapper.
+
 
 ### Fixes
 - `intercg` mapper: various fixes around addresses and demangled names, missing Ghidra thunks, extended ignore list, and argument renaming.
@@ -21,14 +24,19 @@
 - `decomp` mapper: write decompiled source via a portable temporary file, fixing a `TypeError` (`delete_on_close`) that aborted every run on Python 3.11.
 - `decomp` mapper: attach call-site locations to the call reference returned by `record_ref_call` instead of the callee symbol id.
 - `decomp` mapper: record each function's source file under a per-function unique name, fixing a `UNIQUE constraint failed: file.id` crash when two functions share a name.
+- `decomp` mapper (IDA backend): fix the function type reported by IDA.
+- `decomp` mapper: fix small remaining issues in database handling.
+- `imports` mapper: fix duplicate-import resolution not honoring the `INTERACTIVE` cache on a cache hit, which could leave the resolution prompt loop stuck.
 - `cli`: keep an existing suffix in the DB path and annotate the `decomp` mapper variable with its base type to fix a type-checking error.
 
 ### Internal
 - Reorganize the repository into two submodules (`backend` and `mappers`) and rework the mappers so backend support lives in a single common place; remove unused modules and the `heimdallr`/disassembly-sync prototype.
 - CI: build and test IDA and Ghidra Docker images, run the `decomp` export-model and functional tests, export test artifacts, and trigger builds only on relevant changes.
-- Add backend-free unit tests for the `decomp` mapper's recording, source-indexing and call-graph logic, raising its coverage without a disassembler.
+- CI: expand the supported Python version range.
+- Add backend-free unit tests for the `decomp`, `imports` and `intercg` mappers and the CLI, raising coverage without needing a disassembler; run them in CI and merge their coverage into the global report.
 - Tests: make export-artifact collection best-effort so a read-only pre-existing destination (e.g. artifacts downloaded from another job) no longer fails the test at teardown.
-- CI: run coverage in parallel mode and add a `coverage` job that combines the data files from every test job into a single global coverage report (the union of all lines exercised by the whole suite).
+- CI: run coverage in parallel mode, add a `coverage` job that combines the data files from every test job into a single global coverage report (the union of all lines exercised by the whole suite), preserve each job's coverage data ahead of that combine step so nothing is lost, and refine the coverage targets.
+**Full Changelog**: [https://github.com/quarkslab/pyrrha/compare/v1.0.1...v2.0.0](https://github.com/quarkslab/pyrrha/compare/v1.0.1...v2.0.0)
 
 ## v1.0.1—Improve exe-decomp mapper
 
