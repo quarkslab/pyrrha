@@ -1488,7 +1488,9 @@
 <li><code>decomp</code> mapper: full rework around a class-based object integrated with the common backend layer.</li>
 <li><code>decomp</code> mapper: add a <code>-e/--export</code> option to dump the result as JSON, loadable through the new <code>ExportedDecompilation</code> object exposed by Pyrrha.</li>
 <li>Expose <code>Binary</code> image base and relocatable information on the internal representation.</li>
-<li>Improve the documentation (installation, quick summary, decomp mapper) and add unit tests for the <code>decomp</code> export model plus functional tests for the <code>decomp</code> mapper.</li>
+<li><code>cli</code>: revamp the console output rendering.</li>
+<li>Improve the documentation (installation, quick summary, decomp mapper) and migrate the documentation build from MkDocs to Zensical.</li>
+<li>Add unit tests for the <code>decomp</code> export model plus functional tests for the <code>decomp</code> mapper.</li>
 </ul>
 <h3 id="fixes">Fixes<a class="headerlink" href="#fixes" title="Permanent link">&para;</a></h3>
 <ul>
@@ -1503,15 +1505,20 @@
 <li><code>decomp</code> mapper: write decompiled source via a portable temporary file, fixing a <code>TypeError</code> (<code>delete_on_close</code>) that aborted every run on Python 3.11.</li>
 <li><code>decomp</code> mapper: attach call-site locations to the call reference returned by <code>record_ref_call</code> instead of the callee symbol id.</li>
 <li><code>decomp</code> mapper: record each function's source file under a per-function unique name, fixing a <code>UNIQUE constraint failed: file.id</code> crash when two functions share a name.</li>
+<li><code>decomp</code> mapper (IDA backend): fix the function type reported by IDA.</li>
+<li><code>decomp</code> mapper: fix small remaining issues in database handling.</li>
+<li><code>imports</code> mapper: fix duplicate-import resolution not honoring the <code>INTERACTIVE</code> cache on a cache hit, which could leave the resolution prompt loop stuck.</li>
 <li><code>cli</code>: keep an existing suffix in the DB path and annotate the <code>decomp</code> mapper variable with its base type to fix a type-checking error.</li>
 </ul>
 <h3 id="internal">Internal<a class="headerlink" href="#internal" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Reorganize the repository into two submodules (<code>backend</code> and <code>mappers</code>) and rework the mappers so backend support lives in a single common place; remove unused modules and the <code>heimdallr</code>/disassembly-sync prototype.</li>
 <li>CI: build and test IDA and Ghidra Docker images, run the <code>decomp</code> export-model and functional tests, export test artifacts, and trigger builds only on relevant changes.</li>
-<li>Add backend-free unit tests for the <code>decomp</code> mapper's recording, source-indexing and call-graph logic, raising its coverage without a disassembler.</li>
+<li>CI: expand the supported Python version range.</li>
+<li>Add backend-free unit tests for the <code>decomp</code>, <code>imports</code> and <code>intercg</code> mappers and the CLI, raising coverage without needing a disassembler; run them in CI and merge their coverage into the global report.</li>
 <li>Tests: make export-artifact collection best-effort so a read-only pre-existing destination (e.g. artifacts downloaded from another job) no longer fails the test at teardown.</li>
-<li>CI: run coverage in parallel mode and add a <code>coverage</code> job that combines the data files from every test job into a single global coverage report (the union of all lines exercised by the whole suite).</li>
+<li>CI: run coverage in parallel mode, add a <code>coverage</code> job that combines the data files from every test job into a single global coverage report (the union of all lines exercised by the whole suite), preserve each job's coverage data ahead of that combine step so nothing is lost, and refine the coverage targets.
+<strong>Full Changelog</strong>: <a href="https://github.com/quarkslab/pyrrha/compare/v1.0.1...v2.0.0">https://github.com/quarkslab/pyrrha/compare/v1.0.1...v2.0.0</a></li>
 </ul>
 <h2 id="v101improve-exe-decomp-mapper">v1.0.1—Improve exe-decomp mapper<a class="headerlink" href="#v101improve-exe-decomp-mapper" title="Permanent link">&para;</a></h2>
 <h3 id="features_1">Features<a class="headerlink" href="#features_1" title="Permanent link">&para;</a></h3>
