@@ -1,5 +1,5 @@
 ---
-title: Home
+title: Pyrrha
 ---
 
 --8<-- "README.md:intro"
@@ -71,24 +71,23 @@ title: Home
 --8<-- "README.md:usage"
 
 !!! note "Run Pyrrha"
-    === ":fontawesome-brands-python: Python Package"
-        If your backend is not on  `PATH`, indicate its directory using the matching environment variable.
-        ```sh
-        export IDADIR=/opt/idapro 
-        export GHIDRA_INSTALL_DIR=/opt/ghidra_12.0.4_PUBLIC  
-        ```
-        Run **Pyrrha**, to obtain NumbatUI/Sourcetrail compatible files.
-        ```
-        pyrrha MAPPER [OPTIONS] ROOT_DIRECTORY
-        ```
-
+    If your backend is not on  `PATH`, indicate its directory using the matching environment variable.
+    ```sh
+    export IDADIR=/opt/idapro 
+    export GHIDRA_INSTALL_DIR=/opt/ghidra_12.0.4_PUBLIC  
+    ```
+    Run **Pyrrha**, to obtain NumbatUI/Sourcetrail compatible files.
+    ```
+    pyrrha MAPPER [OPTIONS] ROOT_DIRECTORY
+    ```
+<!-- 
     === ":fontawesome-brands-docker: Docker Image"
         Download the docker image from Github Registry, this image is backed by Ghidra.
 
         ```sh
         cd ROOT_DIRECTORY/..
         docker run  --rm -t -v $PWD:/tmp/pyrrha ghcr.io/quarkslab/pyrrha:latest MAPPER [OPTIONS] ROOT_DIRECTORY
-        ```
+        ``` -->
 
 !!! note "Visualize results"
     You should have a `*.srctrlprj` file corresponding to the project file and a `*.srctrldb` file for the DB. 
