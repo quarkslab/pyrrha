@@ -1,4 +1,4 @@
-## Unreleased
+## v2.0.0—Ghidra Backend
 
 ### Features
 - All mappers now share a single disassembler `--backend` value (`ida`/`ghidra`) implemented in one common place, replacing the previous per-mapper disassembler/exporter selection.
