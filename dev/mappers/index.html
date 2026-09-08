@@ -12,36 +12,36 @@
         <meta name="author" content="Quarkslab">
       
       
-        <link rel="canonical" href="https://quarkslab.github.io/pyrrha/dev/mappers/exe-decomp/">
+        <link rel="canonical" href="https://quarkslab.github.io/pyrrha/dev/mappers/">
       
       
-        <link rel="prev" href="../fs-cg/">
+        <link rel="prev" href="../installation/">
       
       
-        <link rel="next" href="../../contributing/dev_mapper/">
+        <link rel="next" href="./fs/">
       
       
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      <link rel="icon" href="../assets/images/favicon.png">
       <meta name="generator" content="zensical-0.0.59">
     
     
       
-        <title>Decompilation Graph - Pyrrha Documentation</title>
+        <title>Pyrrha Mappers - Pyrrha Documentation</title>
       
     
     
       
         
       
-      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.5da3a30f.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/modern/main.5da3a30f.min.css">
       
         
           
         
-        <link rel="stylesheet" href="../../assets/stylesheets/modern/palette.812a03bb.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/modern/palette.812a03bb.min.css">
       
       
   
@@ -70,7 +70,7 @@
       
     
     
-    <script>__md_scope=new URL("../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    <script>__md_scope=new URL("..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
     
       
 
@@ -95,7 +95,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#decomp-executable-decompilation-mapper" class="md-skip">
+        <a href="#pyrrha-mappers" class="md-skip">
           Skip to content
         </a>
       
@@ -115,7 +115,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="Pyrrha Documentation" class="md-header__button md-logo" aria-label="Pyrrha Documentation" data-md-component="logo">
+    <a href="./.." title="Pyrrha Documentation" class="md-header__button md-logo" aria-label="Pyrrha Documentation" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
@@ -135,7 +135,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Decompilation Graph
+              Pyrrha Mappers
             
           </span>
         </div>
@@ -224,7 +224,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="Pyrrha Documentation" class="md-nav__button md-logo" aria-label="Pyrrha Documentation" data-md-component="logo">
+    <a href="./.." title="Pyrrha Documentation" class="md-nav__button md-logo" aria-label="Pyrrha Documentation" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
@@ -254,7 +254,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../.." class="md-nav__link">
+      <a href="./.." class="md-nav__link">
         
   
   
@@ -280,7 +280,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../installation/" class="md-nav__link">
+      <a href="../installation/" class="md-nav__link">
         
   
   
@@ -350,10 +350,19 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
         
   
   
@@ -368,6 +377,7 @@
   
 
       </a>
+      
     </li>
   
 
@@ -380,7 +390,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../fs/" class="md-nav__link">
+      <a href="./fs/" class="md-nav__link">
         
   
   
@@ -407,7 +417,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../fs-cg/" class="md-nav__link">
+      <a href="./fs-cg/" class="md-nav__link">
         
   
   
@@ -431,36 +441,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-  Decompilation Graph
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="././" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="./exe-decomp/" class="md-nav__link">
         
   
   
@@ -475,60 +459,6 @@
   
 
       </a>
-      
-        
-
-
-<nav class="md-nav md-nav--secondary" aria-label="On this page">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      On this page
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#introduction" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Introduction
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#usage" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Usage
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#json-export" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        JSON export
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -593,7 +523,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../contributing/dev_mapper/" class="md-nav__link">
+      <a href="../contributing/dev_mapper/" class="md-nav__link">
         
   
   
@@ -627,7 +557,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../changelog/" class="md-nav__link">
+      <a href="../changelog/" class="md-nav__link">
         
   
   
@@ -653,7 +583,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../license/" class="md-nav__link">
+      <a href="../license/" class="md-nav__link">
         
   
   
@@ -689,11 +619,6 @@
                       
                     
                     
-                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-                      <div class="md-sidebar-button__wrapper">
-                        <label class="md-sidebar-button" for="__toc"></label>
-                      </div>
-                    
                   
                   <div class="md-sidebar__inner">
                     
@@ -705,47 +630,6 @@
   
     
   
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      On this page
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#introduction" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Introduction
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#usage" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Usage
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#json-export" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        JSON export
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
   
 </nav>
                   </div>
@@ -763,46 +647,14 @@
   
 
 
-<h1 id="decomp-executable-decompilation-mapper"><code>decomp</code>: Executable Decompilation mapper<a class="headerlink" href="#decomp-executable-decompilation-mapper" title="Permanent link">&para;</a></h1>
-<h2 id="introduction">Introduction<a class="headerlink" href="#introduction" title="Permanent link">&para;</a></h2>
-<p>This mapper is not a firmware mapper but an executable mapper. It will map its call graph and its decompiled code with cross-references within the source code. In order
-the mapper will:</p>
+<h1 id="pyrrha-mappers">Pyrrha Mappers<a class="headerlink" href="#pyrrha-mappers" title="Permanent link">&para;</a></h1>
+<p>Pyrrha provides the following mappers:</p>
 <ul>
-<li>Decompile all functions (with Hex-Rays or Ghidra) to dump the whole decompiled code</li>
-<li>Index all functions with the associated decompilation</li>
-<li>Apply cross-references between functions</li>
+<li><a href="fs/"><code>fs</code></a>: a filesystem mapper. It maps  ELF/PE files, their imports and their exports.
+ Also map symlinks which target ELF files.</li>
+<li><a href="fs-cg/"><code>fs-cg</code></a>: a filesystem call graph mapper. It maps the whole firmware by interconnecting call graphs of all executables (requires disassembly).</li>
+<li><a href="exe-decomp/"><code>decomp</code></a>: Map an executable call graph along with its decompiled code. The mapper will use Sourcetrail source code indexing features to cross-reference calls within the source code.</li>
 </ul>
-<h2 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h2>
-<div class="admonition tip">
-<p class="admonition-title">Tip</p>
-<p>If your backend is not on  <code>PATH</code>, indicate its directory using the matching environment variable.
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">IDADIR</span><span class="o">=</span>/opt/idapro<span class="w"> </span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">GHIDRA_INSTALL_DIR</span><span class="o">=</span>/opt/ghidra_12.0.4_PUBLIC<span class="w">  </span>
-</span></code></pre></div></p>
-</div>
-<p><div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Usage: pyrrha decomp [OPTIONS] EXECUTABLE
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  Map a single executable call graph into a NumbatUI-compatible database. Also indexes the decompiled code along with
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>  all call cross-references.
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>Options:
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>  -d, --debug                 Set log level to DEBUG.
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>  --db PATH                   NumbatUI DB file path (.srctrldb).  [default: decomp.srctrldb]
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>  -b, --backend [ida|ghidra]  Backend to use.  [default: Backend.IDA]
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>  -e, --export                Create a JSON export of the resulting decompilation mapping.
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>  -h, --help                  Show this message and exit.
-</span></code></pre></div>
-After firmware analysis, you can visualize and navigate into the results with <code>numbatui</code>. The user interface is described in depth in the <a href="https://quarkslab.github.io/NumbatUI/interface/">NumbatUI documentation</a>.</p>
-<p>Do not hesitate to take a look at  all the possibilities offered by NumbatUI, especially <a href="https://quarkslab.github.io/NumbatUI/interface/#custom-trail">Custom Trails</a>.</p>
-<h2 id="json-export">JSON export<a class="headerlink" href="#json-export" title="Permanent link">&para;</a></h2>
-<p>With the <code>-e/--export</code> option, the mapper writes a JSON file next to the database (<code>&lt;db&gt;.json</code>) describing the result of the run. It is loaded back into an <code>ExportedDecompilation</code> object exposed by Pyrrha, so results can be post-processed without re-running a disassembler:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pyrrha_mapper.mappers</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExportedDecompilation</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">result</span> <span class="o">=</span> <span class="n">ExportedDecompilation</span><span class="o">.</span><span class="n">from_json_export</span><span class="p">(</span><span class="s2">"my_binary.json"</span><span class="p">)</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">for</span> <span class="n">func</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">iter_functions</span><span class="p">():</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="nb">print</span><span class="p">(</span><span class="nb">hex</span><span class="p">(</span><span class="n">func</span><span class="o">.</span><span class="n">addr</span><span class="p">),</span> <span class="n">func</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">func</span><span class="o">.</span><span class="n">type</span><span class="p">)</span>
-</span></code></pre></div>
-<p>An <code>ExportedDecompilation</code> stores the analysed binary identity (<code>path</code>, <code>id</code>, <code>name</code>) and its functions, keyed by their parser-space entry-point address. Each function is an <code>ExportedFunction</code> carrying its <code>Symbol</code>, its <code>FuncType</code>, the addresses it calls and is called by, its decompiled <code>source</code>, and the in-source locations of its declaration and call sites (<code>ExportedLocation</code>).</p>
 
 
 
@@ -896,10 +748,10 @@ After firmware analysis, you can visualize and navigate into the results with <c
     
       
       
-      <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":[],"search":"../../assets/javascripts/workers/search.7d14d953.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"provider":"mike"}}</script>
+      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":[],"search":"../assets/javascripts/workers/search.7d14d953.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"provider":"mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.6970bfe9.min.js"></script>
+      <script src="../assets/javascripts/bundle.6970bfe9.min.js"></script>
       
     
   </body>
