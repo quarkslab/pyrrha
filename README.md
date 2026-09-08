@@ -22,7 +22,7 @@ Pyrrha is a firmware cartography tool which provide three level of details:
 - a complete map of a given decompiled binary.
 
 It uses the open-source code source
-explorer [NumbatUI](https://github.com/quarkslab/NumbatUI) to provide users with an easy way to navigate through and search for 
+explorer [NumbatUI](https://quarkslab.github.io/NumbatUI/) to provide users with an easy way to navigate through and search for 
 path to function.
  <!-- # --8<-- [end:intro]-->
 
@@ -41,7 +41,7 @@ path to function.
 The installation is done in two parts:
 
 1. Install `Pyrrha` itself.
-1. Install [`NumbatUI`](https://github.com/quarkslab/NumbatUI) (or [`Sourcetrail`](https://github.com/CoatiSoftware/Sourcetrail)) to be able to visualize Pyrrha's results. 
+1. Install [`NumbatUI`](https://quarkslab.github.io/NumbatUI/installation/) (or [`Sourcetrail`](https://github.com/CoatiSoftware/Sourcetrail)) to be able to visualize Pyrrha's results. 
 1. _(Optional)_ Install Ghidra or IDA if you want to use `fs-cg` or `decomp` mappers.
 > [!NOTE]
 > A quick start installation is available on [Pyrrha documentation](https://quarkslab.github.io/pyrrha/#installation).
@@ -56,7 +56,7 @@ The usage workflow is composed of two steps which allow you to separate DB creat
 2. Visualize your results with Sourcetrail/NumbatUI. 
 
 > [!NOTE]
-> The detailed documentation of each mapper is available in the [documentation](https://quarkslab.github.io/pyrrha/mappers/mappers/).
+> The detailed documentation of each mapper is available in the [documentation](https://quarkslab.github.io/pyrrha/latest/mappers/).
 
  <!-- # --8<-- [start:publications]-->
 ## Publications
