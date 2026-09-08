@@ -632,7 +632,7 @@ class FileSystemImportsMapper:
     def map_lib_imports(
         self,
         binary: Binary,
-        resolution_strategy: ResolveDuplicateOption = ResolveDuplicateOption.IGNORE,
+        resolution_strategy: ResolveDuplicateOption = ResolveDuplicateOption.ARBITRARY,
     ) -> None:
         """Given an already mapped binary, resolve its libraryimports.
 
@@ -727,7 +727,7 @@ import, drop case"
     def map_symbol_imports(
         self,
         binary: Binary,
-        resolution_strategy: ResolveDuplicateOption = ResolveDuplicateOption.IGNORE,
+        resolution_strategy: ResolveDuplicateOption = ResolveDuplicateOption.ARBITRARY,
     ) -> None:
         """Given an already mapped binary, resolve its symbols.
 
@@ -872,7 +872,7 @@ import, drop case"
     def map(
         self,
         threads: int,
-        resolution_strategy: ResolveDuplicateOption = ResolveDuplicateOption.IGNORE,
+        resolution_strategy: ResolveDuplicateOption = ResolveDuplicateOption.ARBITRARY,
     ) -> FileSystem:
         """Wrap mapper_main with usefull elements for CLI rendering.
 
@@ -892,7 +892,7 @@ import, drop case"
         self,
         threads: int,
         progress: Progress,
-        resolution_strategy: ResolveDuplicateOption = ResolveDuplicateOption.IGNORE,
+        resolution_strategy: ResolveDuplicateOption = ResolveDuplicateOption.ARBITRARY,
     ) -> FileSystem:
         """Map recursively the content of a given directory.
 
