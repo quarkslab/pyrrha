@@ -47,13 +47,13 @@ def resolve_duplicates_options(f):
         "resolve_duplicates",
         flag_value=ResolveDuplicateOption.IGNORE,
         help="Ignore them.",
-        default=True,
     )
     @click.option(
         "--arbitrary",
         "resolve_duplicates",
         flag_value=ResolveDuplicateOption.ARBITRARY,
         help="Select the first one available.",
+        default=True,
     )
     @click.option(
         "--interactive",
