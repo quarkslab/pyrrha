@@ -400,6 +400,7 @@ class InterImageCGMapper(FileSystemImportsMapper):
                                 target,
                                 resolution_strategy,
                                 unindex_symbols,
+                                progress,
                                 log_prefix,
                             )
                             count_res[res] += 1
@@ -479,6 +480,7 @@ class InterImageCGMapper(FileSystemImportsMapper):
         callee: str,
         resolver: ResolveDuplicateOption,
         unindex_symbols: set[str],
+        progress: Progress, 
         log_prefix: str = "",
     ) -> bool:
         """Record call edge betwen caller and callee.
@@ -526,7 +528,7 @@ class InterImageCGMapper(FileSystemImportsMapper):
             )
 
         # solve import from listed imported libraries
-        tmp = self.resolve_symbol_import(binary, callee, resolver, log_prefix)
+        tmp = self.resolve_symbol_import(binary, callee, resolver, progress, log_prefix)
         if tmp is not None:
             target_bin, target_symb = tmp
             if not binary.imported_library_exists(target_bin.name):
@@ -544,9 +546,9 @@ class InterImageCGMapper(FileSystemImportsMapper):
         if len(served_by) > 1:
             if resolver == ResolveDuplicateOption.INTERACTIVE and self.progress is not None:
                 with hide_progress(self.progress):
-                    choice = self._select_fs_component(resolver, served_by, log_prefix, callee)
+                    choice = self._select_fs_component(resolver, served_by, progress, log_prefix, callee)
             else:
-                choice = self._select_fs_component(resolver, served_by, log_prefix, callee)
+                choice = self._select_fs_component(resolver, served_by, progress, log_prefix, callee)
             if choice:
                 # if a choice has been done
                 served_by = [choice]  # registerded just below

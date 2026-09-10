@@ -262,6 +262,7 @@ class FileSystemImportsMapper:
     def _select_fs_component(
         strategy: ResolveDuplicateOption,
         matching_objects: list[Binary],
+        progress: Progress,
         log_prefix: str,
         target_name: str,
         cache: set[Binary] | None = None,
@@ -272,6 +273,7 @@ class FileSystemImportsMapper:
     def _select_fs_component(
         strategy: ResolveDuplicateOption,
         matching_objects: list[Symlink],
+        progress: Progress,
         log_prefix: str,
         target_name: str,
         cache: set[Symlink] | None = None,
@@ -281,6 +283,7 @@ class FileSystemImportsMapper:
     def _select_fs_component(
         strategy: ResolveDuplicateOption,
         matching_objects: list[Binary] | list[Symlink],
+        progress: Progress,
         log_prefix: str,
         target_name: str,
         cache: set[Binary] | set[Symlink] | None = None,
@@ -321,19 +324,18 @@ class FileSystemImportsMapper:
                     selected_index = matching_objects.index(cache_entry)
                     break
 
-            while (
-                selected_bin is None
-                or selected_index is None
-                or selected_index < 0
-                or selected_index >= len(matching_objects)
-            ):
-                print(f"{log_prefix}: several matches for {target_name}, select one\n")
-                for i in range(len(matching_objects)):
-                    print(f"{i}: {matching_objects[i].path}")
-                try:
-                    selected_index = int(input())
-                except ValueError:
-                    print("Enter a valid number")
+            with hide_progress(progress):
+                while (selected_index is None
+                    or selected_index < 0
+                    or selected_index >= len(matching_objects)
+                ):
+                    print(f"{log_prefix}: several matches for {target_name}, select one\n")
+                    for i in range(len(matching_objects)):
+                        print(f"{i}: {matching_objects[i].path}")
+                    try:
+                        selected_index = int(input())
+                    except ValueError:
+                        print("Enter a valid number")
         else:  # "arbitrary" option
             selected_index = 0
         if selected_bin is None:
@@ -588,7 +590,7 @@ class FileSystemImportsMapper:
         pass
 
     def _resolve_lib_import(
-        self, lib_name: str, strategy: ResolveDuplicateOption, log_prefix: str
+        self, lib_name: str, strategy: ResolveDuplicateOption, progress: Progress, log_prefix: str
     ) -> _SolvedLibImport | _PartialLibImport | _FailedLibImport | _UndecidedLibImport:
         """Based on its name, find a library.
 
@@ -602,7 +604,7 @@ class FileSystemImportsMapper:
         if self.fs.binary_name_exists(lib_name):
             matching_binaries = self.fs.get_binaries_by_name(lib_name)
             lib_obj: Binary | None = self._select_fs_component(
-                strategy, matching_binaries, log_prefix, lib_name
+                strategy, matching_binaries, progress, log_prefix, lib_name
             )
             if lib_obj is None:
                 return self._FailedLibImport()
@@ -610,7 +612,7 @@ class FileSystemImportsMapper:
         elif self.fs.symlink_name_exists(lib_name):
             matching_symlinks = self.fs.get_symlinks_by_name(lib_name)
             sym_obj: Symlink | None = self._select_fs_component(
-                strategy, matching_symlinks, log_prefix, lib_name
+                strategy, matching_symlinks, progress, log_prefix, lib_name
             )
             if sym_obj is None:
                 return self._UndecidedLibImport()
@@ -622,7 +624,9 @@ class FileSystemImportsMapper:
             # The imported name matches the SONAME of a binary whose filename
             # differs (e.g. libpthread.so.0 is the SONAME of libpthread-2.11.1.so).
             matching_binaries = self.fs.get_binaries_by_soname(lib_name)
-            lib_obj = self._select_fs_component(strategy, matching_binaries, log_prefix, lib_name)
+            lib_obj = self._select_fs_component(
+                strategy, matching_binaries, progress, log_prefix, lib_name
+            )
             if lib_obj is None:
                 return self._FailedLibImport()
             return self._SolvedLibImport(initial_import=lib_obj, final_import=lib_obj)
@@ -632,6 +636,7 @@ class FileSystemImportsMapper:
     def map_lib_imports(
         self,
         binary: Binary,
+        progress: Progress,
         resolution_strategy: ResolveDuplicateOption = ResolveDuplicateOption.ARBITRARY,
     ) -> None:
         """Given an already mapped binary, resolve its libraryimports.
@@ -648,7 +653,8 @@ class FileSystemImportsMapper:
         log_prefix = f"[lib imports] {binary.path}"
 
         for lib_name in binary.imported_library_names:
-            res = self._resolve_lib_import(lib_name, resolution_strategy, log_prefix)
+            with hide_progress(progress):
+                res = self._resolve_lib_import(lib_name, resolution_strategy, progress, log_prefix)
             match res:
                 case self._SolvedLibImport():
                     # For symlinks, we record a ref to the symlink but to ease symbol
@@ -697,6 +703,7 @@ import, drop case"
         binary: Binary,
         func_name: str,
         resolution_strategy: ResolveDuplicateOption,
+        progress: Progress,
         log_prefix: str,
     ) -> tuple[Binary, Symbol] | None:
         """Given an already mapped binary and a symbol, resolve this symbol import.
@@ -713,7 +720,9 @@ import, drop case"
             symb_name, symb_version = func_name.split("@@")
             if symb_version in binary.version_requirement:
                 for lib_name in binary.version_requirement[symb_version]:
-                    res = self._resolve_lib_import(lib_name, resolution_strategy, log_prefix)
+                    res = self._resolve_lib_import(
+                        lib_name, resolution_strategy, progress, log_prefix
+                    )
                     if isinstance(res, self._SolvedLibImport):
                         lib = res.final_import
                         if lib.exported_symbol_exists(symb_name):
@@ -727,6 +736,7 @@ import, drop case"
     def map_symbol_imports(
         self,
         binary: Binary,
+        progress: Progress,
         resolution_strategy: ResolveDuplicateOption = ResolveDuplicateOption.ARBITRARY,
     ) -> None:
         """Given an already mapped binary, resolve its symbols.
@@ -736,7 +746,9 @@ import, drop case"
         """
         log_prefix = f"[symbol imports] {binary.path}"
         for func_name in binary.imported_symbol_names:
-            res = self.resolve_symbol_import(binary, func_name, resolution_strategy, log_prefix)
+            res = self.resolve_symbol_import(
+                binary, func_name, resolution_strategy, progress, log_prefix
+            )
             if res is None:
                 self._record_non_resolved_symbol_import(binary, func_name)
             else:
@@ -847,7 +859,7 @@ import, drop case"
             "[orange_red1]Library imports mapping", total=len(list(self.fs.iter_binaries()))
         )
         for binary in self.fs.iter_binaries():
-            self.map_lib_imports(binary, resolution_strategy)
+            self.map_lib_imports(binary, progress, resolution_strategy)
             progress.update(lib_imports, advance=1)
         self.commit()
 
@@ -865,7 +877,7 @@ import, drop case"
             "[orange1]Symbol imports mapping", total=len(list(self.fs.iter_binaries()))
         )
         for binary in self.fs.iter_binaries():
-            self.map_symbol_imports(binary, resolution_strategy)
+            self.map_symbol_imports(binary, progress, resolution_strategy)
             progress.update(symbol_imports, advance=1)
         self.commit()
 
