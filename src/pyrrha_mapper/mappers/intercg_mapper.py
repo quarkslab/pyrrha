@@ -394,15 +394,25 @@ class InterImageCGMapper(FileSystemImportsMapper):
 
                     for target in targets:
                         try:
-                            res = self._record_one_call(
-                                binary,
-                                caller,
-                                target,
-                                resolution_strategy,
-                                unindex_symbols,
-                                progress,
-                                log_prefix,
-                            )
+                            if resolution_strategy == ResolveDuplicateOption.INTERACTIVE:
+                                with hide_progress(progress):
+                                    res = self._record_one_call(
+                                        binary,
+                                        caller,
+                                        target,
+                                        resolution_strategy,
+                                        unindex_symbols,
+                                        log_prefix,
+                                    )
+                            else:
+                                res = self._record_one_call(
+                                    binary,
+                                    caller,
+                                    target,
+                                    resolution_strategy,
+                                    unindex_symbols,
+                                    log_prefix,
+                                )
                             count_res[res] += 1
                         except KeyError as e:
                             logging.error(f"{log_prefix}: can't find symbols: {e}")
@@ -480,7 +490,6 @@ class InterImageCGMapper(FileSystemImportsMapper):
         callee: str,
         resolver: ResolveDuplicateOption,
         unindex_symbols: set[str],
-        progress: Progress, 
         log_prefix: str = "",
     ) -> bool:
         """Record call edge betwen caller and callee.
@@ -528,7 +537,7 @@ class InterImageCGMapper(FileSystemImportsMapper):
             )
 
         # solve import from listed imported libraries
-        tmp = self.resolve_symbol_import(binary, callee, resolver, progress, log_prefix)
+        tmp = self.resolve_symbol_import(binary, callee, resolver, log_prefix)
         if tmp is not None:
             target_bin, target_symb = tmp
             if not binary.imported_library_exists(target_bin.name):
@@ -544,18 +553,14 @@ class InterImageCGMapper(FileSystemImportsMapper):
 
         # if multiple binaries are exposing the symbol try discriminating the symbol
         if len(served_by) > 1:
-            if resolver == ResolveDuplicateOption.INTERACTIVE and self.progress is not None:
-                with hide_progress(self.progress):
-                    choice = self._select_fs_component(resolver, served_by, progress, log_prefix, callee)
-            else:
-                choice = self._select_fs_component(resolver, served_by, progress, log_prefix, callee)
+            choice = self._select_fs_component(resolver, served_by, log_prefix, callee)
             if choice:
                 # if a choice has been done
                 served_by = [choice]  # registerded just below
             else:
                 logging.warning(
                     f"{log_prefix}: several matches for edge {caller} -> {callee}:"
-                    f"{[x.name for x in served_by]}"
+                    f"{[x.name for x in served_by]}",
                 )
                 return False
         if len(served_by) == 1:
