@@ -18,10 +18,12 @@
 import functools
 import logging
 import multiprocessing
+import os
 from pathlib import Path
 
 import coloredlogs  # type: ignore # no typing used in this library
 import rich_click as click
+from click import ParameterSource
 from numbat import SourcetrailDB
 
 from pyrrha_mapper.mappers import (
@@ -99,6 +101,29 @@ def jobs_option(max_fraction: float = 1.0):
 
     return decorator
 
+BACKEND_ENVVARS: dict[Backend, str] = {
+    Backend.IDA: "IDADIR",
+    Backend.GHIDRA: "GHIDRA_INSTALL_DIR",
+}
+
+def resolve_backend(ctx: click.Context, param: click.Parameter, value: Backend) -> Backend:
+    """Override the default backend with the one hinted by the environment.
+
+    Only applies when the user did not provide the option explicitly, so an explicit
+    `-b` always wins over the environment.
+
+    :param ctx: click invocation context
+    :param param: the parameter being processed
+    :param value: the value resolved by click
+    :return: the backend to use
+    """
+    if ctx.get_parameter_source(param.name) is not ParameterSource.DEFAULT:
+        return value
+    for backend, envvar in BACKEND_ENVVARS.items():
+        if os.environ.get(envvar):
+            return backend
+    return value
+
 
 def backend_option(f):
     """*Add the ``--backend`` option."""
@@ -110,6 +135,7 @@ def backend_option(f):
         type=click.Choice([Backend.IDA, Backend.GHIDRA], case_sensitive=False),
         default=Backend.IDA,
         show_default=True,
+        callback=resolve_backend,
         help="Backend to use.",
     )
     @functools.wraps(f)
