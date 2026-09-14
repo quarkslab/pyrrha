@@ -341,12 +341,8 @@ class DecompilMapper(Backend):
     def map(self) -> bool:
         """Run the successive steps of the mapping.
 
-        :return: True if the binary node was recorded and indexing ran, else False.
+        :return: True once the indexing steps have run.
         """
-        # Record the binary as a class node so functions can be attached to it
-        # via parent_id. Without this id, record_function would orphan every
-        # function. Mirrors InterImageCGMapper.record_binary_in_db.
-
         with Progress(
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),

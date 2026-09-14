@@ -50,7 +50,6 @@ class FakeDB:
         self.files: list[tuple[Path, str]] = []
         self.file_languages: list[tuple[int, str]] = []
         self.functions: list[dict] = []
-        self.classes: list[dict] = []
         self.symbol_locations: list[tuple] = []
         self.ref_calls: list[tuple[int, int]] = []
         self.reference_locations: list[tuple] = []
@@ -58,7 +57,6 @@ class FakeDB:
         # When set, the matching record_* returns None to drive error paths.
         self.fail_record_function = False
         self.fail_record_file = False
-        self.fail_record_class = False
         self.fail_record_ref_call = False
 
     def _alloc(self) -> int:
@@ -68,12 +66,6 @@ class FakeDB:
 
     def set_node_type(self, type_to_change, graph_display=None, hover_display=None):  # noqa: D102
         self.node_types.append((type_to_change, graph_display, hover_display))
-
-    def record_class(self, name, prefix="", delimiter=":"):  # noqa: D102
-        if self.fail_record_class:
-            return None
-        self.classes.append({"name": name, "prefix": prefix})
-        return self._alloc()
 
     def record_function(self, name, prefix="", parent_id=None, **kwargs):  # noqa: D102
         if self.fail_record_function:
@@ -221,7 +213,9 @@ class TestRecordFunction:
         assert result.id is not None
         assert db.functions[0]["name"] == "foo"
         assert db.functions[0]["prefix"] == "0x1000"
-        assert db.functions[0]["parent_id"] == mapper.bin.id
+        # Functions are top-level nodes: the mapper handles a single binary,
+        # so there is no binary class node to attach them to.
+        assert db.functions[0]["parent_id"] is None
 
     def test_imported_function_skipped(self) -> None:
         """An imported function is not recorded and keeps a None id."""
@@ -531,16 +525,16 @@ class _DrivingMapper(DecompilMapper):
 class TestInit:
     """Tests for DecompilMapper.__init__."""
 
-    def test_sets_up_state_and_binary_group(self) -> None:
-        """__init__ wires the db, an empty function map and the Binaries group."""
+    def test_sets_up_state_and_source_group(self) -> None:
+        """__init__ wires the db, an empty function map and the Sources group."""
         db = FakeDB()
         mapper = _DrivingMapper(db, Path("/bin/sample"), {})
         assert mapper.db_interface is db
         assert mapper.functions == {}
         assert mapper.source_ids == {}
         assert mapper.bin.path == Path("/bin/sample")
-        # A "Binaries" class node type is registered for NumbatUI grouping.
-        assert ("class", "Binaries", "binary") in db.node_types
+        # A "Sources" file node type is registered for NumbatUI grouping.
+        assert ("file", "Sources", "source") in db.node_types
 
 
 class TestIndexFunction:
@@ -589,8 +583,8 @@ class TestIndexFunction:
 class TestMapBinary:
     """Tests for DecompilMapper.map() orchestration."""
 
-    def test_full_run_records_binary_functions_and_calls(self) -> None:
-        """map() records the binary node then indexes functions and calls."""
+    def test_full_run_records_functions_and_calls(self) -> None:
+        """map() indexes every function, its source and the calls between them."""
         program = {
             0x1000: {
                 "name": "foo",
@@ -612,20 +606,20 @@ class TestMapBinary:
         db = FakeDB()
         mapper = _DrivingMapper(db, Path("/bin/sample"), program)
         assert mapper.map() is True
-        # The binary was recorded as a class node.
-        assert db.classes and db.classes[0]["name"] == "sample"
         # Both functions indexed and recorded.
         assert set(mapper.functions) == {0x1000, 0x2000}
         assert {f["name"] for f in db.functions} == {"foo", "bar"}
         # The foo -> bar call was recorded.
         assert db.ref_calls == [(mapper.functions[0x1000].id, mapper.functions[0x2000].id)]
 
-    def test_binary_record_failure_aborts(self) -> None:
-        """When the binary node cannot be recorded, map() returns False."""
+    def test_function_record_failure_does_not_abort(self) -> None:
+        """map() completes even when the DB refuses to record the functions."""
         db = FakeDB()
-        db.fail_record_class = True
+        db.fail_record_function = True
         mapper = _DrivingMapper(
             db, Path("/bin/sample"), {0x1000: {"name": "foo", "type": FuncType.NORMAL}}
         )
-        assert mapper.map() is False
-        assert mapper.functions == {}
+        assert mapper.map() is True
+        # The function is still tracked, but without a db id no call is recorded.
+        assert mapper.functions[0x1000].id is None
+        assert db.ref_calls == []
