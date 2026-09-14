@@ -88,7 +88,7 @@ def jobs_option(max_fraction: float = 1.0):
             help="Number of parallel jobs.",
             type=click.IntRange(1, max_jobs, clamp=True),
             metavar="INT",
-            default=1,
+            default=max_jobs,
             show_default=True,
         )
         @functools.wraps(f)
