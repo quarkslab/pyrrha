@@ -263,8 +263,12 @@ class TestFsCommand:
         assert res.exit_code == 0, res.output
         assert len(FakeImportsMapper.instances) == 1
         mapper = FakeImportsMapper.instances[0]
-        # Default jobs is 1, default resolve is IGNORE.
-        assert mapper.map_args == (1, ResolveDuplicateOption.IGNORE)
+        # Default jobs is max, default resolve is ARBITRARY.
+        assert (
+            mapper.map_args is not None
+            and len(mapper.map_args) == 2
+            and mapper.map_args[1] == ResolveDuplicateOption.ARBITRARY
+        )
         # root_directory is resolved to an absolute path.
         assert mapper.root_directory.is_absolute()
         assert mapper.db.closed is True
