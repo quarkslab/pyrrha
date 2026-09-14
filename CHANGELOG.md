@@ -1,3 +1,14 @@
+## v2.0.1—Improve Usability
+
+### Features
+- Backend is automatically detected from environment variables if option `-b` is not set.
+
+### Fixes
+- Broken links in the README.
+- mappers: set default stratregy to arbitrary.
+- mappers: set default multiprocessing value to max number of threads instead of monoprocessing.
+- tests: adapt tests to fixes above
+
 ## v2.0.0—Ghidra Backend
 
 ### Features
