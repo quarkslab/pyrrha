@@ -227,8 +227,27 @@ class BinaryParser(Backend):
                     if callee_data.type != FuncType.IMPORTED:
                         continue
 
-                elif func_data.type == FuncType.THUNK and not func_data.calls and func_data.callers:
-                    # Terminal thunk with callers but no callees — keep it
+                elif (
+                    func_data.type == FuncType.THUNK
+                    and not func_data.calls
+                    and func_data.callers
+                    and func_data.name not in lief_imported_names
+                ):
+                    # Terminal thunk with callers but no callees — keep it.
+                    #
+                    # Excluded when the name is a LIEF-confirmed dynamic import:
+                    # that is a genuine PLT stub whose branch target the
+                    # disassembler did not expose as a call reference (Ghidra
+                    # models the `jmp [GOT]` of a PLT entry as a jump reference
+                    # plus a thunk relationship, so func_children returns an
+                    # empty list).  Keeping it would leave a private function
+                    # named after the import registered in the binary, and
+                    # fwmapper would then resolve callers intra-binary instead
+                    # of following the cross-binary import.  Falling through to
+                    # the removal below unregisters the stub while leaving it in
+                    # program_data, so callers still emit its name and the
+                    # cross-binary edge is resolved against the exporting
+                    # binary.
                     continue
 
                 # Remove functions not kept as exported/library/normal.
@@ -342,23 +361,31 @@ class BinaryParser(Backend):
             else:
                 # Internal function — create a new Symbol in parser space.
                 mangled_name = self.func_mangled_name(parser_addr)
-                # Skip LIEF-imported names except: (a) PLT thunks — must reach
-                # Step 3 to build trampoline_map; (b) _Z-prefixed names — a
-                # statically linked binary may contain a private copy of a symbol
-                # whose mangled name also appears in the dynamic import table.
-                if (
-                    mangled_name in imported_names
-                    and not mangled_name.startswith("_Z")
-                    and self.func_type(parser_addr) != FuncType.THUNK
-                ):
-                    continue
+                # A function whose name is a LIEF-confirmed dynamic import is a
+                # PLT stub.  It must not be registered in the binary: it would
+                # shadow the real export, and _record_one_call would then
+                # resolve callers intra-binary instead of following the
+                # cross-binary import.  It must however stay in program_data,
+                # so _build_calls_list still emits its name for callers and
+                # fwmapper resolves the edge against the exporting binary.
+                #
+                # This deliberately does not consult func_type(): whether a stub
+                # is reported as THUNK, IMPORTED or NORMAL varies between
+                # backends (Ghidra cannot type a thunk whose target lives in the
+                # EXTERNAL block), and registration must not depend on it.
+                #
+                # _Z-prefixed names are exempt: a statically linked binary may
+                # hold a private copy of a C++ symbol whose mangled name also
+                # appears in the dynamic import table.
+                is_plt_stub = mangled_name in imported_names and not mangled_name.startswith("_Z")
                 func_symbol = Symbol(
                     name=mangled_name,
                     demangled_name=self.func_demangled_name(parser_addr),
                     is_func=True,
                     addr=parser_addr,
                 )
-                self._binary.add_function(func_symbol)
+                if not is_plt_stub:
+                    self._binary.add_function(func_symbol)
 
             program_data[parser_addr] = FuncData(
                 symbol=func_symbol,

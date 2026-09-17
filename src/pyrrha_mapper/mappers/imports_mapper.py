@@ -390,6 +390,15 @@ class FileSystemImportsMapper:
             for lib in parsing_res.libraries:
                 bin_obj.add_imported_library_name(str(lib))
 
+            # parse version requirements
+            for req in parsing_res.symbols_version_requirement:
+                for symb in req.get_auxiliary_symbols():
+                    name = str(symb.name)
+                    if name in bin_obj.version_requirement:
+                        bin_obj.version_requirement[name].append(req.name)
+                    else:
+                        bin_obj.version_requirement[name] = [req.name]
+
             # parse symbols
             # store name of imported ones and internal functions
             # store exported symbols
@@ -398,9 +407,7 @@ class FileSystemImportsMapper:
             seen_symbol_names: set[str] = set()
             for s in parsing_res.symbols:
                 sym_name = str(s.name)
-                if s.imported:
-                    bin_obj.add_imported_symbol_name(sym_name)
-                elif s.exported or is_kernel_module and s.name:
+                if s.exported or is_kernel_module and s.name:
                     is_func = s.is_function or s.type == lief.ELF.Symbol.TYPE.GNU_IFUNC
                     if not is_func and is_kernel_module:
                         continue
@@ -428,6 +435,15 @@ class FileSystemImportsMapper:
                     bin_obj.add_exported_symbol(sym)
                     if demangled != sym_name:
                         bin_obj.add_exported_symbol(sym, symbol_name=demangled)
+                elif s.imported or (
+                    s.symbol_version.has_auxiliary_version
+                    and s.symbol_version.symbol_version_auxiliary.name
+                    in bin_obj.version_requirement
+                    and sym_name != s.symbol_version.symbol_version_auxiliary.name
+                ) or (bool(sym_name) and s.shndx == 0):
+                    if s.symbol_version.has_auxiliary_version and sym_name.split("@@") != 2:
+                        sym_name = f"{sym_name}@@{s.symbol_version.symbol_version_auxiliary.name}"
+                    bin_obj.add_imported_symbol_name(sym_name)
                 elif s.is_function:
                     # Skip symbols already registered as exported functions to
                     # avoid duplicate DB entries.
@@ -443,14 +459,6 @@ class FileSystemImportsMapper:
                         )
                     )
 
-            # parse version requirements
-            for req in parsing_res.symbols_version_requirement:
-                for symb in req.get_auxiliary_symbols():
-                    name = str(symb.name)
-                    if name in bin_obj.version_requirement:
-                        bin_obj.version_requirement[name].append(req.name)
-                    else:
-                        bin_obj.version_requirement[name] = [req.name]
         else:
             # PE parsing
             res: lief.Binary | None = lief.parse(str(file_path))
@@ -740,9 +748,7 @@ import, drop case"
         """
         log_prefix = f"[symbol imports] {binary.path}"
         for func_name in binary.imported_symbol_names:
-            res = self.resolve_symbol_import(
-                binary, func_name, resolution_strategy, log_prefix
-            )
+            res = self.resolve_symbol_import(binary, func_name, resolution_strategy, log_prefix)
             if res is None:
                 self._record_non_resolved_symbol_import(binary, func_name)
             else:
