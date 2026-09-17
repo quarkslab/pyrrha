@@ -44,7 +44,17 @@ _GHIDRA_REQUIRED_ANALYZERS: frozenset[str] = frozenset(
         "Subroutine References",
         "Subroutine References - One Time",
         # --- Thunk resolution ---
+        # NB: there is no top-level "Thunk Function" analyser in Ghidra 12.x;
+        # thunk creation is driven by the "Create Thunks Early" sub-option of
+        # "Subroutine References", which is why sub-options are left alone
+        # above.  The entry is kept for older Ghidra releases, where it exists.
         "Thunk Function",
+        # --- Architecture-specific symbol handling ---
+        # ARM/THUMB: processes the $a/$t/$d mapping symbols that mark the
+        # instruction set in use.  Without it THUMB regions can be
+        # disassembled as ARM, so function starts and call references in those
+        # regions are wrong or missing.
+        "ARM Symbol",
         # --- Format-specific import/export tables ---
         # ELF
         "ELF Scalar Operand References",
@@ -59,20 +69,9 @@ _GHIDRA_REQUIRED_ANALYZERS: frozenset[str] = frozenset(
     ]
 )
 
-# Additional analyzers required when the Ghidra decompiler is used to produce
-# pseudocode (i.e. in GhidraLoader but NOT in GhidraParser).
-#
-#   Stack                    — stack-frame analysis; needed for correct local-
-#                              variable naming in pseudocode (param_N / local_N).
-#   Stack Variable References — accurate tracking of stack-slot references
-#                              across basic blocks used by the decompiler.
-#   Shared Return Calls      — identifies tail-call / shared-epilogue patterns;
-#                              without it some call edges are absent from the
-#                              decompiled output.
-#   Data Type Propagation    — propagates inferred struct/pointer types through
-#                              the program; without it the decompiler emits
-#                              ``undefined *`` for most pointer arguments,
-#                              making call-site name matching less reliable.
+_GHIDRA_REQUIRED_ANALYZER_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"Constant Reference Analyzer$"),
+)
 _GHIDRA_DECOMPILER_EXTRA_ANALYZERS: frozenset[str] = frozenset(
     [
         "Stack",
@@ -80,16 +79,6 @@ _GHIDRA_DECOMPILER_EXTRA_ANALYZERS: frozenset[str] = frozenset(
         "Shared Return Calls",
         "Data Type Propagation",
     ]
-)
-
-# Tool-generated fallback names emitted by Ghidra when the real symbol name is
-# unknown.  Callees matching this pattern cannot be resolved as meaningful
-# targets and must be skipped.
-#   FUN_<HEX>   unnamed Ghidra function
-#   _INIT_<N>   ELF .init_array slot
-#   _FINI_<N>   ELF .fini_array slot
-_GHIDRA_SYNTHETIC_NAME_RE: re.Pattern[str] = re.compile(
-    r"^(?:FUN_[0-9A-Fa-f]+|_INIT_\d+|_FINI_\d+)$"
 )
 
 
@@ -154,7 +143,11 @@ class Ghidra(Backend):
             active_analyzers = _GHIDRA_REQUIRED_ANALYZERS
         analyzer_options = program.getOptions("Analyzers")
         for option_name in analyzer_options.getOptionNames():
-            enabled = option_name in active_analyzers
+            if "." in option_name:
+                continue
+            enabled = option_name in active_analyzers or any(
+                pattern.search(option_name) for pattern in _GHIDRA_REQUIRED_ANALYZER_PATTERNS
+            )
             try:
                 analyzer_options.setBoolean(option_name, enabled)
             except Exception:
