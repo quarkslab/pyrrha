@@ -430,15 +430,7 @@ class FileSystemImportsMapper:
                     bin_obj.add_exported_symbol(sym)
                     if demangled != sym_name:
                         bin_obj.add_exported_symbol(sym, symbol_name=demangled)
-                elif (
-                    s.imported
-                    or (
-                        sym_aux_version is not None
-                        and sym_aux_version.name in bin_obj.version_requirement
-                        and sym_name != sym_aux_version.name
-                    )
-                    or (bool(sym_name) and s.shndx == 0)
-                ):
+                elif s.imported or (bool(sym_name) and s.shndx == 0 and s.value != 0):
                     if sym_aux_version is not None and len(sym_name.split("@@")) != 2:
                         sym_name = f"{sym_name}@@{sym_aux_version.name}"
                     bin_obj.add_imported_symbol_name(sym_name)
