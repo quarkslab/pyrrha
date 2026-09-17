@@ -513,17 +513,15 @@ class InterImageCGMapper(FileSystemImportsMapper):
         # Ghidra emits template arguments in callee names (e.g. "_M_insert<bool>");
         # strip them so lookups match the base-name key in exported_functions.
         if "<" in callee:
-            callee = callee[: callee.index("<")]
+            callee_name = callee[: callee.index("<")]
+        else:
+            callee_name = callee
 
         # The disassembler may emit versioned symbol names (e.g. "getenv@@GLIBC_2.4").
         # All export/import keys are stored without the version suffix, so strip it.
+        callee_name = callee
         if "@@" in callee:
             callee = callee[: callee.index("@@")]
-
-        if binary.function_exists(callee):
-            callee_symb = binary.get_function_by_name(callee)
-            binary.add_call(caller, callee_symb)
-            return self._record_call_ref(caller, callee_symb, f"{log_prefix}: local call")
 
         if callee in IGNORE_LIST or _GHIDRA_SYNTHETIC_NAME_RE.match(callee):
             return False
@@ -531,10 +529,20 @@ class InterImageCGMapper(FileSystemImportsMapper):
         # already solved import
         if binary.imported_symbol_exists(callee, is_resolved=True):
             callee_symb = binary.get_imported_symbol(callee)
+            if binary.function_exists(callee_name):
+                symb = binary.get_function_by_name(callee_name)
+                if symb.addr == callee_symb.addr:
+                    binary.remove_function(symb.name)
+
             binary.add_call(caller, callee_symb)
             return self._record_call_ref(
                 caller, callee_symb, f"{log_prefix}: already solved import"
             )
+
+        if binary.function_exists(callee):
+            callee_symb = binary.get_function_by_name(callee)
+            binary.add_call(caller, callee_symb)
+            return self._record_call_ref(caller, callee_symb, f"{log_prefix}: local call")
 
         # solve import from listed imported libraries
         tmp = self.resolve_symbol_import(binary, callee, resolver, log_prefix)
