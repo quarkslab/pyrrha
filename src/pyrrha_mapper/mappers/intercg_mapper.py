@@ -513,17 +513,17 @@ class InterImageCGMapper(FileSystemImportsMapper):
         # Ghidra emits template arguments in callee names (e.g. "_M_insert<bool>");
         # strip them so lookups match the base-name key in exported_functions.
         if "<" in callee:
-            callee_name = callee[: callee.index("<")]
-        else:
-            callee_name = callee
+            callee = callee[: callee.index("<")]
 
         # The disassembler may emit versioned symbol names (e.g. "getenv@@GLIBC_2.4").
         # All export/import keys are stored without the version suffix, so strip it.
+        # callee_name keeps the suffix: it is the name under which a local stub is
+        # registered in the binary, while callee is the normalised lookup key.
         callee_name = callee
         if "@@" in callee:
             callee = callee[: callee.index("@@")]
 
-        if callee in IGNORE_LIST or _GHIDRA_SYNTHETIC_NAME_RE.match(callee):
+        if callee in IGNORE_LIST:
             return False
 
         # already solved import
@@ -543,6 +543,17 @@ class InterImageCGMapper(FileSystemImportsMapper):
             callee_symb = binary.get_function_by_name(callee)
             binary.add_call(caller, callee_symb)
             return self._record_call_ref(caller, callee_symb, f"{log_prefix}: local call")
+
+        # Synthetic names (FUN_1234, sub_5678) are disassembler placeholders: they
+        # are only meaningful inside the binary that produced them.  They are
+        # rejected here rather than before the local lookup above, because in a
+        # stripped binary nearly every internal function carries such a name and
+        # dropping them earlier discards most of the intra-binary call graph.
+        # Past this point resolution is cross-binary, where a placeholder name
+        # would match an unrelated function in another binary or create a
+        # meaningless unindexed symbol.
+        if _GHIDRA_SYNTHETIC_NAME_RE.match(callee):
+            return False
 
         # solve import from listed imported libraries
         tmp = self.resolve_symbol_import(binary, callee, resolver, log_prefix)

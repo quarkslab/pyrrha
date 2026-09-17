@@ -407,19 +407,18 @@ class FileSystemImportsMapper:
             seen_symbol_names: set[str] = set()
             for s in parsing_res.symbols:
                 sym_name = str(s.name)
+                sym_aux_version = (
+                    s.symbol_version.symbol_version_auxiliary
+                    if s.symbol_version is not None and s.symbol_version.has_auxiliary_version
+                    else None
+                )
                 if s.exported or is_kernel_module and s.name:
                     is_func = s.is_function or s.type == lief.ELF.Symbol.TYPE.GNU_IFUNC
                     if not is_func and is_kernel_module:
                         continue
-                    # LIEF may yield the same symbol name from both .symtab
-                    # and .dynsym; only register the first occurrence to avoid
-                    # duplicate DB entries (UNIQUE constraint on node_id).
                     if sym_name in seen_symbol_names:
                         continue
                     seen_symbol_names.add(sym_name)
-                    # Use the mangled name as demangled_name when LIEF's
-                    # demangled_name is identical to the mangled name (i.e.
-                    # demangling was not available or not needed).
                     lief_demangled = str(s.demangled_name)
                     demangled = lief_demangled if lief_demangled != sym_name else sym_name
                     sym = Symbol(
@@ -428,21 +427,20 @@ class FileSystemImportsMapper:
                         demangled_name=demangled,
                         addr=s.value,
                     )
-                    # Register under the mangled name as primary key.
-                    # Also register under the demangled name if it differs,
-                    # so that call-graph resolution can match short callee
-                    # strings against exported_functions keys.
                     bin_obj.add_exported_symbol(sym)
                     if demangled != sym_name:
                         bin_obj.add_exported_symbol(sym, symbol_name=demangled)
-                elif s.imported or (
-                    s.symbol_version.has_auxiliary_version
-                    and s.symbol_version.symbol_version_auxiliary.name
-                    in bin_obj.version_requirement
-                    and sym_name != s.symbol_version.symbol_version_auxiliary.name
-                ) or (bool(sym_name) and s.shndx == 0):
-                    if s.symbol_version.has_auxiliary_version and sym_name.split("@@") != 2:
-                        sym_name = f"{sym_name}@@{s.symbol_version.symbol_version_auxiliary.name}"
+                elif (
+                    s.imported
+                    or (
+                        sym_aux_version is not None
+                        and sym_aux_version.name in bin_obj.version_requirement
+                        and sym_name != sym_aux_version.name
+                    )
+                    or (bool(sym_name) and s.shndx == 0)
+                ):
+                    if sym_aux_version is not None and len(sym_name.split("@@")) != 2:
+                        sym_name = f"{sym_name}@@{sym_aux_version.name}"
                     bin_obj.add_imported_symbol_name(sym_name)
                 elif s.is_function:
                     # Skip symbols already registered as exported functions to

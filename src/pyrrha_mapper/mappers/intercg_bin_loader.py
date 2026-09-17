@@ -57,6 +57,26 @@ class FuncData(NamedTuple):
         return self.symbol.addr
 
 
+def _imported_name_set(binary: Binary) -> set[str]:
+    """Collect imported symbol names, with and without their version suffix.
+
+    LIEF-derived import names may carry an ELF symbol version
+    (``X509_free@@OPENSSL_1_1_0`` for a versioned reference), while names
+    reported by a disassembler never do.  Membership tests that compare a
+    disassembler name against the import table therefore need both forms.
+
+    :param binary: binary whose imported symbol names are collected.
+    :return: the imported names plus their version-stripped equivalents.
+    """
+    names: set[str] = set()
+    for name in binary.imported_symbol_names:
+        names.add(name)
+        bare_name = name.split("@")[0]
+        if bare_name:
+            names.add(bare_name)
+    return names
+
+
 def _count_leading_underscores(name: str) -> int:
     """:return: the number of leading underscores/dots in name"""
     return len(name) - len(name.lstrip("_."))
@@ -127,7 +147,7 @@ class BinaryParser(Backend):
         # LIEF-confirmed imported names (.dynsym): distinguishes genuine PLT stubs
         # (IMPORTED + name in this set) from inlined C++ functions mis-classified
         # as external thunks by the disassembler (IMPORTED + name NOT in this set).
-        lief_imported_names: set[str] = set(self._binary.imported_symbol_names)
+        lief_imported_names: set[str] = _imported_name_set(self._binary)
         to_analyse = program_data
 
         while len(to_analyse) > 0:
@@ -342,7 +362,7 @@ class BinaryParser(Backend):
         :param parser_exports: LIEF exports already remapped to parser space.
         :return: mapping from parser-space address to FuncData.
         """
-        imported_names: set[str] = set(self._binary.imported_symbol_names)
+        imported_names: set[str] = _imported_name_set(self._binary)
         program_data: dict[int, FuncData] = {}
 
         for parser_addr in self.func_addrs:
@@ -473,7 +493,7 @@ class GhidraBinaryParser(BinaryParser, Ghidra):
         if not getattr(self, "_ghidra_is_relocatable", False):
             return super()._combine_program_analysis_binary(parser_exports)
 
-        imported_names: set[str] = set(self._binary.imported_symbol_names)
+        imported_names: set[str] = _imported_name_set(self._binary)
         program_data: dict[int, FuncData] = {}
 
         for parser_addr in self.func_addrs:
