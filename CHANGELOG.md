@@ -1,3 +1,8 @@
+## v2.0.2—Fix Ghidra Imports
+
+PLT was not parsed correclty by ghidra which was causing issues in the imports analysis. Some of them were registered as local private functions and were not linked to the corresponding imported function.
+
+
 ## v2.0.1—Improve Usability
 
 ### Features
