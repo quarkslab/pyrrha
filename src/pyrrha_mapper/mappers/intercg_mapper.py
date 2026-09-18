@@ -517,8 +517,6 @@ class InterImageCGMapper(FileSystemImportsMapper):
 
         # The disassembler may emit versioned symbol names (e.g. "getenv@@GLIBC_2.4").
         # All export/import keys are stored without the version suffix, so strip it.
-        # callee_name keeps the suffix: it is the name under which a local stub is
-        # registered in the binary, while callee is the normalised lookup key.
         callee_name = callee
         if "@@" in callee:
             callee = callee[: callee.index("@@")]
@@ -544,14 +542,6 @@ class InterImageCGMapper(FileSystemImportsMapper):
             binary.add_call(caller, callee_symb)
             return self._record_call_ref(caller, callee_symb, f"{log_prefix}: local call")
 
-        # Synthetic names (FUN_1234, sub_5678) are disassembler placeholders: they
-        # are only meaningful inside the binary that produced them.  They are
-        # rejected here rather than before the local lookup above, because in a
-        # stripped binary nearly every internal function carries such a name and
-        # dropping them earlier discards most of the intra-binary call graph.
-        # Past this point resolution is cross-binary, where a placeholder name
-        # would match an unrelated function in another binary or create a
-        # meaningless unindexed symbol.
         if _GHIDRA_SYNTHETIC_NAME_RE.match(callee):
             return False
 
