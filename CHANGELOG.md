@@ -1,3 +1,12 @@
+## v2.0.3—Namespaces and C++ functions
+
+### Features
+- Add a `--version` option to display current version.
+
+### Fixes
+- Namespaces were not taken in account when resolving calls and imports
+
+
 ## v2.0.2—Fix Ghidra Imports
 
 PLT was not parsed correclty by ghidra which was causing issues in the imports analysis. Some of them were registered as local private functions and were not linked to the corresponding imported function.
