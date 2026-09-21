@@ -26,6 +26,7 @@ import rich_click as click
 from click import ParameterSource
 from numbat import SourcetrailDB
 
+from pyrrha_mapper import __version__
 from pyrrha_mapper.mappers import (
     FileSystem,
     FileSystemImportsMapper,
@@ -101,10 +102,12 @@ def jobs_option(max_fraction: float = 1.0):
 
     return decorator
 
+
 BACKEND_ENVVARS: dict[Backend, str] = {
     Backend.IDA: "IDADIR",
     Backend.GHIDRA: "GHIDRA_INSTALL_DIR",
 }
+
 
 def resolve_backend(ctx: click.Context, param: click.Parameter, value: Backend) -> Backend:
     """Override the default backend with the one hinted by the environment.
@@ -170,6 +173,19 @@ class MapperCommand(click.RichCommand):
     Code from: https://stackoverflow.com/a/53875557
     """
 
+    @staticmethod
+    def print_version(ctx: click.Context, param: click.Parameter, value: bool) -> None:
+        """Print Pyrrha version then exit (eager click callback).
+
+        :param ctx: click invocation context
+        :param param: the parameter being processed
+        :param value: True if the flag has been provided
+        """
+        if not value or ctx.resilient_parsing:
+            return
+        click.echo(f"pyrrha, version {__version__}")
+        ctx.exit()
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.params.insert(
@@ -185,6 +201,17 @@ class MapperCommand(click.RichCommand):
         self.params.insert(
             0,
             click.Option(("-d", "--debug"), is_flag=True, help="Set log level to DEBUG."),
+        )
+        self.params.insert(
+            0,
+            click.Option(
+                ("--version",),
+                is_flag=True,
+                is_eager=True,
+                expose_value=False,
+                callback=MapperCommand.print_version,
+                help=("Show the version and exit."),
+            ),
         )
         self.no_args_is_help = True
 
@@ -243,6 +270,14 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"], max_content_width=12
     context_settings=CONTEXT_SETTINGS,
     help="Mapper collection for firmware analysis.",
     no_args_is_help=True,
+)
+@click.option(
+    "--version",
+    is_flag=True,
+    is_eager=True,
+    expose_value=False,
+    callback=MapperCommand.print_version,
+    help=("Show the version and exit."),
 )
 def pyrrha():  # noqa: D103
     pass
