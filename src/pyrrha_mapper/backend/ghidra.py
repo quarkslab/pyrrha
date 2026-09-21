@@ -217,14 +217,6 @@ class Ghidra(Backend):
         if func is None:
             return f"FUN_{addr:X}"
 
-        # A thunk to an external function only exposes its demangled name:
-        # Ghidra's demangler renames the symbol and files it under its class
-        # namespace, so getName() yields the bare method name ("X" for
-        # Y::C::X(int)) and getName(True) the namespace path without the
-        # parameter list.  Neither matches the import/export keys, which LIEF
-        # registers as the mangled name (_ZN1Y1C1XEi) or as the full demangled
-        # form with parameters.  The pre-demangling name is kept on the
-        # external location, and is what the import table actually contains.
         if func.isThunk():
             thunked = func.getThunkedFunction(True)
             if thunked is not None and thunked.isExternal():
@@ -246,15 +238,6 @@ class Ghidra(Backend):
             or name.startswith("operator")
             or (name.startswith("<") and name.endswith(">"))
         ):
-            # Ghidra's demangler renames a C++ function in place and leaves no
-            # mangled symbol at its address, so getName() returns only the bare
-            # member name ("X" for Y::C::X).  Two methods of different classes
-            # would then collide on the same key in internal_functions, the
-            # second silently replacing the first, and callers would be bound to
-            # whichever survived.  The namespace path is only available through
-            # getName(True), so prefer it whenever the function is not in the
-            # global namespace.  Names qualified by a pseudo-namespace such as
-            # "<EXTERNAL>" are left out: imports are handled above.
             namespace = func.getParentNamespace()
             if namespace is not None and not namespace.isGlobal():
                 qualified_name = func.getName(True)
