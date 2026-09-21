@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+      <url>
+        <loc>https://quarkslab.github.io/pyrrha/v2.0.3/</loc>
+      </url>
+      <url>
+        <loc>https://quarkslab.github.io/pyrrha/v2.0.3/installation/</loc>
+      </url>
+      <url>
+        <loc>https://quarkslab.github.io/pyrrha/v2.0.3/mappers/</loc>
+      </url>
+      <url>
+        <loc>https://quarkslab.github.io/pyrrha/v2.0.3/mappers/fs/</loc>
+      </url>
+      <url>
+        <loc>https://quarkslab.github.io/pyrrha/v2.0.3/mappers/fs-cg/</loc>
+      </url>
+      <url>
+        <loc>https://quarkslab.github.io/pyrrha/v2.0.3/mappers/exe-decomp/</loc>
+      </url>
+      <url>
+        <loc>https://quarkslab.github.io/pyrrha/v2.0.3/contributing/dev_mapper/</loc>
+      </url>
+      <url>
+        <loc>https://quarkslab.github.io/pyrrha/v2.0.3/changelog/</loc>
+      </url>
+      <url>
+        <loc>https://quarkslab.github.io/pyrrha/v2.0.3/license/</loc>
+      </url>
+</urlset>
