@@ -112,6 +112,37 @@ _GHIDRA_SYNTHETIC_NAME_RE: re.Pattern[str] = re.compile(
 NUMBAT_UI_BIN = "NumbatUi"
 
 
+def _strip_template_args(name: str) -> str:
+    """Remove balanced template argument groups from a C++ function name.
+
+    ``Y::Box<int>::get`` becomes ``Y::Box::get`` and nested arguments such as
+    ``A<B<C>>::f`` are handled.  Names containing ``operator`` are returned
+    unchanged, since ``operator<``, ``operator<<`` and ``operator<=`` carry
+    angle brackets that are not template arguments.  A name whose brackets are
+    unbalanced is also returned unchanged.
+
+    :param name: function name as reported by the disassembler.
+    :return: the name without its template arguments.
+    """
+    if "<" not in name or "operator" in name:
+        return name
+
+    stripped: list[str] = []
+    depth = 0
+    for char in name:
+        if char == "<":
+            depth += 1
+        elif char == ">":
+            depth -= 1
+            if depth < 0:  # unbalanced, leave the name alone
+                return name
+        elif depth == 0:
+            stripped.append(char)
+    if depth != 0:
+        return name
+    return "".join(stripped)
+
+
 class InterImageCGMapper(FileSystemImportsMapper):
     """Filesystem mapper based on Lief, which computes imports and exports."""
 
@@ -510,10 +541,8 @@ class InterImageCGMapper(FileSystemImportsMapper):
 
         :return: True if target function was found
         """
-        # Ghidra emits template arguments in callee names (e.g. "_M_insert<bool>");
-        # strip them so lookups match the base-name key in exported_functions.
-        if "<" in callee:
-            callee = callee[: callee.index("<")]
+        if "<" in callee and not binary.function_exists(callee):
+            callee = _strip_template_args(callee)
 
         # The disassembler may emit versioned symbol names (e.g. "getenv@@GLIBC_2.4").
         # All export/import keys are stored without the version suffix, so strip it.

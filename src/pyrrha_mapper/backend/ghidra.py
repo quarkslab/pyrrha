@@ -217,6 +217,23 @@ class Ghidra(Backend):
         if func is None:
             return f"FUN_{addr:X}"
 
+        # A thunk to an external function only exposes its demangled name:
+        # Ghidra's demangler renames the symbol and files it under its class
+        # namespace, so getName() yields the bare method name ("X" for
+        # Y::C::X(int)) and getName(True) the namespace path without the
+        # parameter list.  Neither matches the import/export keys, which LIEF
+        # registers as the mangled name (_ZN1Y1C1XEi) or as the full demangled
+        # form with parameters.  The pre-demangling name is kept on the
+        # external location, and is what the import table actually contains.
+        if func.isThunk():
+            thunked = func.getThunkedFunction(True)
+            if thunked is not None and thunked.isExternal():
+                external_location = thunked.getExternalLocation()
+                if external_location is not None:
+                    original_name = external_location.getOriginalImportedName()
+                    if original_name:
+                        return str(original_name)
+
         ghidra_addr = self._to_ghidra_address(addr)
         for sym in self._ghidra_symbol_table.getSymbols(ghidra_addr): # type: ignore
             raw = sym.getName()
@@ -229,6 +246,20 @@ class Ghidra(Backend):
             or name.startswith("operator")
             or (name.startswith("<") and name.endswith(">"))
         ):
+            # Ghidra's demangler renames a C++ function in place and leaves no
+            # mangled symbol at its address, so getName() returns only the bare
+            # member name ("X" for Y::C::X).  Two methods of different classes
+            # would then collide on the same key in internal_functions, the
+            # second silently replacing the first, and callers would be bound to
+            # whichever survived.  The namespace path is only available through
+            # getName(True), so prefer it whenever the function is not in the
+            # global namespace.  Names qualified by a pseudo-namespace such as
+            # "<EXTERNAL>" are left out: imports are handled above.
+            namespace = func.getParentNamespace()
+            if namespace is not None and not namespace.isGlobal():
+                qualified_name = func.getName(True)
+                if qualified_name and not qualified_name.startswith("<"):
+                    return str(qualified_name)
             return name
 
         return f"FUN_{addr:X}"

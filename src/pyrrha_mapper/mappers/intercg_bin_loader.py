@@ -396,8 +396,17 @@ class BinaryParser(Backend):
                 #
                 # _Z-prefixed names are exempt: a statically linked binary may
                 # hold a private copy of a C++ symbol whose mangled name also
-                # appears in the dynamic import table.
-                is_plt_stub = mangled_name in imported_names and not mangled_name.startswith("_Z")
+                # appears in the dynamic import table.  That exemption is
+                # lifted when the backend positively reports a thunk, which a
+                # local definition never is: a C++ import reaches us through a
+                # trampoline, and without this every imported method is
+                # registered as a private member of the calling binary.  Only a
+                # positive answer is used, so a backend that types a stub as
+                # NORMAL keeps the conservative behaviour.
+                is_plt_stub = mangled_name in imported_names and (
+                    not mangled_name.startswith("_Z")
+                    or self.func_type(parser_addr) == FuncType.THUNK
+                )
                 func_symbol = Symbol(
                     name=mangled_name,
                     demangled_name=self.func_demangled_name(parser_addr),
