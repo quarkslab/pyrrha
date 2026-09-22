@@ -197,7 +197,18 @@ class BinaryParser(Backend):
                             is_func=True,
                             addr=func_data.calls[0],
                         )
-                        self._binary.add_function(func_symbol)
+                        # A callee reached only through a thunk may be the
+                        # import itself rather than code of this binary: IDA
+                        # resolves a PLT thunk to its extern-segment entry, so
+                        # the address lands here without ever having been part
+                        # of program_data.  Registering it would add a private
+                        # member named after the import, capturing the callers
+                        # that belong to the exporting binary.  It is still
+                        # recorded in program_data below, so the trampoline
+                        # substitution keeps forwarding callers to its name and
+                        # the edge resolves cross-binary.
+                        if mangled_name not in lief_imported_names:
+                            self._binary.add_function(func_symbol)
                         func = FuncData(
                             symbol=func_symbol,
                             type=self.func_type(func_data.calls[0]),
@@ -233,18 +244,33 @@ class BinaryParser(Backend):
                     # placeholder would drop the cross-binary call edge entirely.
                     # Skipping the substitution leaves the stub name intact so
                     # fwmapper can still resolve it against exported_functions.
-                    if not _SYNTHETIC_FUNC_NAME_RE.match(destination_name):
+                    substitution_recorded = not _SYNTHETIC_FUNC_NAME_RE.match(destination_name)
+                    if substitution_recorded:
                         trampoline_map[trampoline_name] = destination_name
                         for key, val in trampoline_map.items():
                             if val == trampoline_name:
                                 trampoline_map[key] = destination_name
 
-                    # Only remove the thunk stub when it wraps a true external
-                    # (IMPORTED) symbol — i.e. it is a genuine PLT stub.  Internal
-                    # forwarding thunks (callee type is NORMAL or another THUNK)
-                    # must stay registered in the binary so their callers can
-                    # resolve them as local calls.
-                    if callee_data.type != FuncType.IMPORTED:
+                    # Remove the thunk stub when it wraps a true external
+                    # (IMPORTED) symbol — a genuine PLT stub — and also when it
+                    # forwards to another function of this binary that is
+                    # registered under the destination name: the substitution
+                    # recorded above rewrites its callers to that destination,
+                    # so keeping the stub would leave an unreferenced private
+                    # member shadowing the real function.  That second case is
+                    # what a PIE binary produces when it calls its own
+                    # preemptible exports through its own PLT.
+                    #
+                    # An internal forwarding thunk whose destination is
+                    # synthetic, or not registered, stays in place: no
+                    # substitution was recorded for it, so its callers still
+                    # need it to resolve as a local call.
+                    forwards_to_registered_local = (
+                        substitution_recorded
+                        and callee_data.type != FuncType.IMPORTED
+                        and self._binary.function_exists(destination_name)
+                    )
+                    if callee_data.type != FuncType.IMPORTED and not forwards_to_registered_local:
                         continue
 
                 elif (
@@ -379,32 +405,10 @@ class BinaryParser(Backend):
                     for sym in symbols:
                         self._binary.replace_function(func_symbol, sym, True)
             else:
-                # Internal function — create a new Symbol in parser space.
                 mangled_name = self.func_mangled_name(parser_addr)
-                # A function whose name is a LIEF-confirmed dynamic import is a
-                # PLT stub.  It must not be registered in the binary: it would
-                # shadow the real export, and _record_one_call would then
-                # resolve callers intra-binary instead of following the
-                # cross-binary import.  It must however stay in program_data,
-                # so _build_calls_list still emits its name for callers and
-                # fwmapper resolves the edge against the exporting binary.
-                #
-                # This deliberately does not consult func_type(): whether a stub
-                # is reported as THUNK, IMPORTED or NORMAL varies between
-                # backends (Ghidra cannot type a thunk whose target lives in the
-                # EXTERNAL block), and registration must not depend on it.
-                #
-                # _Z-prefixed names are exempt: a statically linked binary may
-                # hold a private copy of a C++ symbol whose mangled name also
-                # appears in the dynamic import table.  That exemption is
-                # lifted when the backend positively reports a thunk, which a
-                # local definition never is: a C++ import reaches us through a
-                # trampoline, and without this every imported method is
-                # registered as a private member of the calling binary.  Only a
-                # positive answer is used, so a backend that types a stub as
-                # NORMAL keeps the conservative behaviour.
                 is_plt_stub = mangled_name in imported_names and (
                     not mangled_name.startswith("_Z")
+                    or self.func_is_import(parser_addr)
                     or self.func_type(parser_addr) == FuncType.THUNK
                 )
                 func_symbol = Symbol(
@@ -416,10 +420,16 @@ class BinaryParser(Backend):
                 if not is_plt_stub:
                     self._binary.add_function(func_symbol)
 
+            calls = self.func_children(parser_addr)
+            if not calls:
+                thunk_target = self.func_thunk_target(parser_addr)
+                if thunk_target is not None and thunk_target != parser_addr:
+                    calls = [thunk_target]
+
             program_data[parser_addr] = FuncData(
                 symbol=func_symbol,
                 type=self.func_type(parser_addr),
-                calls=self.func_children(parser_addr),
+                calls=calls,
                 callers=self.func_parents(parser_addr),
             )
 
