@@ -166,7 +166,7 @@ class BaseTestFsMapper(ABC):
         Path("/lib/libssl.so.1.1"),
         Path("/bin/openssl"),
     }
-    FW_TEST_SYMLINKS_PATHS = {Path("/lib/libssl.so")}
+    FW_TEST_SYMLINKS_PATHS = {Path("/lib/libssl.so"), Path("/lib/libtest.1")}
 
     FW_TEST_SONAMES = {
         "ld-linux.so.3": "ld-linux.so.3",
