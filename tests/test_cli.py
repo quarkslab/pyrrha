@@ -268,14 +268,17 @@ class BaseTestFsMapper(ABC):
     def test_exported_symbols(self, bin_path: Path, export_dump: FileSystem) -> None:
         """Exported symbols exist for each binary of the firware."""
         _bin = export_dump.get_binary_by_path(bin_path)
-        assert len(list(_bin.iter_exported_symbols())) > 0, "Missing exported symbols"
+        if _bin.path != self.CPP_CONSUMER_PATH:
+            assert len(list(_bin.iter_exported_symbols())) > 0  , "Missing exported symbols"
+        else:
+            assert len(list(_bin.iter_exported_symbols())) == 0  , "Has unplanned exported symbols"
 
     @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
     @pytest.mark.parametrize("bin_path", FW_TEST_BIN_PATHS, ids=_path_id)
     def test_dependencies(self, bin_path: Path, export_dump: FileSystem) -> None:
         """Imported libraries exist for each binary of the firware except ldd."""
         _bin = export_dump.get_binary_by_path(bin_path)
-        if bin_path == self.FW_TEST_LD:
+        if bin_path == self.FW_TEST_LD or bin_path == self.CPP_LIB_PATH:
             assert len(list(_bin.iter_imported_libraries())) == 0, "Create false imported libraries"
         else:
             assert len(list(_bin.iter_imported_libraries())) > 0, "Missing imported libraries"
@@ -294,7 +297,7 @@ class BaseTestFsMapper(ABC):
     def test_imported_symbols(self, bin_path: Path, export_dump: FileSystem) -> None:
         """Imported symbols exist for each binary of the firware except ldd."""
         _bin = export_dump.get_binary_by_path(bin_path)
-        if bin_path == self.FW_TEST_LD:
+        if bin_path == self.FW_TEST_LD or bin_path == self.CPP_LIB_PATH:
             assert len(_bin.imported_symbol_names) == 0, "Create false imported symbols"
         else:
             assert len(_bin.imported_symbol_names) > 0, "Missing imported symbols"
