@@ -287,7 +287,7 @@ test_fs-cg_backend:
   rules:
     - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
       variables:
-        DISASS_IMAGE_TAG: "${VERSION}-${CI_COMMIT_TAG#v}"  # strip the leading v, e.g. 12.0.4-1.2.3
+        DISASS_IMAGE_TAG: "${VERSION}-${CI_COMMIT_TAG:1}"  # strip the leading v, e.g. 12.0.4-1.2.3
     - if: '$CI_COMMIT_BRANCH == "main"'
       changes: *source_paths
       variables:
