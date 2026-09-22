@@ -168,6 +168,46 @@ class IDA(Backend):
             return FuncType.LIBRARY
         return FuncType.NORMAL
 
+    def func_is_import(self, addr: int) -> bool:
+        """:return: True when *addr* is an entry of IDA's import table.
+
+        IDA places imports in its ``extern`` segment and names them
+        ``__imp_<mangled>``, with flags that carry neither ``THUNK`` nor
+        ``LIB``, so they cannot be recognised from flags alone.
+
+        :param addr: function entry-point address, in parser space.
+        """
+        from ida_domain.base import InvalidEAError
+
+        try:
+            return self._ida_db.imports.get_import_at(addr) is not None
+        except InvalidEAError:
+            return False
+
+    def func_thunk_target(self, addr: int) -> int | None:
+        """Return the parser-space address the thunk at *addr* forwards to.
+
+        IDA resolves a thunk to its target, so the target appears as the sole
+        callee.  Returns ``None`` when the function is not flagged as a thunk,
+        when its target cannot be told apart from several callees, or when it
+        forwards to itself.
+
+        :param addr: function entry-point address, in parser space.
+        :return: the target address in parser space, or None.
+        """
+        from ida_domain.functions import FunctionFlags
+
+        func = self._get_ida_func(addr)
+        if func is None:
+            return None
+        if FunctionFlags.THUNK not in self._ida_db.functions.get_flags(func):
+            return None
+        callees = list(self._ida_db.functions.get_callees(func))
+        if len(callees) != 1:
+            return None
+        target = callees[0].start_ea
+        return None if target == func.start_ea else target
+
     def func_decompiled(self, addr: int) -> str:
         """:return: decompilation result of the function"""
         from ida_domain.base import IdaDomainError
