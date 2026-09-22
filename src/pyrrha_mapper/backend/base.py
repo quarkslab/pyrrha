@@ -70,6 +70,45 @@ class Backend(object, metaclass=ABCMeta):
         """:return: entry-point addresses of callers of the function at *addr*."""
         ...
 
+    def func_thunk_target(self, addr: int) -> int | None:
+        """Return the address the thunk at *addr* forwards to, if any.
+
+        A PLT entry branches through the GOT with an indirect jump, which
+        disassemblers expose as a jump reference rather than a call, so
+        ``func_children`` reports no callee for it.  The thunk relationship is
+        the only way to recover the target, and it is needed for both a stub
+        forwarding to an imported symbol and a PIE binary calling its own
+        preemptible exports through its own PLT.
+
+        Targets outside the parser address space (Ghidra's ``EXTERNAL`` block,
+        for instance) are reported as ``None``: their offsets are meaningless
+        as parser-space addresses, and such stubs are resolved by name instead.
+
+        The default implementation returns ``None``; backends able to resolve
+        thunks override it.
+
+        :param addr: function entry-point address, in parser space.
+        :return: the target address in parser space, or None.
+        """
+        return None
+
+    def func_is_import(self, addr: int) -> bool:
+        """Return whether *addr* is an entry of the binary's import table.
+
+        This is the disassembler's own verdict, independent of function flags
+        and callee counts: IDA answers from its import table, Ghidra from the
+        external nature of the function or of the thunk's target.  It tells a
+        genuine import stub apart from a statically linked private copy of the
+        same symbol, which no name comparison can do.
+
+        The default implementation returns ``False``; backends able to answer
+        override it.
+
+        :param addr: function entry-point address, in parser space.
+        :return: True when the address belongs to the import table.
+        """
+        return False
+
     @abstractmethod
     def func_type(self, addr: int) -> FuncType:
         """:return: the FuncType of the function at *addr*.
