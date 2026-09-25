@@ -245,6 +245,10 @@ class MapperCommand(click.RichCommand):
                 default=False,
             ),
         )
+        self.params.insert(
+            0,
+            click.Option(("-d", "--debug"), is_flag=True, help="Set log level to DEBUG."),
+        )
         self.no_args_is_help = True
 
 
