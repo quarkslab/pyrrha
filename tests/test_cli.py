@@ -133,8 +133,31 @@ class BaseTestFsMapper(ABC):
 
     FW_TEST_PATH = Path(__file__).parent / "test_fw"
     FW_TEST_LD = Path("/lib/ld-linux.so.3")
+    CPP_CONSUMER_PATH = Path("/bin/consumer")
+    CPP_LIB_PATH = Path("/lib/libtest.1.0")
+    #: Symbols the C++ library exports, as LIEF keys them (mangled names).
+    CPP_LIB_EXPORTS = {
+        "_ZN6TestNs12FreeFunctionEi",
+        "_ZN6TestNs13TailCallThunkERN4Data4BlobE",
+        "_ZN6TestNs13TemplateClassIiE14TemplateMethodERKi",
+        "_ZN6TestNs9TestClass12StaticMethodEi",
+        "_ZN6TestNs9TestClass14MethodRefParamERN4Data4BlobE",
+        "_ZN6TestNs9TestClass14MethodRefParamERN4Data4BlobEi",
+        "_ZNK4Data4Blob4ReadEv",
+    }
+    #: Symbols the C++ executable imports from that library.
+    CPP_CONSUMER_IMPORTS = {
+        "_ZN6TestNs12FreeFunctionEi",
+        "_ZN6TestNs13TailCallThunkERN4Data4BlobE",
+        "_ZN6TestNs13TemplateClassIiE14TemplateMethodERKi",
+        "_ZN6TestNs9TestClass14MethodRefParamERN4Data4BlobE",
+        "_ZN6TestNs9TestClass14MethodRefParamERN4Data4BlobEi",
+    }
+
     FW_TEST_BIN_PATHS = {
         FW_TEST_LD,
+        CPP_CONSUMER_PATH,
+        CPP_LIB_PATH,
         Path("/lib/libc.so.6"),
         # Path("/lib/libcrypto.so.1.1"),
         Path("/lib/libcrypto.so.FOR_SONAME_TESTING"),
@@ -143,7 +166,7 @@ class BaseTestFsMapper(ABC):
         Path("/lib/libssl.so.1.1"),
         Path("/bin/openssl"),
     }
-    FW_TEST_SYMLINKS_PATHS = {Path("/lib/libssl.so")}
+    FW_TEST_SYMLINKS_PATHS = {Path("/lib/libssl.so"), Path("/lib/libtest.1")}
 
     FW_TEST_SONAMES = {
         "ld-linux.so.3": "ld-linux.so.3",
@@ -245,14 +268,17 @@ class BaseTestFsMapper(ABC):
     def test_exported_symbols(self, bin_path: Path, export_dump: FileSystem) -> None:
         """Exported symbols exist for each binary of the firware."""
         _bin = export_dump.get_binary_by_path(bin_path)
-        assert len(list(_bin.iter_exported_symbols())) > 0, "Missing exported symbols"
+        if _bin.path != self.CPP_CONSUMER_PATH:
+            assert len(list(_bin.iter_exported_symbols())) > 0  , "Missing exported symbols"
+        else:
+            assert len(list(_bin.iter_exported_symbols())) == 0  , "Has unplanned exported symbols"
 
     @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
     @pytest.mark.parametrize("bin_path", FW_TEST_BIN_PATHS, ids=_path_id)
     def test_dependencies(self, bin_path: Path, export_dump: FileSystem) -> None:
         """Imported libraries exist for each binary of the firware except ldd."""
         _bin = export_dump.get_binary_by_path(bin_path)
-        if bin_path == self.FW_TEST_LD:
+        if bin_path == self.FW_TEST_LD or bin_path == self.CPP_LIB_PATH:
             assert len(list(_bin.iter_imported_libraries())) == 0, "Create false imported libraries"
         else:
             assert len(list(_bin.iter_imported_libraries())) > 0, "Missing imported libraries"
@@ -271,7 +297,7 @@ class BaseTestFsMapper(ABC):
     def test_imported_symbols(self, bin_path: Path, export_dump: FileSystem) -> None:
         """Imported symbols exist for each binary of the firware except ldd."""
         _bin = export_dump.get_binary_by_path(bin_path)
-        if bin_path == self.FW_TEST_LD:
+        if bin_path == self.FW_TEST_LD or bin_path == self.CPP_LIB_PATH:
             assert len(_bin.imported_symbol_names) == 0, "Create false imported symbols"
         else:
             assert len(_bin.imported_symbol_names) > 0, "Missing imported symbols"
@@ -401,6 +427,67 @@ class TestFsCgMapper(BaseTestFsMapper):
         return cls.ExecResults(res=run_pyrrha_subprocess(args), db_path=tmp_path)
 
     # =================================== TESTS ========================================
+
+    @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
+    def test_cpp_imports_are_not_binary_functions(self, export_dump: FileSystem) -> None:
+        """An imported C++ method is not registered as a function of the caller.
+
+        The PLT stub carries the same name as the imported method, and with a
+        mangled name it used to survive the ``_Z`` carve-out of the stub guard
+        and end up as a private member holding the callers of the real
+        function.
+        """
+        consumer = export_dump.get_binary_by_path(self.CPP_CONSUMER_PATH)
+        registered = {f.name for f in consumer.iter_functions()}
+        assert not (registered & self.CPP_CONSUMER_IMPORTS), (
+            f"imported methods registered as functions of {self.CPP_CONSUMER_PATH}: "
+            f"{sorted(registered & self.CPP_CONSUMER_IMPORTS)}"
+        )
+
+    @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
+    def test_cpp_library_exports(self, export_dump: FileSystem) -> None:
+        """The C++ library exports every symbol, keyed by its mangled name."""
+        library = export_dump.get_binary_by_path(self.CPP_LIB_PATH)
+        exported = {f.name for f in library.iter_exported_functions()}
+        missing = self.CPP_LIB_EXPORTS - exported
+        assert not missing, f"missing exports in {self.CPP_LIB_PATH}: {sorted(missing)}"
+
+    @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
+    def test_cpp_no_stub_shadowing_export(self, export_dump: FileSystem) -> None:
+        """No private function shadows an export of the same library.
+
+        The library is PIE, so it calls its own preemptible exports through its
+        own PLT.  Those stubs must not be registered: a private function named
+        after an export captures the callers of the real one.
+        """
+        library = export_dump.get_binary_by_path(self.CPP_LIB_PATH)
+        exported_names = {f.name for f in library.iter_exported_functions()}
+        exported_demangled = {f.demangled_name for f in library.iter_exported_functions()}
+        shadows = [
+            f.name
+            for f in library.iter_not_exported_functions()
+            if f.name in exported_names or f.demangled_name in exported_demangled
+        ]
+        assert not shadows, f"private functions shadowing an export: {sorted(shadows)}"
+
+    @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
+    def test_cpp_calls_resolve_to_library(self, export_dump: FileSystem) -> None:
+        """Every C++ method the executable calls resolves to the library symbol."""
+        consumer = export_dump.get_binary_by_path(self.CPP_CONSUMER_PATH)
+        library = export_dump.get_binary_by_path(self.CPP_LIB_PATH)
+        library_ids = {f.id for f in library.iter_exported_functions() if f.id is not None}
+        called_ids = {callee.id for callees in consumer.calls.values() for callee in callees}
+        resolved = {
+            callee.name
+            for callees in consumer.calls.values()
+            for callee in callees
+            if callee.id in library_ids
+        }
+        unresolved = self.CPP_CONSUMER_IMPORTS - resolved
+        assert not unresolved, (
+            f"calls not resolved to {self.CPP_LIB_PATH}: {sorted(unresolved)} "
+            f"(callee ids seen: {sorted(i for i in called_ids if i is not None)})"
+        )
 
     @pytest.mark.parametrize("export_res", [1, 16], indirect=True)
     @pytest.mark.parametrize(

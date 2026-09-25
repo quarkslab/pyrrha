@@ -55,7 +55,7 @@ def resolve_duplicates_options(f):
         "--arbitrary",
         "resolve_duplicates",
         flag_value=ResolveDuplicateOption.ARBITRARY,
-        help="Select the first one available.",
+        help="Select the first one available (default).",
         default=True,
     )
     @click.option(
@@ -63,11 +63,6 @@ def resolve_duplicates_options(f):
         "resolve_duplicates",
         flag_value=ResolveDuplicateOption.INTERACTIVE,
         help="User manually selects which one to use.",
-    )
-    @click.option_panel(
-        "Resolution",
-        help="When resolving duplicate imports:",
-        options=["--arbitrary", "--interactive", "--ignore"],
     )
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
@@ -92,7 +87,6 @@ def jobs_option(max_fraction: float = 1.0):
             type=click.IntRange(1, max_jobs, clamp=True),
             metavar="INT",
             default=max_jobs,
-            show_default=True,
         )
         @functools.wraps(f)
         def wrapper(*args, **kwargs):
@@ -137,9 +131,43 @@ def backend_option(f):
         required=False,
         type=click.Choice([Backend.IDA, Backend.GHIDRA], case_sensitive=False),
         default=Backend.IDA,
-        show_default=True,
         callback=resolve_backend,
-        help="Backend to use.",
+        help=("Backend to use. Set backend directory with the environment " 
+              f"variable `{BACKEND_ENVVARS[Backend.IDA]}` for {Backend.IDA.name.lower()} " 
+              f"and `{BACKEND_ENVVARS[Backend.GHIDRA]}` for {Backend.GHIDRA.name.lower()}."
+        )
+    )
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        return f(*args, **kwargs)
+
+    return wrapper
+
+
+def option_panels(f):
+    """Define option panels."""
+
+    @click.option_panel(
+        "Mapper Settings",
+        options=[
+            "--backend",
+            "--db",
+            "-e",
+            "-j",
+        ],
+    )
+    @click.option_panel(
+        "Resolution",
+        help="When resolving duplicate imports:",
+        options=["--arbitrary", "--interactive", "--ignore"],
+    )
+    @click.option_panel(
+        "Other",
+        options=[
+            "--debug",
+            "--help",
+            "--version",
+        ],
     )
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
@@ -195,12 +223,7 @@ class MapperCommand(click.RichCommand):
                 help=f"NumbatUI DB file path ({SourcetrailDB.SOURCETRAIL_DB_EXT}).",
                 type=click.Path(file_okay=True, dir_okay=True, path_type=Path),
                 default=Path() / f"{self.name}{SourcetrailDB.SOURCETRAIL_DB_EXT}",
-                show_default=True,
             ),
-        )
-        self.params.insert(
-            0,
-            click.Option(("-d", "--debug"), is_flag=True, help="Set log level to DEBUG."),
         )
         self.params.insert(
             0,
@@ -211,6 +234,15 @@ class MapperCommand(click.RichCommand):
                 expose_value=False,
                 callback=MapperCommand.print_version,
                 help=("Show the version and exit."),
+            ),
+        )
+        self.params.insert(
+            0,
+            click.Option(
+                ("-e", "--export"),
+                help="Create a JSON export of the resulting mapping.",
+                is_flag=True,
+                default=False,
             ),
         )
         self.no_args_is_help = True
@@ -279,6 +311,14 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"], max_content_width=12
     callback=MapperCommand.print_version,
     help=("Show the version and exit."),
 )
+@click.rich_config(
+    {
+        "style_options_panel_box": "HEAVY",
+        "style_options_panel_title_style": "bold",
+        "text_markup": "markdown",
+        "text_emojis": True,
+    }
+)
 def pyrrha():  # noqa: D103
     pass
 
@@ -293,25 +333,10 @@ def pyrrha():  # noqa: D103
         "plus the symlinks that point to these executable files."
     ),
 )
-@click.option(
-    "-e",
-    "--export",
-    help="Create a JSON export of the resulting FileSystem mapping.",
-    is_flag=True,
-    default=False,
-)
 @jobs_option(max_fraction=1.0)
-@click.option_panel(
-    "Mapper Options",
-    options=[
-        "-b",
-        "--db",
-        "-e",
-        "-j",
-    ],
-)
 @resolve_duplicates_options
 @root_directory_argument
+@option_panels
 def fs_mapper(
     debug: bool,
     db: Path,
@@ -344,21 +369,14 @@ def fs_mapper(
     ),
 )
 @jobs_option(max_fraction=0.7)
-@click.option_panel(
-    "Mapper Options",
-    options=[
-        "-b",
-        "--db",
-        "-e",
-        "-j",
-    ],
-)
-@resolve_duplicates_options
 @backend_option
+@resolve_duplicates_options
 @root_directory_argument
+@option_panels
 def fs_call_graph_mapper(
     debug: bool,
     db: Path,
+    export: bool,
     jobs: int,
     resolve_duplicates: ResolveDuplicateOption,
     backend: Backend,
@@ -380,7 +398,8 @@ def fs_call_graph_mapper(
     try:
         intercg_mapper = InterImageCGMapper(root_directory, db_instance, backend)
         fs_object: FileSystem = intercg_mapper.map(jobs, resolve_duplicates)
-        fs_object.write(db_instance.path.with_suffix(intercg_mapper.FS_EXT))
+        if export:
+            fs_object.write(db_instance.path.with_suffix(intercg_mapper.FS_EXT))
     except RuntimeError:
         pass
 
@@ -398,22 +417,8 @@ def fs_call_graph_mapper(
     ),
 )
 @backend_option
-@click.option_panel(
-    "Mapper Options",
-    options=[
-        "-b",
-        "--db",
-        "-e",
-        "-j",
-    ],
-)
-@click.option(
-    "-e",
-    "--export",
-    help="Create a JSON export of the resulting decompilation mapping.",
-    is_flag=True,
-    default=False,
-)
+@resolve_duplicates_options
+@option_panels
 @click.argument(
     "executable",
     type=click.Path(exists=False, file_okay=True, dir_okay=False, path_type=Path),
