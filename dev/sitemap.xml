@@ -4,27 +4,27 @@
         <loc>https://quarkslab.github.io/pyrrha/dev/</loc>
       </url>
       <url>
-        <loc>https://quarkslab.github.io/pyrrha/dev/installation/</loc>
-      </url>
-      <url>
-        <loc>https://quarkslab.github.io/pyrrha/dev/mappers/</loc>
-      </url>
-      <url>
-        <loc>https://quarkslab.github.io/pyrrha/dev/mappers/fs/</loc>
-      </url>
-      <url>
-        <loc>https://quarkslab.github.io/pyrrha/dev/mappers/fs-cg/</loc>
-      </url>
-      <url>
-        <loc>https://quarkslab.github.io/pyrrha/dev/mappers/exe-decomp/</loc>
+        <loc>https://quarkslab.github.io/pyrrha/dev/changelog/</loc>
       </url>
       <url>
         <loc>https://quarkslab.github.io/pyrrha/dev/contributing/dev_mapper/</loc>
       </url>
       <url>
-        <loc>https://quarkslab.github.io/pyrrha/dev/changelog/</loc>
+        <loc>https://quarkslab.github.io/pyrrha/dev/installation/</loc>
       </url>
       <url>
         <loc>https://quarkslab.github.io/pyrrha/dev/license/</loc>
+      </url>
+      <url>
+        <loc>https://quarkslab.github.io/pyrrha/dev/mappers/</loc>
+      </url>
+      <url>
+        <loc>https://quarkslab.github.io/pyrrha/dev/mappers/exe-decomp/</loc>
+      </url>
+      <url>
+        <loc>https://quarkslab.github.io/pyrrha/dev/mappers/fs-cg/</loc>
+      </url>
+      <url>
+        <loc>https://quarkslab.github.io/pyrrha/dev/mappers/fs/</loc>
       </url>
 </urlset>
