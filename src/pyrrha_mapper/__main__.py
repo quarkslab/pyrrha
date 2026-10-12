@@ -421,7 +421,6 @@ def fs_call_graph_mapper(
     ),
 )
 @backend_option
-@resolve_duplicates_options
 @option_panels
 @click.argument(
     "executable",
