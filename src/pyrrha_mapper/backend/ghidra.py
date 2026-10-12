@@ -304,6 +304,39 @@ class Ghidra(Backend):
             result.append(self._to_parser_addr(caller.getEntryPoint().getOffset()))
         return result
 
+    def func_is_import(self, addr: int) -> bool:
+        """:return: True when the function at *addr* is, or forwards to, an external.
+
+        :param addr: function entry-point address, in parser space.
+        """
+        func = self._get_ghidra_func(addr)
+        if func is None:
+            return False
+        if func.isExternal():
+            return True
+        thunked = func.getThunkedFunction(True) if func.isThunk() else None
+        return thunked is not None and thunked.isExternal()
+
+    def func_thunk_target(self, addr: int) -> int | None:
+        """Return the parser-space address the thunk at *addr* forwards to.
+
+        Returns ``None`` when the function is not a thunk, or when its target
+        is external: Ghidra keeps external functions in the ``EXTERNAL``
+        address space, whose offsets cannot be expressed in parser space.
+        Those stubs are named through their external location instead (see
+        ``func_mangled_name``).
+
+        :param addr: function entry-point address, in parser space.
+        :return: the target address in parser space, or None.
+        """
+        func = self._get_ghidra_func(addr)
+        if func is None or not func.isThunk():
+            return None
+        thunked = func.getThunkedFunction(True)
+        if thunked is None or thunked.isExternal():
+            return None
+        return self._to_parser_addr(thunked.getEntryPoint().getOffset())
+
     def func_type(self, addr: int) -> FuncType:
         """:return: the FuncType of the function at *addr*.
 
