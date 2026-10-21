@@ -50,12 +50,14 @@ class FakeDB:
         self.files: list[tuple[Path, str]] = []
         self.file_languages: list[tuple[int, str]] = []
         self.functions: list[dict] = []
+        self.global_variables: list[dict] = []
         self.symbol_locations: list[tuple] = []
         self.ref_calls: list[tuple[int, int]] = []
         self.reference_locations: list[tuple] = []
         self.node_types: list[tuple] = []
         # When set, the matching record_* returns None to drive error paths.
         self.fail_record_function = False
+        self.fail_record_global_variable = False
         self.fail_record_file = False
         self.fail_record_ref_call = False
 
@@ -71,6 +73,12 @@ class FakeDB:
         if self.fail_record_function:
             return None
         self.functions.append({"name": name, "prefix": prefix, "parent_id": parent_id})
+        return self._alloc()
+
+    def record_global_variable(self, name, prefix="", is_indexed=True, **kwargs):  # noqa: D102
+        if self.fail_record_global_variable:
+            return None
+        self.global_variables.append({"name": name, "prefix": prefix, "is_indexed": is_indexed})
         return self._alloc()
 
     def record_file(self, path, name="", **kwargs):  # noqa: D102
@@ -217,14 +225,17 @@ class TestRecordFunction:
         # so there is no binary class node to attach them to.
         assert db.functions[0]["parent_id"] is None
 
-    def test_imported_function_skipped(self) -> None:
-        """An imported function is not recorded and keeps a None id."""
+    def test_imported_function_recorded_in_import_category(self) -> None:
+        """An imported function is recorded as an indexed import node."""
         db = FakeDB()
         mapper = make_mapper(db)
         func = make_func(0x1000, "calloc", func_type=FuncType.IMPORTED)
         result = mapper.record_function(func, "[test]")
-        assert result.id is None
+        assert result.id is not None
+        # Recorded in the import category, not among the real functions.
         assert db.functions == []
+        # Indexed, otherwise NumbatUI hides the category from its overview.
+        assert db.global_variables == [{"name": "calloc", "prefix": "0x1000", "is_indexed": True}]
 
     def test_record_failure_keeps_none_id(self) -> None:
         """When the DB returns None, the function id stays None."""
@@ -232,6 +243,47 @@ class TestRecordFunction:
         db.fail_record_function = True
         mapper = make_mapper(db)
         func = make_func(0x1000, "foo")
+        result = mapper.record_function(func, "[test]")
+        assert result.id is None
+
+    def test_stub_forwarding_to_import_not_recorded(self) -> None:
+        """A thunk jumping to an import gets no node of its own."""
+        db = FakeDB()
+        mapper = make_mapper(db)
+        imported = make_func(0x2000, "curl_easy_setopt", func_type=FuncType.IMPORTED, id=20)
+        stub = make_func(0x1000, "curl_easy_setopt", func_type=FuncType.THUNK, calls=[0x2000])
+        mapper.functions = {0x2000: imported}
+        result = mapper.record_function(stub, "[test]")
+        assert result.id is None
+        assert db.functions == []
+        assert db.global_variables == []
+
+    def test_thunk_to_regular_function_not_recorded(self) -> None:
+        """A thunk jumping to a regular function gets no node either."""
+        db = FakeDB()
+        mapper = make_mapper(db)
+        target = make_func(0x2000, "bar", id=20)
+        thunk = make_func(0x1000, "bar_stub", func_type=FuncType.THUNK, calls=[0x2000])
+        mapper.functions = {0x2000: target}
+        result = mapper.record_function(thunk, "[test]")
+        assert result.id is None
+        assert db.functions == []
+
+    def test_thunk_without_single_callee_recorded(self) -> None:
+        """A thunk with no resolvable target keeps its own node."""
+        db = FakeDB()
+        mapper = make_mapper(db)
+        thunk = make_func(0x1000, "orphan_stub", func_type=FuncType.THUNK, calls=[])
+        result = mapper.record_function(thunk, "[test]")
+        assert result.id is not None
+        assert db.functions[0]["name"] == "orphan_stub"
+
+    def test_import_record_failure_keeps_none_id(self) -> None:
+        """When the DB refuses the import node, the function id stays None."""
+        db = FakeDB()
+        db.fail_record_global_variable = True
+        mapper = make_mapper(db)
+        func = make_func(0x1000, "calloc", func_type=FuncType.IMPORTED)
         result = mapper.record_function(func, "[test]")
         assert result.id is None
 
@@ -335,6 +387,25 @@ class TestIndexDecompiled:
         mapper.index_decompiled(0x1000, "[test]")
         assert db.files == []
 
+    def test_thunk_name_rewritten_to_its_target(self) -> None:
+        """A call printed under a thunk name is renamed to the real callee."""
+        db = FakeDB()
+        mapper = make_mapper(db)
+        target = make_func(0x3000, "print_err", id=30)
+        thunk = make_func(0x2000, "j_print_err", func_type=FuncType.THUNK, calls=[0x3000])
+        src = "void boot_notify(void)\n{\n  j_print_err(v3);\n}"
+        caller = make_func(0x1000, "boot_notify", id=10, calls=[0x2000], source=src)
+        mapper.functions = {0x1000: caller, 0x2000: thunk, 0x3000: target}
+        mapper.index_decompiled(0x1000, "[test]")
+        assert "j_print_err(" not in caller.source
+        assert "print_err(v3)" in caller.source
+        # The location stays keyed by the address listed in func.calls.
+        locs = caller.source_calls_loc[0x2000]
+        assert len(locs) == 1
+        assert locs[0].start_line == 3
+        # It spans the rewritten token, not the original one.
+        assert locs[0].end_col - locs[0].start_col + 1 == len("print_err")
+
     def test_declaration_and_callsites_located(self) -> None:
         """The declaration and each call site are located in the source."""
         db = FakeDB()
@@ -423,17 +494,84 @@ class TestIndexCallGraph:
         assert db.ref_calls == []
         assert any("not a registered function" in r.message for r in caplog.records)
 
-    def test_imported_callee_skipped_quietly(self, caplog) -> None:
-        """A call to an imported callee is skipped without a warning."""
+    def test_imported_callee_recorded(self) -> None:
+        """A call to an imported callee is recorded like any other call."""
         db = FakeDB()
         mapper = make_mapper(db)
-        callee = make_func(0x2000, "calloc", func_type=FuncType.IMPORTED, id=None)
+        callee = make_func(0x2000, "calloc", func_type=FuncType.IMPORTED, id=20)
+        caller = make_func(0x1000, "foo", id=10, calls=[0x2000])
+        mapper.functions = {0x1000: caller, 0x2000: callee}
+        mapper.index_call_graph(0x1000, "[test]")
+        assert db.ref_calls == [(10, 20)]
+
+    def test_call_to_stub_forwarded_to_import(self) -> None:
+        """A call to a PLT stub is recorded against the import it jumps to."""
+        db = FakeDB()
+        mapper = make_mapper(db)
+        imported = make_func(0x3000, "curl_easy_setopt", func_type=FuncType.IMPORTED, id=30)
+        stub = make_func(
+            0x2000, "curl_easy_setopt", func_type=FuncType.THUNK, calls=[0x3000], id=None
+        )
+        caller = make_func(0x1000, "foo", id=10, calls=[0x2000], source="void foo(){ x(); }")
+        caller.source_id = 99
+        # Locations stay keyed by the stub address, as found by the source scan.
+        caller.source_calls_loc[0x2000].append(Location(1, 12, 1, 13))
+        mapper.functions = {0x1000: caller, 0x2000: stub, 0x3000: imported}
+        mapper.index_call_graph(0x1000, "[test]")
+        assert db.ref_calls == [(10, 30)]
+        assert len(db.reference_locations) == 1
+
+    def test_stub_caller_skipped(self) -> None:
+        """A PLT stub is never recorded as a caller of its import."""
+        db = FakeDB()
+        mapper = make_mapper(db)
+        imported = make_func(0x3000, "curl_easy_setopt", func_type=FuncType.IMPORTED, id=30)
+        stub = make_func(
+            0x2000, "curl_easy_setopt", func_type=FuncType.THUNK, calls=[0x3000], id=None
+        )
+        mapper.functions = {0x2000: stub, 0x3000: imported}
+        mapper.index_call_graph(0x2000, "[test]")
+        assert db.ref_calls == []
+
+    def test_call_through_thunk_chain_forwarded_to_the_end(self) -> None:
+        """A chain of thunks resolves to the first function that is not one."""
+        db = FakeDB()
+        mapper = make_mapper(db)
+        imported = make_func(0x4000, "curl_easy_setopt", func_type=FuncType.IMPORTED, id=40)
+        inner = make_func(
+            0x3000, "curl_easy_setopt", func_type=FuncType.THUNK, calls=[0x4000], id=None
+        )
+        outer = make_func(
+            0x2000, "curl_easy_setopt", func_type=FuncType.THUNK, calls=[0x3000], id=None
+        )
+        caller = make_func(0x1000, "foo", id=10, calls=[0x2000])
+        mapper.functions = {0x1000: caller, 0x2000: outer, 0x3000: inner, 0x4000: imported}
+        mapper.index_call_graph(0x1000, "[test]")
+        assert db.ref_calls == [(10, 40)]
+
+    def test_thunk_cycle_is_not_forwarded(self, caplog) -> None:
+        """Thunks jumping to each other resolve to nothing rather than loop."""
+        db = FakeDB()
+        mapper = make_mapper(db)
+        first = make_func(0x2000, "a", func_type=FuncType.THUNK, calls=[0x3000], id=20)
+        second = make_func(0x3000, "b", func_type=FuncType.THUNK, calls=[0x2000], id=30)
+        caller = make_func(0x1000, "foo", id=10, calls=[0x2000])
+        mapper.functions = {0x1000: caller, 0x2000: first, 0x3000: second}
+        mapper.index_call_graph(0x1000, "[test]")
+        # The call lands on the thunk itself, no infinite resolution.
+        assert db.ref_calls == [(10, 20)]
+
+    def test_callee_without_id_warns(self, caplog) -> None:
+        """A callee that could not be recorded is skipped with a warning."""
+        db = FakeDB()
+        mapper = make_mapper(db)
+        callee = make_func(0x2000, "bar", id=None)
         caller = make_func(0x1000, "foo", id=10, calls=[0x2000])
         mapper.functions = {0x1000: caller, 0x2000: callee}
         with caplog.at_level("WARNING"):
             mapper.index_call_graph(0x1000, "[test]")
         assert db.ref_calls == []
-        assert not any("cannot record call" in r.message for r in caplog.records)
+        assert any("missing target id" in r.message for r in caplog.records)
 
     def test_unknown_callee_addr_warns(self, caplog) -> None:
         """A call to an address with no known function logs a warning."""
@@ -542,8 +680,9 @@ class TestInit:
         assert mapper.functions == {}
         assert mapper.source_ids == {}
         assert mapper.bin.path == Path("/bin/sample")
-        # A "Sources" file node type is registered for NumbatUI grouping.
+        # "Sources" and "Imports" node types are registered for NumbatUI grouping.
         assert ("file", "Sources", "source") in db.node_types
+        assert ("global variable", "Imports", "imported function") in db.node_types
 
 
 class TestIndexFunction:
@@ -587,6 +726,9 @@ class TestIndexFunction:
         mapper.bin.id = 1
         mapper.index_function(0x3000, "[idx]")
         assert mapper.functions[0x3000].source == ""
+        # It is still recorded, in the import category.
+        assert mapper.functions[0x3000].id is not None
+        assert [g["name"] for g in db.global_variables] == ["calloc"]
 
     def test_thunk_recorded_without_decompiling(self) -> None:
         """A thunk is recorded in the DB but never decompiled."""
@@ -636,6 +778,33 @@ class TestMapBinary:
         assert {f["name"] for f in db.functions} == {"foo", "bar"}
         # The foo -> bar call was recorded.
         assert db.ref_calls == [(mapper.functions[0x1000].id, mapper.functions[0x2000].id)]
+
+    def test_stub_collapsed_into_its_import(self) -> None:
+        """map() records one node per import, with the stub callers attached.
+
+        The stub is indexed before its import, which exercises the backend
+        fallback in forwarded_import_addr.
+        """
+        program = {
+            0x1000: {
+                "name": "foo",
+                "type": FuncType.NORMAL,
+                "calls": [0x1500],
+                "source": "void foo(void)\n{\n    curl_easy_setopt();\n}",
+            },
+            0x1500: {"name": "curl_easy_setopt", "type": FuncType.THUNK, "calls": [0x2000]},
+            0x2000: {"name": "curl_easy_setopt", "type": FuncType.IMPORTED},
+        }
+        db = FakeDB()
+        mapper = _DrivingMapper(db, Path("/bin/sample"), program)
+        assert mapper.map() is True
+        # The stub got no node, the import did.
+        assert [f["name"] for f in db.functions] == ["foo"]
+        assert [g["name"] for g in db.global_variables] == ["curl_easy_setopt"]
+        # foo -> import, not foo -> stub.
+        assert db.ref_calls == [(mapper.functions[0x1000].id, mapper.functions[0x2000].id)]
+        # The call site found on the stub name is still located in foo's source.
+        assert len(db.reference_locations) == 1
 
     def test_function_record_failure_does_not_abort(self) -> None:
         """map() completes even when the DB refuses to record the functions."""
