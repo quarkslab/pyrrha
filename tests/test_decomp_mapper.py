@@ -326,6 +326,15 @@ class TestIndexDecompiled:
         mapper.index_decompiled(0x1000, "[test]")
         assert db.files == []
 
+    def test_thunk_function_skipped(self) -> None:
+        """Thunks are skipped entirely (no source recorded)."""
+        db = FakeDB()
+        mapper = make_mapper(db)
+        func = make_func(0x1000, "pipe", func_type=FuncType.THUNK, id=1)
+        mapper.functions = {0x1000: func}
+        mapper.index_decompiled(0x1000, "[test]")
+        assert db.files == []
+
     def test_declaration_and_callsites_located(self) -> None:
         """The declaration and each call site are located in the source."""
         db = FakeDB()
@@ -578,6 +587,22 @@ class TestIndexFunction:
         mapper.bin.id = 1
         mapper.index_function(0x3000, "[idx]")
         assert mapper.functions[0x3000].source == ""
+
+    def test_thunk_recorded_without_decompiling(self) -> None:
+        """A thunk is recorded in the DB but never decompiled."""
+        program = {
+            0x3000: {
+                "name": "pipe",
+                "type": FuncType.THUNK,
+                "source": "SHOULD NOT BE READ",
+            }
+        }
+        db = FakeDB()
+        mapper = _DrivingMapper(db, Path("/bin/sample"), program)
+        mapper.bin.id = 1
+        mapper.index_function(0x3000, "[idx]")
+        assert mapper.functions[0x3000].source == ""
+        assert mapper.functions[0x3000].id is not None
 
 
 class TestMapBinary:
