@@ -1,3 +1,21 @@
+## v2.1.0—HackLu version: Imports and Thunks
+
+### Features
+- `decomp`: imported functions are now recorded in a dedicated `Imports` category instead of being skipped, so calls reaching them show up in the graph.
+- `decomp`: forwarding thunks (PLT stubs) are no longer recorded, their callers are forwarded to the real target.
+- `decomp`: imported functions are no longer decompiled.
+- `fs-cg`: the JSON export is now behind `-e/--export`, as for the other mappers.
+- `cli`: options are grouped into panels, `-d/--debug` is available on every mapper and the backend directory environment variables are documented in the `--backend` help.
+- `backend`: expose thunk targets and import status (`func_thunk_target()`, `func_is_import()`) for both IDA and Ghidra.
+
+### Fixes
+- mappers: PLT stubs no longer shadow the functions they forward to. An imported C++ method was registered as a private function of the calling binary, and a PIE library calling its own exports through its PLT ended up with a private stub holding the callers of the real function.
+- mappers: remove the cache system of the `fs-cg` mapper.
+- cli: add the missing `--debug` flag and fix a few option definitions.
+- cli: import `ParameterSource` from `click.core`, it is only re-exported at package level from click 8.4 while 8.2 and 8.3 are supported.
+- tests: add C++ binaries to `test_fw` to cover namespaced methods, mangled names, PLT stubs and inheritance mapping, and adapt the `fs`, `fs-cg`, `decomp` and CLI tests.
+- ci: the version given by a tag was not correctly detected, and backend-free jobs ran on `python:latest` instead of a pinned image.
+
 ## v2.0.3—Namespaces and C++ functions
 
 ### Features
