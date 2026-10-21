@@ -120,19 +120,79 @@ class DecompilMapper(Backend):
         self.functions: dict[int, FuncData] = dict()
         self.source_ids: dict[int, int] = dict()
         self.db_interface.set_node_type("file", "Sources", "source")
+        self.db_interface.set_node_type("global variable", "Imports", "imported function")
+
+    def _call_target(self, addr: int) -> tuple[FuncType, list[int]]:
+        """Return the type and callees of the function at *addr*.
+
+        Reads the indexed data when available and falls back to the backend
+        otherwise, as a thunk may be recorded before its target is indexed.
+        """
+        func = self.functions.get(addr)
+        if func is not None:
+            return func.type, func.calls
+        return self.func_type(addr), self.func_children(addr)
+
+    def forwarded_target_addr(self, func: FuncData) -> int | None:
+        """Resolve the function a thunk jumps to.
+
+        A thunk holds no code of its own: it is never decompiled, so recording
+        it adds a bodyless node between a caller and the function it really
+        reaches. Such a thunk is left out of the DB and the calls aiming at it
+        are forwarded to its target instead.
+
+        Chains are followed to the first target that is not itself a
+        forwarding thunk, so that collapsing an inner thunk never strands the
+        callers of an outer one.
+
+        :param func: function to inspect.
+        :return: parser-space address of the forwarding target, or None when
+            *func* is not a thunk with a single callee, or when the chain
+            loops back on itself.
+        """
+        if func.type != FuncType.THUNK or len(func.calls) != 1:
+            return None
+        seen = {func.addr}
+        target_addr = func.calls[0]
+        while target_addr not in seen:
+            seen.add(target_addr)
+            target_type, target_calls = self._call_target(target_addr)
+            if target_type != FuncType.THUNK or len(target_calls) != 1:
+                return target_addr
+            target_addr = target_calls[0]
+        return None
 
     def record_function(self, func: FuncData, log_prefix) -> FuncData:
         """Record a function into the DB (do not record the associated source).
 
+        Imported functions are recorded in the "Imports" category: their body
+        lives in another binary, but they must exist in the DB for the calls
+        targeting them to show up in the graph. They are recorded as indexed
+        nodes, otherwise NumbatUI drops them from its overview, which only
+        displays explicitly defined symbols.
+
+        Forwarding thunks are not recorded at all: a PLT stub carries the
+        name of the import it jumps to, so recording it would double every
+        imported symbol in the graph, and a thunk in general adds a bodyless
+        node on the way to the real function. Their callers are forwarded to
+        the target instead.
+
         :return: updated func data with id
         """
+        if self.forwarded_target_addr(func) is not None:
+            logging.debug(f"{log_prefix}: forwarding thunk, skip")
+            return func
+        prefix = hex(func.addr) if func.addr is not None else "None"
         if func.type == FuncType.IMPORTED:
-            logging.debug(f"{log_prefix}: extern function, skip")
-            return func  # do not add EXTERN functions
-        f_id = self.db_interface.record_function(
-            func.demangled_name,
-            prefix=hex(func.addr) if func.addr is not None else "None",
-        )
+            f_id = self.db_interface.record_global_variable(
+                func.demangled_name,
+                prefix=prefix,
+            )
+        else:
+            f_id = self.db_interface.record_function(
+                func.demangled_name,
+                prefix=prefix,
+            )
         if f_id is None:
             logging.error(f"{log_prefix}: error while recording function in db")
         else:
@@ -168,21 +228,10 @@ class DecompilMapper(Backend):
         :param log_prefix: string prepended to every log message.
         :return: updated func data object
         """
-        # Write the source to a temporary file, hand its path to the DB, then
-        # remove it. delete=False (rather than NamedTemporaryFile auto-delete)
-        # is required because record_file reopens the path: on Windows an open
-        # NamedTemporaryFile cannot be reopened, and delete_on_close only
-        # exists on Python >= 3.12 while the project supports 3.11.
         tmp = NamedTemporaryFile(mode="wt", delete=False)
         try:
             tmp.write(func.source)
             tmp.close()
-            # The file is recorded under a name that includes the function
-            # address: numbat derives the file node from this name, and two
-            # functions can share a mangled name (e.g. tool-generated or
-            # versioned symbols). A non-unique name reuses the existing file
-            # node id and then re-inserts a file row with it, raising a UNIQUE
-            # constraint error on file.id.
             file_name = f"{func.name}@{func.addr:#x}"
             func.source_id = self.db_interface.record_file(Path(tmp.name), name=file_name)
             if func.source_id is None:
@@ -211,13 +260,21 @@ class DecompilMapper(Backend):
         if func.type in NO_SOURCE_TYPES:
             return
 
-        # Build lookup tables for the callees of this function.
-        # normalize_name strips leading/trailing underscores and dots so that
-        # e.g. "__memcpy" and "memcpy" both match the same call-site token.
+        callee_names: dict[int, str] = {}
+        for callee_addr in func.calls:
+            callee = self.functions.get(callee_addr)
+            if callee is None or not callee.name:
+                continue
+            name = callee.name
+            target_addr = self.forwarded_target_addr(callee)
+            target = self.functions.get(target_addr) if target_addr is not None else None
+            if target is not None and target.name and target.name != name:
+                func.source = func.source.replace(f"{name}(", f"{target.name}(")
+                name = target.name
+            callee_names[callee_addr] = name
+
         callee_name_to_addr: dict[str, int] = {
-            normalize_name(self.functions[callee_addr].name): callee_addr
-            for callee_addr in func.calls
-            if callee_addr in self.functions and self.functions[callee_addr].name
+            normalize_name(name): callee_addr for callee_addr, name in callee_names.items()
         }
 
         func_name = normalize_name(func.name)
@@ -237,15 +294,9 @@ class DecompilMapper(Backend):
                         decl_col + len(func_name),
                     )
 
-            # Scan the line for each callee name, recording the start column of
-            # every hit.  The dict key is the column so overlaps are detected
-            # in the sort pass below.
-            # key: start_col, value: (callee_addr, callee_name)
             hits_by_col: dict[int, tuple[int, str]] = {}
 
             for callee_name, callee_addr in callee_name_to_addr.items():
-                # If the stored name includes a type signature (e.g. "func(int)")
-                # strip to the bare identifier before searching.
                 search_token = (
                     callee_name.split("(")[0] if callee_name.endswith(")") else callee_name
                 )
@@ -253,10 +304,6 @@ class DecompilMapper(Backend):
                 if hit_col != -1:
                     hits_by_col[hit_col] = (callee_addr, callee_name)
 
-            # Process hits left-to-right so that a longer earlier match
-            # (e.g. "lxstat") shadows a shorter later substring (e.g. "xstat").
-            # end_of_last_accepted tracks the column just past the last accepted
-            # match so that substring overlaps are detected.
             end_of_last_accepted = 0
             last_accepted_col = 0
             last_accepted_name = ""
@@ -267,8 +314,6 @@ class DecompilMapper(Backend):
                     if start_col + len(
                         callee_name
                     ) == end_of_last_accepted and last_accepted_name.endswith(callee_name):
-                        # The hit is a suffix of the accepted match — expected,
-                        # not a real overlap (e.g. "stat" at the end of "lxstat").
                         logging.debug(
                             f"{log_prefix}: skip '{callee_name}' — suffix of '{last_accepted_name}'"
                         )
@@ -304,9 +349,9 @@ class DecompilMapper(Backend):
         :param log_prefix: string prepended to every log message.
         """
         func = self.functions[addr]
-        # Imported functions have no body and are not recorded in the DB, so
-        # they cannot be callers; skip them without warning.
         if func.type == FuncType.IMPORTED:
+            return
+        if self.forwarded_target_addr(func) is not None:
             return
         if func.id is None:
             logging.warning(f"{log_prefix}: {func.name}  is not a registered function, skip")
@@ -319,20 +364,17 @@ class DecompilMapper(Backend):
                 )
                 continue
             child = self.functions[child_addr]
+            forwarded_addr = self.forwarded_target_addr(child)
+            if forwarded_addr is not None and forwarded_addr in self.functions:
+                child = self.functions[forwarded_addr]
             if child.id is None:
-                # Imported callees are never recorded in the DB (they have no
-                # body), so a missing id is expected rather than an error.
-                level = logging.DEBUG if child.type == FuncType.IMPORTED else logging.WARNING
-                logging.log(
-                    level,
+                logging.warning(
                     f"{log_prefix}: cannot record call to {child.name} from {func.name} "
-                    + "missing target id.",
+                    + "missing target id."
                 )
                 continue
             ref_id = self.db_interface.record_ref_call(func.id, child.id)
 
-            # source_calls_loc is keyed by the *callee* address (see
-            # index_decompiled), so look up the locations for this child.
             child_locations = func.source_calls_loc.get(child_addr, [])
             if (
                 ref_id is None
