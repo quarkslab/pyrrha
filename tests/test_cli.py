@@ -418,6 +418,7 @@ class TestFsCgMapper(BaseTestFsMapper):
             cls.SUBCOMMAND,
             "--backend",
             f"{request.config.getoption('--backend')}",
+            "-e",
             "--db",
             f"{tmp_path}",
             "-j",
