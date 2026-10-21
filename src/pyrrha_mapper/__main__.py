@@ -23,7 +23,7 @@ from pathlib import Path
 
 import coloredlogs  # type: ignore # no typing used in this library
 import rich_click as click
-from click import ParameterSource
+from click.core import ParameterSource
 from numbat import SourcetrailDB
 
 from pyrrha_mapper import __version__
