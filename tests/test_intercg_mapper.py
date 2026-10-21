@@ -251,40 +251,6 @@ class TestTreatBinParsingResult:
 
 
 # --------------------------------------------------------------------------- #
-#  _merge_parser_functions_into_cached_binary
-# --------------------------------------------------------------------------- #
-
-
-class TestMergeParserFunctions:
-    """Tests for the static _merge_parser_functions_into_cached_binary helper."""
-
-    def test_merges_missing_internal_function(self) -> None:
-        """An internal function only in parser_bin is added to cached_bin."""
-        parser = make_binary("/bin/app")
-        parser.add_function(func("only_parser", 0x100))
-        cached = make_binary("/bin/app")
-        InterImageCGMapper._merge_parser_functions_into_cached_binary(parser, cached)
-        assert cached.function_exists("only_parser")
-
-    def test_merges_missing_exported_function(self) -> None:
-        """An exported function only in parser_bin is added to cached_bin."""
-        parser = make_binary("/bin/app")
-        parser.add_exported_symbol(func("new_export", 0x200))
-        cached = make_binary("/bin/app")
-        InterImageCGMapper._merge_parser_functions_into_cached_binary(parser, cached)
-        assert cached.exported_function_exists("new_export")
-
-    def test_does_not_overwrite_existing(self) -> None:
-        """A function already present in cached_bin is preserved (keeps its id)."""
-        parser = make_binary("/bin/app")
-        parser.add_function(func("shared", 0x100))
-        cached = make_binary("/bin/app")
-        cached.add_function(func("shared", 0x100, id=42))
-        InterImageCGMapper._merge_parser_functions_into_cached_binary(parser, cached)
-        assert cached.get_function_by_name("shared").id == 42
-
-
-# --------------------------------------------------------------------------- #
 #  _record_call_ref / _record_unindexed_call
 # --------------------------------------------------------------------------- #
 

@@ -308,7 +308,7 @@ class TestFsCgCommand:
     def test_runs_and_writes_fs(self, runner: CliRunner, tmp_path: Path) -> None:
         """fs-cg runs the mapper, writes the FS export and commits/closes the db."""
         db_path = tmp_path / "cg.srctrldb"
-        res = runner.invoke(main.pyrrha, ["fs-cg", "--db", str(db_path), str(tmp_path)])
+        res = runner.invoke(main.pyrrha, ["fs-cg", "--db", str(db_path), "--export", str(tmp_path)])
         assert res.exit_code == 0, res.output
         assert len(FakeInterCGMapper.instances) == 1
         mapper = FakeInterCGMapper.instances[0]
@@ -326,7 +326,7 @@ class TestFsCgCommand:
     def test_runtime_error_is_swallowed(self, runner: CliRunner, tmp_path: Path) -> None:
         """A RuntimeError from map() is caught; the db is still committed/closed."""
         FakeInterCGMapper.raise_runtime = True
-        res = runner.invoke(main.pyrrha, ["fs-cg", str(tmp_path)])
+        res = runner.invoke(main.pyrrha, ["fs-cg", "--export", str(tmp_path)])
         assert res.exit_code == 0, res.output
         mapper = FakeInterCGMapper.instances[0]
         assert mapper.fs.written_to == []  # write skipped
@@ -463,6 +463,7 @@ class TestUnsupportedBackend:
         rv = callback(
             debug=False,
             db=tmp_path / "cg.srctrldb",
+            export=False,
             jobs=1,
             resolve_duplicates=ResolveDuplicateOption.IGNORE,
             backend=Backend.BINARY_NINJA,

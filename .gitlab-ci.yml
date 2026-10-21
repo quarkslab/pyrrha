@@ -14,6 +14,8 @@ stages:
   - .gitlab-ci.yml
   - ci/ghidra/*
 
+.python_image: &python_image python:3.13
+
 #======================== BUILD DOCKER IMAGE AND PUSH TO REGISTRY ======================
 build_image:
   stage: build
@@ -155,7 +157,7 @@ test_data_structures:
     # a per-job name so it survives as an artifact and the `coverage` job can
     # merge every job's file (combine picks up all .coverage.* in its CWD).
     - mv .coverage ".coverage.${CI_JOB_NAME_SLUG}"
-  image: python:latest
+  image: *python_image
   variables:
     TEST_COVERAGE_SOURCE: pyrrha_mapper.mappers.objects
     TEST_PATH: tests/test_filesystem_objects.py
@@ -325,7 +327,7 @@ test_decomp_backend:
 # backend job) is reported as the union of all lines any test exercised.
 coverage:
   stage: coverage
-  image: python:latest
+  image: *python_image
   needs:
     - test_data_structures
     - test_decomp_objects
