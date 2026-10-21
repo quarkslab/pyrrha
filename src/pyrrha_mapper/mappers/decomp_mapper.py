@@ -92,6 +92,15 @@ class FuncData:
         return self.symbol.addr
 
 
+NO_SOURCE_TYPES: frozenset[FuncType] = frozenset({FuncType.IMPORTED, FuncType.THUNK})
+"""Function types whose decompiled source is neither computed nor recorded.
+
+Imports have no body.  Thunks are not decompiled either: Hex-Rays gives an
+untyped thunk the prototype ``int()`` and stores it, so every caller decompiled
+afterwards shows its calls through that thunk without arguments.
+"""
+
+
 def normalize_name(name: str) -> str:
     """Transform function name."""
     return name.strip("_").strip(".")
@@ -147,7 +156,7 @@ class DecompilMapper(Backend):
             type=func_type,
             calls=self.func_children(addr),
             callers=self.func_parents(addr),
-            source=self.func_decompiled(addr) if func_type != FuncType.IMPORTED else "",
+            source=self.func_decompiled(addr) if func_type not in NO_SOURCE_TYPES else "",
         )
         self.bin.add_function(func_data.symbol)
         self.functions[addr] = self.record_function(func_data, log_prefix)
@@ -199,10 +208,7 @@ class DecompilMapper(Backend):
         """
         func = self.functions[addr]
 
-        # Imported functions have no decompiled body (source is set to "" in
-        # index_function), so there is nothing to locate or record. Skip them
-        # to avoid spurious "declaration not found" errors.
-        if func.type == FuncType.IMPORTED:
+        if func.type in NO_SOURCE_TYPES:
             return
 
         # Build lookup tables for the callees of this function.
